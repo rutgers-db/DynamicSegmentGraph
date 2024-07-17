@@ -579,7 +579,7 @@ namespace base_hnsw
             // 主循环处理候选节点
             while (!candidate_set.empty())
             {
-                std::pair<dist_t, tableid> current_node_pair = candidate_set.top();
+                std::pair<dist_t, tableint> current_node_pair = candidate_set.top();
                 if ((-current_node_pair.first) > lowerBound)
                 {
                     break;
@@ -594,7 +594,7 @@ namespace base_hnsw
                 if (collect_metrics)
                 {
                     metric_hops++;
-                    metric_distance_computations += size;
+                    metric_distance_computions += size;
                 }
 
                 // 预取优化（SSE指令集支持）
@@ -966,6 +966,8 @@ namespace base_hnsw
          * 确保多线程环境下数据的一致性和完整性。
          */
         std::mutex global;
+
+        size_t ef_;
 
         /**
          * @brief 设置搜索效率因子
@@ -2023,7 +2025,7 @@ namespace base_hnsw
                     int size = getListCount(data);
                     // 更新度量统计信息
                     metric_hops++;
-                    metric_distance_computations += size;
+                    metric_distance_computions += size;
 
                     // 解析链接列表中的节点
                     tableint *datal = (tableint *)(data + 1);

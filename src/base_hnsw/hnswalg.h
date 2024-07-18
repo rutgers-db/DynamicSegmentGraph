@@ -24,6 +24,7 @@ namespace base_hnsw
     template <typename dist_t>
     class HierarchicalNSW : public AlgorithmInterface<dist_t>
     {
+    public:
         /**
          * 定义HierarchicalNSW类的最大更新元素锁数量常量。
          */

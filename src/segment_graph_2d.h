@@ -59,6 +59,16 @@ namespace SeRF
     class SegmentGraph2DHNSW : public HierarchicalNSW<float>
     {
     public:
+        /**
+         * 构造一个二维段图层次邻近搜索树（Hierarchical Navigable Small World graph）实例.
+         *
+         * @param index_params 索引参数配置对象，包含索引构建过程中的关键参数.
+         * @param s 距离计算空间接口，用于执行距离度量操作.
+         * @param max_elements 最大元素数量，即索引能容纳的最大数据点数.
+         * @param M 默认连接度，每个节点默认与其他M个节点相连.
+         * @param ef_construction 扩展因子，在构造过程中使用的查询效率参数.
+         * @param random_seed 随机种子，用于初始化随机数生成器.
+         */
         SegmentGraph2DHNSW(const BaseIndex::IndexParams &index_params,
                            SpaceInterface<float> *s, size_t max_elements,
                            size_t M = 16, size_t ef_construction = 200,
@@ -66,25 +76,40 @@ namespace SeRF
             : HierarchicalNSW(s, max_elements, M, index_params.ef_construction,
                               random_seed)
         {
+            // 将传入的索引参数指针赋值给成员变量
             params = &index_params;
+
+            // 设置最大扩展因子为索引参数中的ef_max值
             ef_max_ = index_params.ef_max;
         }
 
+        // 指向BaseIndex::IndexParams类型的常量指针，存储索引参数
         const BaseIndex::IndexParams *params;
+
+        // 存储指向段图邻居列表的指针，表示图结构中的边信息
         vector<DirectedSegNeighbors> *segment_graph;
 
-        // Rewrite the searching while construting HNSW, keep more neighbors.
-        // TODO: maybe can be updated to a position sensing functions.
-        // or combine with rnn-descent
+        /**
+         * 在构建HNSW图时优化搜索过程，保留更多邻居节点信息。
+         * 这个是基本就是原本的search 就是在整个图里当前层搜最近的
+         * 或许可以结合（RNN-descent）以提升效率。
+         *
+         * @param ep_id 起始点ID
+         * @param data_point 数据点指针
+         * @param layer 当前层级
+         * @return 返回一个优先队列，其中包含距离和节点ID对，按距离排序。
+         */
         virtual std::priority_queue<std::pair<dist_t, tableint>,
                                     std::vector<std::pair<dist_t, tableint>>,
                                     CompareByFirst>
         searchBaseLayerLevel0(tableint ep_id, const void *data_point, int layer)
         {
+            // 获取空闲访问列表
             VisitedList *vl = visited_list_pool_->getFreeVisitedList();
             vl_type *visited_array = vl->mass;
             vl_type visited_array_tag = vl->curV;
 
+            // 初始化候选集和待处理集合
             std::priority_queue<std::pair<dist_t, tableint>,
                                 std::vector<std::pair<dist_t, tableint>>,
                                 CompareByFirst>
@@ -94,10 +119,13 @@ namespace SeRF
                                 CompareByFirst>
                 candidateSet;
 
+            // 存储删除的邻接节点列表
             std::vector<pair<dist_t, tableint>> deleted_list;
 
+            // 设置构造时的EF值
             size_t ef_construction = ef_max_;
 
+            // 计算起始点的距离下界
             dist_t lowerBound;
             if (!isMarkedDeleted(ep_id))
             {
@@ -114,6 +142,7 @@ namespace SeRF
             }
             visited_array[ep_id] = visited_array_tag;
 
+            // 主循环：遍历候选集直到为空
             while (!candidateSet.empty())
             {
                 std::pair<dist_t, tableint> curr_el_pair = candidateSet.top();
@@ -123,12 +152,12 @@ namespace SeRF
                 }
                 candidateSet.pop();
 
+                // 处理当前节点
                 tableint curNodeNum = curr_el_pair.second;
-
                 std::unique_lock<std::mutex> lock(link_list_locks_[curNodeNum]);
 
-                int *data; // = (int *)(linkList0_ + curNodeNum *
-                           // size_links_per_element0_);
+                // 根据层级获取链接列表数据
+                int *data;
                 if (layer == 0)
                 {
                     data = (int *)get_linklist0(curNodeNum);
@@ -136,36 +165,41 @@ namespace SeRF
                 else
                 {
                     data = (int *)get_linklist(curNodeNum, layer);
-                    //                    data = (int *) (linkLists_[curNodeNum] + (layer
-                    //                    - 1) * size_links_per_element_);
                 }
                 size_t size = getListCount((linklistsizeint *)data);
                 tableint *datal = (tableint *)(data + 1);
+
 #ifdef USE_SSE
+                // 预取指令提高性能
                 _mm_prefetch((char *)(visited_array + *(data + 1)), _MM_HINT_T0);
                 _mm_prefetch((char *)(visited_array + *(data + 1) + 64), _MM_HINT_T0);
                 _mm_prefetch(getDataByInternalId(*datal), _MM_HINT_T0);
                 _mm_prefetch(getDataByInternalId(*(datal + 1)), _MM_HINT_T0);
 #endif
 
+                // 遍历链接列表中的每个元素
                 for (size_t j = 0; j < size; j++)
                 {
                     tableint candidate_id = *(datal + j);
-//                    if (candidate_id == 0) continue;
 #ifdef USE_SSE
+                    // 预取指令提高性能
                     _mm_prefetch((char *)(visited_array + *(datal + j + 1)), _MM_HINT_T0);
                     _mm_prefetch(getDataByInternalId(*(datal + j + 1)), _MM_HINT_T0);
 #endif
                     if (visited_array[candidate_id] == visited_array_tag)
                         continue;
                     visited_array[candidate_id] = visited_array_tag;
-                    char *currObj1 = (getDataByInternalId(candidate_id));
 
+                    // 计算候选节点到目标点的距离
+                    char *currObj1 = (getDataByInternalId(candidate_id));
                     dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_);
+
+                    // 更新候选集和已访问节点
                     if (top_candidates.size() < ef_construction || lowerBound > dist1)
                     {
                         candidateSet.emplace(-dist1, candidate_id);
 #ifdef USE_SSE
+                        // 预取指令提高性能
                         _mm_prefetch(getDataByInternalId(candidateSet.top().second),
                                      _MM_HINT_T0);
 #endif
@@ -173,7 +207,7 @@ namespace SeRF
                         if (!isMarkedDeleted(candidate_id))
                             top_candidates.emplace(dist1, candidate_id);
 
-                        // record deleted neighbors
+                        // 记录并移除超出EF限制的节点
                         if (top_candidates.size() > ef_construction)
                         {
                             deleted_list.emplace_back(top_candidates.top());
@@ -185,9 +219,11 @@ namespace SeRF
                     }
                 }
             }
+
+            // 释放访问列表资源
             visited_list_pool_->releaseVisitedList(vl);
 
-            // add back deleted neighbors for recursively pruning
+            // 将之前记录的删除节点重新加入候选集
             for (auto deleted_candidate : deleted_list)
             {
                 top_candidates.emplace(deleted_candidate);
@@ -196,39 +232,48 @@ namespace SeRF
             return top_candidates;
         }
 
-        // rewrite connect new element, integrate recursively heuristic pruning
+        /**
+         * @file src/segment_graph_2d.h
+         * @brief 互连新元素并递归地应用启发式剪枝算法
+         *
+         * 此函数用于连接新的数据点到图中的现有节点，
+         * 并通过优先队列处理候选邻居以优化连接过程。
+         */
+
         virtual tableint mutuallyConnectNewElementLevel0(
-            const void *data_point, tableint cur_c,
+            const void *data_point, /**< 当前数据点 */
+            tableint cur_c,         /**< 当前节点的内部标识符 */
             std::priority_queue<std::pair<dist_t, tableint>,
                                 std::vector<std::pair<dist_t, tableint>>,
-                                CompareByFirst> &top_candidates,
-            int level, bool isUpdate)
+                                CompareByFirst> &top_candidates, /**< 候选邻居列表 */
+            int level,                                           /**< 连接级别 */
+            bool isUpdate)                                       /**< 是否更新已存在的链接 */
         {
-            size_t Mcurmax = maxM0_;
+            size_t Mcurmax = maxM0_; // 最大邻接数量
 
-            // forward neighbors in top candidates
+            // 获取当前节点的外部标签
             int external_id = getExternalLabel(cur_c);
-            tableint next_closest_entry_point = 0;
+            tableint next_closest_entry_point = 0; // 下一个最近入口点
 
-            // original structure for fetching nodes
+            // 邻居选择容器初始化 这个邻居是对整个图的邻居 也就是说对整个图他本身整个range的信息他有 但是sub range 的信息我是自己额外存的
             std::vector<tableint> selectedNeighbors;
             selectedNeighbors.reserve(M_);
+
             {
                 // MAX_POS recursive pruning, combining into connect function.
 
-                // reverse top_candidates, from cloest to farthest
+                // 处理优先级队列：从最近到最远排序候选者
                 std::priority_queue<std::pair<dist_t, tableint>> queue_closest;
-                while (top_candidates.size() > 0)
+                while (!top_candidates.empty())
                 {
-                    queue_closest.emplace(-top_candidates.top().first,
-                                          top_candidates.top().second);
+                    queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second);
                     top_candidates.pop();
                 }
                 // Now top_candidates is empty
 
-                int external_left_most = -1;
-                int last_batch_left_most = -1;
-
+                // 初始化变量
+                int external_left_most = -1;   // keeps track of the furthest external ID encountered
+                int last_batch_left_most = -1; //  leftmost boundary of the previous processing batch
                 unsigned iter_counter = 0;
                 unsigned batch_counter = 0;
                 std::vector<std::pair<dist_t, tableint>> return_list;
@@ -238,11 +283,12 @@ namespace SeRF
                 // internal_id)
                 vector<pair<int, pair<dist_t, tableint>>> buffer_candidates;
 
+                // 已访问邻居距离映射表定义
                 using tableint_pair = std::pair<tableint, tableint>;
-                std::unordered_map<tableint_pair, dist_t, boost::hash<tableint_pair>>
-                    visited_nn_dists;
+                std::unordered_map<tableint_pair, dist_t, boost::hash<tableint_pair>> visited_nn_dists;
 
-                while (queue_closest.size())
+                // 主循环处理候选者队列直到为空
+                while (!queue_closest.empty())
                 {
                     // If return list size meet M or current window exceed ef_construction,
                     // end this batch, enter the new batch
@@ -295,7 +341,7 @@ namespace SeRF
                         one_segment.nns_id.swap(return_external_list);
                         segment_graph->at(external_id).forward_nns.emplace_back(one_segment);
 
-                        return_list.clear();
+                        return_list.clear(); // 这里会清空return list
                         return_external_list.clear();
                         iter_counter = 0;
                         batch_counter++;
@@ -317,12 +363,12 @@ namespace SeRF
                     //   break;
                     // }
 
-                    std::pair<dist_t, tableint> curent_pair = queue_closest.top();
+                    std::pair<dist_t, tableint> curent_pair = queue_closest.top(); // 当前离我最近的点
                     dist_t dist_to_query = -curent_pair.first;
                     queue_closest.pop();
 
                     int curent_external_id = getExternalLabel(curent_pair.second);
-                    if (curent_external_id < last_batch_left_most)
+                    if (curent_external_id < last_batch_left_most) // 因为是maxleap 所以我的batch之间没有重叠，所以在上一个batch的左边
                     {
                         // position left than last batch, skip
                         continue;
@@ -378,7 +424,7 @@ namespace SeRF
                     }
                 }
 
-                if (batch_counter == 0)
+                if (batch_counter == 0) // 这种情况是上面的while 跑完了 但是一个batch都没满 所以需要单独处理
                 {
                     // The first batch, also use for original HNSW constructing
                     next_closest_entry_point = return_list.front().second;
@@ -387,7 +433,8 @@ namespace SeRF
                         selectedNeighbors.push_back(curent_pair.second);
                     }
                 }
-                if (!return_list.empty())
+
+                if (!return_list.empty()) // 这里肯定会进的 因为最后还是batch没打满 离插入点的attribute维度上最近的点们，很可能凑不齐M或者ef construction个 然后这里也得进OneSegmentNeighbors
                 {
                     OneSegmentNeighbors one_segment(batch_counter, last_batch_left_most + 1,
                                                     external_id);
@@ -402,6 +449,7 @@ namespace SeRF
                 }
             }
 
+            // 把找到的selectedNeighbors放进cur_c的邻接列表
             {
                 linklistsizeint *ll_cur;
                 ll_cur = get_linklist0(cur_c);
@@ -458,6 +506,7 @@ namespace SeRF
                     }
                 }
 
+                // 这里就正常跑就完事了
                 // If cur_c is already present in the neighboring connections of
                 // `selectedNeighbors[idx]` then no need to modify any connections or
                 // run the heuristics.
@@ -568,6 +617,7 @@ namespace SeRF
                     {
                         // add reverse edge
                         // this->directed_indexed_arr.at(nn).reverse_nns.emplace_back(i);
+                        // 在最开始的地方插入不会慢吗？ 不应该在最末尾插入吗
                         this->directed_indexed_arr.at(nn).reverse_nns.insert(
                             this->directed_indexed_arr.at(nn).reverse_nns.begin(), i);
                     }
@@ -602,58 +652,69 @@ namespace SeRF
             cout << endl;
         }
 
+        /**
+         * @brief 计算图中的邻居节点数量统计信息
+         *
+         * 此方法遍历有向图索引数组以计算平均前向邻居数、最大前向批量邻居数，
+         * 平均反向邻居数、最大反向邻居数以及相关批处理计数。
+         */
         void countNeighbrs()
         {
+            // 初始化计数器
             double batch_counter = 0;
             double max_batch_counter = 0;
             size_t max_reverse_nn = 0;
+
+            // 如果有向图索引不为空，则开始处理
             if (!directed_indexed_arr.empty())
+            {
+                // 遍历所有节点的前向邻居列表
                 for (unsigned j = 0; j < directed_indexed_arr.size(); j++)
                 {
                     int temp_size = 0;
-                    for (auto nns : directed_indexed_arr[j].forward_nns)
+                    // 累加每个节点的前向邻居数量
+                    for (const auto &nns : directed_indexed_arr[j].forward_nns)
                     {
                         temp_size += nns.nns_id.size();
                     }
+                    // 更新总前向邻居数量和批处理计数
                     batch_counter += directed_indexed_arr[j].forward_nns.size();
                     index_info->nodes_amount += temp_size;
                 }
-            index_info->avg_forward_nns =
-                index_info->nodes_amount / (float)data_wrapper->data_size;
+            }
+
+            // 计算平均前向邻居数
+            index_info->avg_forward_nns = index_info->nodes_amount / static_cast<float>(data_wrapper->data_size);
+
+            // 打印日志（如果启用）
             if (isLog)
             {
                 cout << "Max. forward batch nn #: " << max_batch_counter << endl;
-                cout << "Avg. forward nn #: "
-                     << index_info->nodes_amount / (float)data_wrapper->data_size << endl;
-                cout << "Avg. forward batch #: "
-                     << batch_counter / (float)data_wrapper->data_size << endl;
-                batch_counter = 0;
-            }
+                cout << "Avg. forward nn #: " << index_info->nodes_amount / static_cast<float>(data_wrapper->data_size) << endl;
+                cout << "Avg. forward batch #: " << batch_counter / static_cast<float>(data_wrapper->data_size) << endl;
+                batch_counter = 0; // 重置批处理计数器为零以便后续使用
 
-            int reverse_node_amount = 0;
-            if (!directed_indexed_arr.empty())
-            {
+                // 继续处理反向邻居统计数据
+                int reverse_node_amount = 0;
+
+                // 再次遍历所有节点的反向邻居列表
                 for (unsigned j = 0; j < directed_indexed_arr.size(); j++)
                 {
                     reverse_node_amount += directed_indexed_arr[j].reverse_nns.size();
+                    // 这里不对吧 应该是如果 有reverse_nns size不为0 才+=1吧
                     batch_counter += 1;
-                    max_reverse_nn = std::max(max_reverse_nn,
-                                              directed_indexed_arr[j].reverse_nns.size());
+                    max_reverse_nn = std::max(max_reverse_nn, directed_indexed_arr[j].reverse_nns.size());
                 }
-            }
 
-            index_info->nodes_amount += reverse_node_amount;
-            index_info->avg_reverse_nns =
-                reverse_node_amount / (float)data_wrapper->data_size;
-            if (isLog)
-            {
+                // 更新总节点数量并计算平均反向邻居数
+                index_info->nodes_amount += reverse_node_amount;
+                index_info->avg_reverse_nns = reverse_node_amount / static_cast<float>(data_wrapper->data_size);
+
+                // 输出反向邻居统计数据到控制台
                 cout << "Max. reverse nn #: " << max_reverse_nn << endl;
-                cout << "Avg. reverse nn #: "
-                     << reverse_node_amount / (float)data_wrapper->data_size << endl;
-                cout << "Avg. reverse batch #: "
-                     << batch_counter / (float)data_wrapper->data_size << endl;
-                cout << "Avg. delta nn #: "
-                     << index_info->nodes_amount / (float)data_wrapper->data_size << endl;
+                cout << "Avg. reverse nn #: " << reverse_node_amount / static_cast<float>(data_wrapper->data_size) << endl;
+                cout << "Avg. reverse batch #: " << batch_counter / static_cast<float>(data_wrapper->data_size) << endl;
+                cout << "Avg. delta nn #: " << index_info->nodes_amount / static_cast<float>(data_wrapper->data_size) << endl;
             }
         }
 
@@ -730,21 +791,35 @@ namespace SeRF
             return reverse_batch_it;
         }
 
-        // range filtering search, only calculate distance on on-range nodes.
+        /**
+         * @brief 范围过滤搜索，在范围内节点上计算距离。
+         *
+         * 此方法执行范围过滤搜索算法，仅在指定范围内的节点上计算距离，
+         * 并返回最邻近点列表。
+         *
+         * @param search_params 搜索参数指针，包含控制批处理阈值和搜索ef值。
+         * @param search_info 搜索信息结构体指针，用于记录搜索过程中的统计信息。
+         * @param query 查询向量。
+         * @param query_bound 查询边界对，定义查询范围。
+         * @return vector<int> 返回最邻近点ID列表。
+         */
         vector<int> rangeFilteringSearchInRange(
             const SearchParams *search_params, SearchInfo *search_info,
             const vector<float> &query,
             const std::pair<int, int> query_bound) override
         {
+            // 时间测量变量初始化
             timeval tt1, tt2, tt3, tt4;
 
+            // 初始化访问列表
             VisitedList *vl = visited_list_pool_->getFreeVisitedList();
             vl_type *visited_array = vl->mass;
             vl_type visited_array_tag = vl->curV;
-            float lower_bound = std::numeric_limits<float>::max();
-            std::priority_queue<pair<float, int>> top_candidates;
-            std::priority_queue<pair<float, int>> candidate_set;
+            float lower_bound = std::numeric_limits<float>::max(); // 最低界限初始化为最大浮点数
+            std::priority_queue<pair<float, int>> top_candidates;  // 优先队列存储候选结果
+            std::priority_queue<pair<float, int>> candidate_set;   // 候选集优先队列
 
+            // 数据大小和批量阈值设置
             const int data_size = data_wrapper->data_size;
             const int two_batch_threshold =
                 data_size * search_params->control_batch_threshold;
@@ -753,17 +828,17 @@ namespace SeRF
             search_info->cal_dist_time = 0;
             search_info->fetch_nns_time = 0;
             // finding enters
-            vector<int> enter_list;
+            vector<int> enter_list; // 维护这个东西有什么用？
             {
                 int lbound = query_bound.first;
                 int interval = (query_bound.second - lbound) / 3;
                 for (size_t i = 0; i < 3; i++)
                 {
                     int point = lbound + interval * i;
-                    float dist = EuclideanDistance(data_wrapper->nodes[point], query);
-                    candidate_set.push(make_pair(-dist, point));
-                    enter_list.emplace_back(point);
-                    visited_array[point] = visited_array_tag;
+                    float dist = EuclideanDistance(data_wrapper->nodes[point], query); // 计算距离
+                    candidate_set.push(make_pair(-dist, point));                       // 将负距离和点ID推入候选集
+                    enter_list.emplace_back(point);                                    // 添加到入口点列表
+                    visited_array[point] = visited_array_tag;                          // 标记已访问
                 }
             }
             gettimeofday(&tt3, NULL);
@@ -771,16 +846,15 @@ namespace SeRF
             // only one center
             // float dist_enter = EuclideanDistance(data_nodes[l_bound], query);
             // candidate_set.push(make_pair(-dist_enter, l_bound));
-            // TODO: How to find proper enters.
+            // TODO: How to find proper enters. // looks like useless
 
             size_t hop_counter = 0;
-
             while (!candidate_set.empty())
             {
-                std::pair<float, int> current_node_pair = candidate_set.top();
+                std::pair<float, int> current_node_pair = candidate_set.top(); // 获取当前节点
                 int current_node_id = current_node_pair.second;
 
-                if (-current_node_pair.first > lower_bound)
+                if (-current_node_pair.first > lower_bound) // 如果当前节点的距离大于最低界限，则跳出循环
                 {
                     break;
                 }
@@ -818,15 +892,13 @@ namespace SeRF
                     auto forward_it = decompressForwardPath(
                         directed_indexed_arr[current_node_id].forward_nns,
                         query_bound.first);
-                    if (forward_it !=
-                        directed_indexed_arr[current_node_id].forward_nns.end())
+                    if (forward_it != directed_indexed_arr[current_node_id].forward_nns.end())
                     {
                         neighbor_iterators.emplace_back(&forward_it->nns_id);
                         if (current_node_id - query_bound.first < two_batch_threshold)
                         {
                             forward_it++;
-                            if (forward_it !=
-                                directed_indexed_arr[current_node_id].forward_nns.end())
+                            if (forward_it != directed_indexed_arr[current_node_id].forward_nns.end())
                             {
                                 neighbor_iterators.emplace_back(&forward_it->nns_id);
                             }
@@ -845,79 +917,76 @@ namespace SeRF
                     neighbor_iterators.emplace_back(
                         &directed_indexed_arr.at(current_node_id).reverse_nns);
                 }
+                gettimeofday(&tt2, NULL);                              // 结束时间记录
+                AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
 
-                gettimeofday(&tt2, NULL);
-                AccumulateTime(tt1, tt2, search_info->fetch_nns_time);
-                // print_set(current_neighbors);
-                // assert(false);
-                gettimeofday(&tt1, NULL);
-
+                // 处理邻居集合
+                gettimeofday(&tt1, NULL); // 开始时间记录
                 for (auto batch_it : neighbor_iterators)
                 {
                     for (auto candidate_id : *batch_it)
                     {
-                        if (candidate_id < query_bound.first ||
-                            candidate_id > query_bound.second)
+                        if (candidate_id < query_bound.first || candidate_id > query_bound.second) // 忽略越界节点
                             continue;
-                        if (!(visited_array[candidate_id] == visited_array_tag))
+                        if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
                         {
-                            visited_array[candidate_id] = visited_array_tag;
+                            visited_array[candidate_id] = visited_array_tag; // 标记为已访问
 
-                            // float dist = EuclideanDistance(query, data_nodes[candidate_id]);
+                            // 计算距离
                             float dist = fstdistfunc_(query.data(),
                                                       data_wrapper->nodes[candidate_id].data(),
                                                       dist_func_param_);
 
 #ifdef LOG_DEBUG_MODE
-                            // cout << "candidate: " << candidate_id << "  dist: " << dist <<
-                            // endl;
+                            // 输出调试信息
 #endif
 
-                            num_search_comparison++;
-                            if (top_candidates.size() < search_params->search_ef ||
-                                lower_bound > dist)
+                            num_search_comparison++; // 更新比较次数
+                            if (top_candidates.size() < search_params->search_ef || lower_bound > dist)
                             {
-                                candidate_set.push(make_pair(-dist, candidate_id));
-                                top_candidates.push(make_pair(dist, candidate_id));
+                                candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
+                                top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
                                 if (top_candidates.size() > search_params->search_ef)
                                 {
-                                    top_candidates.pop();
+                                    top_candidates.pop(); // 维护候选集大小
                                 }
                                 if (!top_candidates.empty())
                                 {
-                                    lower_bound = top_candidates.top().first;
+                                    lower_bound = top_candidates.top().first; // 更新最低界限
                                 }
                             }
                         }
                     }
                 }
-                gettimeofday(&tt2, NULL);
-                AccumulateTime(tt1, tt2, search_info->cal_dist_time);
+                gettimeofday(&tt2, NULL);                             // 结束时间记录
+                AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
             }
 
+            // 构建结果列表
             vector<int> res;
             while (top_candidates.size() > search_params->query_K)
             {
-                top_candidates.pop();
+                top_candidates.pop(); // 减少候选集至所需K个
             }
 
             while (!top_candidates.empty())
             {
-                res.emplace_back(top_candidates.top().second);
+                res.emplace_back(top_candidates.top().second); // 提取节点ID构建结果
                 top_candidates.pop();
             }
-            search_info->total_comparison += num_search_comparison;
+            search_info->total_comparison += num_search_comparison; // 更新总比较次数
 
 #ifdef LOG_DEBUG_MODE
             print_set(res);
             cout << l_bound << "," << r_bound << endl;
             assert(false);
 #endif
-            visited_list_pool_->releaseVisitedList(vl);
 
+            // 释放资源和更新时间统计
+            visited_list_pool_->releaseVisitedList(vl);
             gettimeofday(&tt4, NULL);
             CountTime(tt3, tt4, search_info->internal_search_time);
-            return res;
+            return res; // 返回结果列表
         }
 
         // also calculate outbount dists, similar to knn-first

@@ -1880,7 +1880,7 @@ namespace base_hnsw
             memcpy(getExternalLabeLp(cur_c), &label, sizeof(labeltype));
             memcpy(getDataByInternalId(cur_c), data_point, data_size_);
 
-            // 如果我的层数不至于在0层 我就得给这些层每一层分配领结列表的空间
+            // 如果我的层数不在0层 我就得给这些层每一层分配领结列表的空间
             if (curlevel)
             {
                 linkLists_[cur_c] =

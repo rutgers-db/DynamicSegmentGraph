@@ -33,9 +33,24 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/include/common)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
+# 如果想要Release而不是Debug 就cmake .. -DCMAKE_BUILD_TYPE=Release
+if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
+   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build." FORCE)
+endif()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+   # 开启调试信息
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+else()
+   # 如果不是 Debug 模式，默认设置优化标志
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+endif()
+
+
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 option(NOSIMD "build hnsw on SIMD" ON)
 if(NOSIMD)
     add_definitions(-DNO_MANUAL_VECTORIZATION)

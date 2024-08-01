@@ -158,7 +158,9 @@ def insert_points2cr(cur_range, cr, insert_points, array, k, pivot):
     if start != cur_range[0] or end != cur_range[1]:
         start = cur_range[0]
         end = cur_range[1]
-            
+    
+    # TODO: Maybe the passed cur_range is a larger range and curerent top_k_indices is not up to k elements (the last layer)
+    # We can just push the outer elements into the top_k_indices (But it is not important to update the minimum range)
     # build a max heap for top_k_indices that the top point has maximum value array[indice]
     max_heap = []
     for indice in top_k_indices:

@@ -1,9 +1,9 @@
 /**
  * @author zhencan
  * @brief Benchmark Arbitrary Range Filter Search with Random Insertion
- * @date 2024-7-30 
+ * @date 2024-7-30
  *
- * @copyright Copyright (c) 2023
+ * @copyright Copyright (c) 2024
  */
 
 #include <algorithm>
@@ -13,8 +13,9 @@
 #include <random>
 #include <sstream>
 #include <vector>
+#include <iomanip>
+#include <tuple>
 
-// #include "baselines/knn_first_hnsw.h"
 #include "data_processing.h"
 #include "data_wrapper.h"
 #include "index_base.h"
@@ -22,7 +23,7 @@
 #include "reader.h"
 #include "compact_graph.h"
 #include "utils.h"
-#include <iomanip>
+
 
 #ifdef __linux__
 #include "sys/sysinfo.h"
@@ -34,20 +35,26 @@ using std::endl;
 using std::string;
 using std::to_string;
 using std::vector;
-
+using std::tuple;
 void log_result_recorder(
-    const std::map<int, std::pair<float, float>> &result_recorder,
+    const std::map<int, tuple<double, double, double>> &result_recorder,
     const std::map<int, float> &comparison_recorder, const int amount)
 {
-    for (auto it : result_recorder)
+    // 遍历结果记录器
+    for (const auto& item : result_recorder)
     {
-        cout << std::setiosflags(ios::fixed) << std::setprecision(4)
-             << "range: " << it.first
-             << "\t recall: " << it.second.first / (amount / result_recorder.size())
-             << "\t QPS: " << std::setprecision(0)
-             << (amount / result_recorder.size()) / it.second.second << "\t Comps: "
-             << comparison_recorder.at(it.first) / (amount / result_recorder.size())
-             << endl;
+        // 解构元组以访问各个成员
+        const auto& [recall, calDistTime, internal_search_time] = item.second;
+
+        // 打印范围、召回率、QPS和比较次数
+        std::cout << std::setiosflags(std::ios::fixed) << std::setprecision(4)
+                  << "range: " << item.first
+                  << "\t recall: " << recall / (amount / result_recorder.size())
+                  << "\t QPS: " << std::setprecision(0)
+                  << (amount / result_recorder.size()) / internal_search_time << "\t"
+                  << "Comps: " << comparison_recorder.at(item.first) / (amount / result_recorder.size()) << std::setprecision(4)
+                  << "\t Internal Search Time: " << internal_search_time
+                  << "\t CalDist Time: " << calDistTime << std::endl; // 新增一行显示CalDist时间
     }
 }
 
@@ -78,7 +85,8 @@ int main(int argc, char **argv)
     for (int i = 0; i < argc; i++)
     {
         string arg = argv[i];
-        // if (arg == "-dataset") dataset = string(argv[i + 1]);
+        if (arg == "-dataset")
+            dataset = string(argv[i + 1]);
         if (arg == "-N")
             data_size = atoi(argv[i + 1]);
         if (arg == "-dataset_path")
@@ -94,7 +102,7 @@ int main(int argc, char **argv)
 
     assert(index_k_list.size() != 0);
     assert(ef_construction_list.size() != 0);
-    // assert(groundtruth_path != "");
+    assert(groundtruth_path != "");
 
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path);
@@ -103,7 +111,6 @@ int main(int argc, char **argv)
     // data_wrapper.generateRangeFilteringQueriesAndGroundtruthBenchmark(false);
     // Or you can load groundtruth from the given path
     data_wrapper.LoadGroundtruth(groundtruth_path);
-
     assert(data_wrapper.query_ids.size() == data_wrapper.query_ranges.size());
 
     vector<int> searchef_para_range_list = {16, 64, 256};
@@ -155,10 +162,12 @@ int main(int argc, char **argv)
                         for (auto one_searchef : searchef_para_range_list)
                         {
                             s_params.search_ef = one_searchef;
-                            std::map<int, std::pair<float, float>>
-                                result_recorder; // first->precision, second->query_time
+                            std::map<int, std::tuple<double, double, double>> result_recorder; // first->precision, second-> caldist time, third->query_time
                             std::map<int, float> comparison_recorder;
                             gettimeofday(&tt3, NULL);
+                            /**
+                             * 对于每个查询ID，执行范围过滤搜索并更新结果记录器。
+                             */
                             for (int idx = 0; idx < data_wrapper.query_ids.size(); idx++)
                             {
                                 int one_id = data_wrapper.query_ids.at(idx);
@@ -168,14 +177,16 @@ int main(int argc, char **argv)
                                 auto res = index.rangeFilteringSearchInRange(
                                     &s_params, &search_info, data_wrapper.querys.at(one_id),
                                     data_wrapper.query_ranges.at(idx));
+
+                                /**
+                                 * 更新精度和内部搜索时间。
+                                 */
                                 search_info.precision =
                                     countPrecision(data_wrapper.groundtruth.at(idx), res);
-                                result_recorder[s_params.query_range].first +=
-                                    search_info.precision;
-                                result_recorder[s_params.query_range].second +=
-                                    search_info.internal_search_time;
-                                comparison_recorder[s_params.query_range] +=
-                                    search_info.total_comparison;
+                                std::get<0>(result_recorder[s_params.query_range]) += search_info.precision;
+                                std::get<1>(result_recorder[s_params.query_range]) += search_info.cal_dist_time;
+                                std::get<2>(result_recorder[s_params.query_range]) += search_info.internal_search_time;
+                                comparison_recorder[s_params.query_range] += search_info.total_comparison;
                             }
 
                             cout << endl

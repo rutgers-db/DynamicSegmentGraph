@@ -827,6 +827,8 @@ namespace SeRF
             search_info->internal_search_time = 0;
             search_info->cal_dist_time = 0;
             search_info->fetch_nns_time = 0;
+            num_search_comparison = 0;
+
             // finding enters
             vector<int> enter_list; // 维护这个东西有什么用？
             {

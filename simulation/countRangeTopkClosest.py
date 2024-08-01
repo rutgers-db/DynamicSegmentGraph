@@ -13,8 +13,6 @@ import random
 import hashlib
 import math
 from collections import defaultdict
-
-
 from collections import Counter
 
 def generate_frequency_ranges(max_freq):
@@ -132,7 +130,8 @@ def simulate(n, pivot):
     
     # 步骤2：创建哈希映射以存储独特的前K个最小值位置
     top_k_min_hash_map = defaultdict(int)
-    
+    position_counts = Counter()
+
     # 步骤3：遍历所有可能的范围
     # 这个步骤3 需要考虑 pivot为-1 和pivot 为 n-1的情况
     if 0 <= pivot < n - 1:
@@ -142,6 +141,7 @@ def simulate(n, pivot):
                 sub_arr = arr[left:right + 1]
                 top_k_min_pos = top_k_min_positions(sub_arr, min(k, len(sub_arr)))
                 adjusted_pos = [left + pos for pos in top_k_min_pos]  # 调整位置相对于原数组
+                position_counts.update(adjusted_pos)
                 hash_value = hash_top_k_min_positions(adjusted_pos)
                 top_k_min_hash_map[hash_value] = top_k_min_hash_map.get(hash_value, 0) + 1
 
@@ -150,6 +150,7 @@ def simulate(n, pivot):
         for right in range(n):
             sub_arr = arr[:right + 1]
             top_k_min_pos = top_k_min_positions(sub_arr, min(k, len(sub_arr)))
+            position_counts.update(top_k_min_pos)
             hash_value = hash_top_k_min_positions(top_k_min_pos)
             top_k_min_hash_map[hash_value] = top_k_min_hash_map.get(hash_value, 0) + 1
 
@@ -159,6 +160,7 @@ def simulate(n, pivot):
             sub_arr = arr[left:]
             top_k_min_pos = top_k_min_positions(sub_arr, min(k, len(sub_arr)))
             adjusted_pos = [left + pos for pos in top_k_min_pos]  # 调整位置相对于原数组
+            position_counts.update(adjusted_pos)
             hash_value = hash_top_k_min_positions(adjusted_pos)
             top_k_min_hash_map[hash_value] = top_k_min_hash_map.get(hash_value, 0) + 1
 
@@ -172,11 +174,15 @@ def simulate(n, pivot):
     print("频次范围分布占比:")
     for range_label, percentage in distribution.items():
         print(f"{range_label} 次出现: {percentage:.2f}%")
+    print(f"pos unique的数量: {len(position_counts)}")
+    # print(f"pos unique的分布: {position_counts}")
+
 
 if __name__ == "__main__":
-    n = 1 << 15 # Example value for n, which is 1024
-    # Example value for n, which is 4096
-    # pivot = int(n / 2)  # Example pivot
-    pivot = -1 # n - 1 || -1
+    n = 1 << 10 # Example value for n, which is 1024
+    # the value of k is log2(n)
+    pivot = int(n / 2)  # Simulate the case where pivot is in the middle of the array
+    # pivot = -1 # Simulate the case where pivot is at the beginning of the array
+    # pivot = n - 1 # Simulate the case where pivot is at the end of the array
     print(f"Simulate n:{n} pivot:{pivot}")
     simulate(n, pivot)

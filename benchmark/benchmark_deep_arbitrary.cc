@@ -170,6 +170,9 @@ int main(int argc, char **argv)
                                 auto res = index.rangeFilteringSearchOutBound(
                                     &s_params, &search_info, data_wrapper.querys.at(one_id),
                                     data_wrapper.query_ranges.at(idx));
+                                // auto res = index.rangeFilteringSearchInRange(
+                                //     &s_params, &search_info, data_wrapper.querys.at(one_id),
+                                //     data_wrapper.query_ranges.at(idx));
                                 search_info.precision =
                                     countPrecision(data_wrapper.groundtruth.at(idx), res);
                                 result_recorder[s_params.query_range].first +=

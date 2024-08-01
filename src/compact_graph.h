@@ -90,6 +90,9 @@ namespace Compact
             ef_max_ = index_params.ef_max;
         }
 
+        int max_external_id_ = -1;
+        int min_external_id_ = std::numeric_limits<int>::max();
+
         // 指向BaseIndex::IndexParams类型的常量指针，存储索引参数
         const BaseIndex::IndexParams *params;
 
@@ -261,6 +264,12 @@ namespace Compact
             // 获取当前节点的外部标签
             int external_id = getExternalLabel(cur_c);
             tableint next_closest_entry_point = 0; // 下一个最近入口点
+            
+            // 更新目前所有节点的最大和最小外部标签值
+            if (external_id > max_external_id_)
+                max_external_id_ = external_id;
+            if (external_id < min_external_id_)
+                min_external_id_ = external_id;
 
             // 邻居选择容器初始化 这个邻居是对整个图的邻居 也就是说对整个图他本身整个range的信息他有 但是sub range 的信息我是自己额外存的
             std::vector<tableint> selectedNeighbors;
@@ -281,7 +290,7 @@ namespace Compact
                 // 初始化变量
                 // TODO: maybe the initial lr most should consider the current attribute min and max
                 // TODO: test the effect of this corner case
-                pair<int, int> external_lr_most = {-1, std::numeric_limits<int>::max()}; // keeps track of the furthest (bidirectional) external ID encountered
+                pair<int, int> external_lr_most = {min_external_id_, max_external_id_}; // keeps track of the furthest (bidirectional) external ID encountered
                 // pair<int, int> last_batch_lr_most = {-1, std::numeric_limits<int>::max()}; //  bidirectional boundary of the previous processing batch
                 int l_rightmost = external_id, r_leftmost = external_id;
                 int tmp_min = std::numeric_limits<int>::max();
@@ -715,7 +724,7 @@ namespace Compact
             std::shuffle(permutation.begin(), permutation.end(), g);
 
             // Step 3: Traverse the shuffled sequence
-            
+
             for (size_t i : permutation)
             {
                 hnsw.addPoint(data_wrapper->nodes.at(i).data(), i);
@@ -787,8 +796,9 @@ namespace Compact
             search_info->internal_search_time = 0;
             search_info->cal_dist_time = 0;
             search_info->fetch_nns_time = 0;
-            // finding enters
-            vector<int> enter_list; // 维护这个东西有什么用？
+            num_search_comparison = 0;
+
+            // 初始化三个entry points
             {
                 int lbound = query_bound.first;
                 int interval = (query_bound.second - lbound) / 3;
@@ -797,7 +807,6 @@ namespace Compact
                     int point = lbound + interval * i;
                     float dist = EuclideanDistance(data_wrapper->nodes[point], query); // 计算距离
                     candidate_set.push(make_pair(-dist, point));                       // 将负距离和点ID推入候选集
-                    enter_list.emplace_back(point);                                    // 添加到入口点列表
                     visited_array[point] = visited_array_tag;                          // 标记已访问
                 }
             }
@@ -834,11 +843,12 @@ namespace Compact
                 candidate_set.pop();
 
                 // // only search when candidate point is inside the range
-                if (current_node_id < query_bound.first || current_node_id > query_bound.second)
-                {
-                    // cout << "no satisfied range point" << endl;
-                    continue;
-                }
+                // this can be commented because no way to do this
+                // if (current_node_id < query_bound.first || current_node_id > query_bound.second)
+                // {
+                //     cout << "no satisfied range point" << endl;
+                //     continue;
+                // }
 
                 // search cw on the fly
                 vector<const vector<int> *> neighbor_iterators;
@@ -878,7 +888,7 @@ namespace Compact
                 const auto Mcurmax = index_params_ -> K; // 其实就是在这个range里面应该的邻居的邻居的最大数量 （当然会有问题 因为互相可能互prune但是没办法了）
                 for (auto batch_it : neighbor_iterators)
                 {
-                    bool if_process_positive = batch_it == negative_neighor_pointer? false: true;
+                    bool if_process_positive = batch_it == negative_neighor_pointer ? false : true;
 
                     for (auto candidate_id : *batch_it)
                     {
@@ -887,10 +897,10 @@ namespace Compact
                         
                         if(if_process_positive)
                             if(cnt_positive_through_neighbors < Mcurmax)
-                                cnt_positive_through_neighbors++;
+                        cnt_positive_through_neighbors++;
                             else
                                 break;
-                        
+
                         if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
                         {
                             visited_array[candidate_id] = visited_array_tag; // 标记为已访问
@@ -951,12 +961,12 @@ namespace Compact
             CountTime(tt3, tt4, search_info->internal_search_time);
             return res; // 返回结果列表
         }
-        
+
         vector<int> rangeFilteringSearchOutBound(
             const SearchParams *search_params, SearchInfo *search_info,
             const vector<float> &query,
             const std::pair<int, int> query_bound) override
-        {   
+        {
             return vector<int>();
         }
         ~IndexCompactGraph()

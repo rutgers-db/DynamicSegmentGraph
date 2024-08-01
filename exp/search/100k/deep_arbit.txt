@@ -46,3 +46,4 @@ range: 10000     recall: 0.9944  QPS: 3238       Comps: 1381
 range: 50000     recall: 0.9940  QPS: 2546       Comps: 2174
 range: 100000    recall: 0.9968  QPS: 2143       Comps: 2745
 ========================
+# total query time: 1.6102260s

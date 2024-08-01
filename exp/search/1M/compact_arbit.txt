@@ -1,0 +1,58 @@
+oading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 64, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-deep-1000000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexCompactGraph
+ 
+Max. forward batch nn #: 0
+Avg. forward nn #: 21.4071
+Avg. forward batch #: 3.24673
+Max. reverse nn #: 499
+Avg. reverse nn #: 21.4071
+Avg. reverse batch #: 1
+Avg. delta nn #: 42.8142
+# Build Index Time: 507.5126890s
+Total # of Neighbors: 42814244
+
+Search ef: 16
+========================
+range: 1000      recall: 0.0143  QPS: 127812     Comps: 3802
+range: 5000      recall: 0.4471  QPS: 26665      Comps: 54978
+range: 10000     recall: 0.6420  QPS: 21805      Comps: 175753
+range: 50000     recall: 0.7832  QPS: 12375      Comps: 405717
+range: 100000    recall: 0.7830  QPS: 9861       Comps: 771374
+range: 500000    recall: 0.7655  QPS: 6632       Comps: 1315934
+range: 1000000   recall: 0.8065  QPS: 5309       Comps: 2097965
+========================
+# total query time: 0.6213160s
+
+Search ef: 64
+========================
+range: 1000      recall: 0.0187  QPS: 95657      Comps: 2548916
+range: 5000      recall: 0.6829  QPS: 11738      Comps: 2662628
+range: 10000     recall: 0.8478  QPS: 9323       Comps: 2925777
+range: 50000     recall: 0.9430  QPS: 5082       Comps: 3438966
+range: 100000    recall: 0.9452  QPS: 4102       Comps: 4265477
+range: 500000    recall: 0.9377  QPS: 2623       Comps: 5545519
+range: 1000000   recall: 0.9511  QPS: 2049       Comps: 7415991
+========================
+# total query time: 1.5211800s
+
+Search ef: 256
+========================
+range: 1000      recall: 0.0196  QPS: 81800      Comps: 8484244
+range: 5000      recall: 0.8067  QPS: 4032       Comps: 8783597
+range: 10000     recall: 0.9322  QPS: 3200       Comps: 9495752
+range: 50000     recall: 0.9892  QPS: 1841       Comps: 10857391
+range: 100000    recall: 0.9902  QPS: 1467       Comps: 13049847
+range: 500000    recall: 0.9907  QPS: 921        Comps: 16549959
+range: 1000000   recall: 0.9917  QPS: 710        Comps: 21768958
+========================
+# total query time: 4.3013520s

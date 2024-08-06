@@ -259,6 +259,18 @@ namespace base_hnsw
                     offsetData_);
         }
 
+        inline char *getDataByLabel(labeltype label) const
+        {   
+            tableint label_c;
+            auto search = label_lookup_.find(label);
+            if (search == label_lookup_.end() || isMarkedDeleted(search->second))
+            {
+                throw std::runtime_error("Label not found");
+            }
+            label_c = search->second;
+
+            return getDataByInternalId(label_c);
+        }
         /**
          * 随机生成一个层级。
          *

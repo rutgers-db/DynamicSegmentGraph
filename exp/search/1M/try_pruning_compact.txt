@@ -1,180 +1,7 @@
-
-这个是很傻逼的 所有反向边基本都会新开一个batch 放到最里面的batch里的结果
-Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs...    Done!
-index K:
-vertex in set: {8}
-ef construction:
-vertex in set: {100}
-search ef:
-vertex in set: {16, 64, 256}
-
-Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
-Method: Compact
-parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
-Building Index using IndexCompactGraph
-All the forward batch nn #: 2139643
-Theoratical backward batch nn #: 2139643
-Sum of forward batch nn #: 4173860
-Max. forward batch nn #: 0
-Avg. forward nn #: 41.7386
-Avg. forward batch #: 23.5769
-Max. reverse nn #: 0
-Avg. reverse nn #: 0
-Avg. reverse batch #: 0
-Avg. delta nn #: 41.7386
-# Build Index Time: 36.7810820s
-Total # of Neighbors: 4173860
-
-Search ef: 16
-========================
-range: 100       recall: 0.0479  QPS: 147471    Comps: 4         Internal Search Time: 0.0068    CalDist Time: 0.0025
-range: 500       recall: 0.5287  QPS: 33776     Comps: 56        Internal Search Time: 0.0296    CalDist Time: 0.0162
-range: 1000      recall: 0.7328  QPS: 31438     Comps: 89        Internal Search Time: 0.0318    CalDist Time: 0.0191
-range: 5000      recall: 0.8158  QPS: 23048     Comps: 178       Internal Search Time: 0.0434    CalDist Time: 0.0303
-range: 10000     recall: 0.7556  QPS: 20258     Comps: 219       Internal Search Time: 0.0494    CalDist Time: 0.0353
-range: 50000     recall: 0.6022  QPS: 16935     Comps: 296       Internal Search Time: 0.0590    CalDist Time: 0.0435
-range: 100000    recall: 0.5008  QPS: 18096     Comps: 310       Internal Search Time: 0.0553    CalDist Time: 0.0401
-========================
-# total query time: 0.2816430s
-
-Search ef: 64
-========================
-range: 100       recall: 0.0485  QPS: 188857    Comps: 4         Internal Search Time: 0.0053    CalDist Time: 0.0020
-range: 500       recall: 0.7397  QPS: 13229     Comps: 134       Internal Search Time: 0.0756    CalDist Time: 0.0371
-range: 1000      recall: 0.9012  QPS: 11203     Comps: 206       Internal Search Time: 0.0893    CalDist Time: 0.0496
-range: 5000      recall: 0.9588  QPS: 8099      Comps: 415       Internal Search Time: 0.1235    CalDist Time: 0.0819
-range: 10000     recall: 0.9409  QPS: 7404      Comps: 506       Internal Search Time: 0.1351    CalDist Time: 0.0927
-range: 50000     recall: 0.8763  QPS: 5994      Comps: 692       Internal Search Time: 0.1668    CalDist Time: 0.1220
-range: 100000    recall: 0.7856  QPS: 5784      Comps: 747       Internal Search Time: 0.1729    CalDist Time: 0.1260
-========================
-# total query time: 0.7748340s
-
-Search ef: 256
-========================
-range: 100       recall: 0.0485  QPS: 175346    Comps: 4         Internal Search Time: 0.0057    CalDist Time: 0.0021
-range: 500       recall: 0.8149  QPS: 4416      Comps: 332       Internal Search Time: 0.2264    CalDist Time: 0.0951
-range: 1000      recall: 0.9501  QPS: 3825      Comps: 533       Internal Search Time: 0.2615    CalDist Time: 0.1243
-range: 5000      recall: 0.9949  QPS: 2711      Comps: 1111      Internal Search Time: 0.3689    CalDist Time: 0.2213
-range: 10000     recall: 0.9905  QPS: 2399      Comps: 1363      Internal Search Time: 0.4168    CalDist Time: 0.2651
-range: 50000     recall: 0.9764  QPS: 2085      Comps: 1923      Internal Search Time: 0.4797    CalDist Time: 0.3245
-range: 100000    recall: 0.9461  QPS: 2104      Comps: 2046      Internal Search Time: 0.4754    CalDist Time: 0.3195
-========================
-# total query time: 2.2410730s
-
-这个是去掉那个bug 上一个innerrange可能会让下一个的outrange变小 从而prune掉很多的版本
-Method: Compact
-parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
-Building Index using IndexCompactGraph
-All the forward batch nn #: 2139643
-Theoratical backward batch nn #: 2139643
-Sum of forward batch nn #: 2574488
-Max. forward batch nn #: 0
-Avg. forward nn #: 25.7449
-Avg. forward batch #: 3.18581
-Max. reverse nn #: 0
-Avg. reverse nn #: 0
-Avg. reverse batch #: 0
-Avg. delta nn #: 25.7449
-# Build Index Time: 43.0988130s
-Total # of Neighbors: 2574488
-
-Search ef: 16
-========================
-range: 100       recall: 0.0098  QPS: 710732    Comps: 1         Internal Search Time: 0.0014    CalDist Time: 0.0005
-range: 500       recall: 0.0262  QPS: 189753    Comps: 9         Internal Search Time: 0.0053    CalDist Time: 0.0029
-range: 1000      recall: 0.1005  QPS: 91233     Comps: 29        Internal Search Time: 0.0110    CalDist Time: 0.0070
-range: 5000      recall: 0.4958  QPS: 37662     Comps: 114       Internal Search Time: 0.0266    CalDist Time: 0.0202
-range: 10000     recall: 0.6014  QPS: 33686     Comps: 159       Internal Search Time: 0.0297    CalDist Time: 0.0234
-range: 50000     recall: 0.6817  QPS: 27358     Comps: 259       Internal Search Time: 0.0366    CalDist Time: 0.0307
-range: 100000    recall: 0.6899  QPS: 24358     Comps: 307       Internal Search Time: 0.0411    CalDist Time: 0.0352
-========================
-# total query time: 0.1572210s
-
-Search ef: 64
-========================
-range: 100       recall: 0.0098  QPS: 828500    Comps: 1         Internal Search Time: 0.0012    CalDist Time: 0.0004
-range: 500       recall: 0.0342  QPS: 134935    Comps: 14        Internal Search Time: 0.0074    CalDist Time: 0.0038
-range: 1000      recall: 0.2087  QPS: 35921     Comps: 80        Internal Search Time: 0.0278    CalDist Time: 0.0171
-range: 5000      recall: 0.7948  QPS: 15289     Comps: 280       Internal Search Time: 0.0654    CalDist Time: 0.0478
-range: 10000     recall: 0.8546  QPS: 12972     Comps: 377       Internal Search Time: 0.0771    CalDist Time: 0.0587
-range: 50000     recall: 0.9051  QPS: 10136     Comps: 625       Internal Search Time: 0.0987    CalDist Time: 0.0806
-range: 100000    recall: 0.9073  QPS: 8955      Comps: 748       Internal Search Time: 0.1117    CalDist Time: 0.0932
-========================
-# total query time: 0.3943490s
-
-Search ef: 256
-========================
-range: 100       recall: 0.0098  QPS: 827130    Comps: 1         Internal Search Time: 0.0012    CalDist Time: 0.0004
-range: 500       recall: 0.0355  QPS: 119574    Comps: 16        Internal Search Time: 0.0084    CalDist Time: 0.0043
-range: 1000      recall: 0.3303  QPS: 12651     Comps: 213       Internal Search Time: 0.0790    CalDist Time: 0.0449
-range: 5000      recall: 0.9081  QPS: 5032      Comps: 756       Internal Search Time: 0.1987    CalDist Time: 0.1366
-range: 10000     recall: 0.9568  QPS: 3976      Comps: 1025      Internal Search Time: 0.2515    CalDist Time: 0.1824
-range: 50000     recall: 0.9848  QPS: 3284      Comps: 1775      Internal Search Time: 0.3045    CalDist Time: 0.2366
-range: 100000    recall: 0.9853  QPS: 2824      Comps: 2146      Internal Search Time: 0.3541    CalDist Time: 0.2833
-========================
-# total query time: 1.2031280s
-
-现在这个是outrange不会被上一个innerrange影响 只会变大不会变小的版本 好像精度山好多了
-
-Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
-Method: Compact
-parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
-Building Index using IndexCompactGraph
-All the forward batch nn #: 2139643
-Theoratical backward batch nn #: 2139643
-Sum of forward batch nn #: 3858585
-Max. forward batch nn #: 0
-Avg. forward nn #: 38.5858
-Avg. forward batch #: 3.18236
-Max. reverse nn #: 0
-Avg. reverse nn #: 0
-Avg. reverse batch #: 0
-Avg. delta nn #: 38.5858
-# Build Index Time: 45.6270530s
-Total # of Neighbors: 3858585
-
-Search ef: 16
-========================
-range: 100       recall: 0.0373  QPS: 366166    Comps: 3         Internal Search Time: 0.0027    CalDist Time: 0.0011
-range: 500       recall: 0.4514  QPS: 52643     Comps: 49        Internal Search Time: 0.0190    CalDist Time: 0.0120
-range: 1000      recall: 0.6834  QPS: 43105     Comps: 80        Internal Search Time: 0.0232    CalDist Time: 0.0160
-range: 5000      recall: 0.8351  QPS: 31357     Comps: 167       Internal Search Time: 0.0319    CalDist Time: 0.0249
-range: 10000     recall: 0.8058  QPS: 28855     Comps: 202       Internal Search Time: 0.0347    CalDist Time: 0.0276
-range: 50000     recall: 0.7173  QPS: 25261     Comps: 277       Internal Search Time: 0.0396    CalDist Time: 0.0328
-range: 100000    recall: 0.6931  QPS: 23813     Comps: 309       Internal Search Time: 0.0420    CalDist Time: 0.0360
-========================
-# total query time: 0.1986300s
-
-Search ef: 64
-========================
-range: 100       recall: 0.0373  QPS: 386698    Comps: 3         Internal Search Time: 0.0026    CalDist Time: 0.0010
-range: 500       recall: 0.6727  QPS: 21245     Comps: 119       Internal Search Time: 0.0471    CalDist Time: 0.0278
-range: 1000      recall: 0.8727  QPS: 17800     Comps: 186       Internal Search Time: 0.0562    CalDist Time: 0.0361
-range: 5000      recall: 0.9624  QPS: 12151     Comps: 389       Internal Search Time: 0.0823    CalDist Time: 0.0604
-range: 10000     recall: 0.9517  QPS: 10465     Comps: 477       Internal Search Time: 0.0956    CalDist Time: 0.0727
-range: 50000     recall: 0.9197  QPS: 8087      Comps: 663       Internal Search Time: 0.1237    CalDist Time: 0.1016
-range: 100000    recall: 0.9087  QPS: 8734      Comps: 756       Internal Search Time: 0.1145    CalDist Time: 0.0955
-========================
-# total query time: 0.5271740s
-
-Search ef: 256
-========================
-range: 100       recall: 0.0373  QPS: 390320    Comps: 3         Internal Search Time: 0.0026    CalDist Time: 0.0011
-range: 500       recall: 0.7620  QPS: 7162      Comps: 305       Internal Search Time: 0.1396    CalDist Time: 0.0711
-range: 1000      recall: 0.9307  QPS: 5433      Comps: 492       Internal Search Time: 0.1841    CalDist Time: 0.1049
-range: 5000      recall: 0.9941  QPS: 3758      Comps: 1044      Internal Search Time: 0.2661    CalDist Time: 0.1787
-range: 10000     recall: 0.9903  QPS: 3389      Comps: 1292      Internal Search Time: 0.2951    CalDist Time: 0.2059
-range: 50000     recall: 0.9883  QPS: 3077      Comps: 1869      Internal Search Time: 0.3250    CalDist Time: 0.2460
-range: 100000    recall: 0.9860  QPS: 2759      Comps: 2169      Internal Search Time: 0.3625    CalDist Time: 0.2872
-========================
-# total query time: 1.5807600s
-
-在上个版本基础上加了pruning的 就是每个batch更新后如果size太大了会prune一下
-
-zhencan@U-75W324KW-2106 build % ../script/run_compactgraph.zsh
+第一次在1M上跑 效果一般般啊 recall没有其他的好 而且还有bug的样子
 Load vecs from: ../data/deep10M.fvecs
-# of vecs: 100000
-Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs...    Done!
+# of vecs: 1000000
+Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs...    Done!
 index K:
 vertex in set: {8}
 ef construction:
@@ -182,119 +9,75 @@ vertex in set: {100}
 search ef:
 vertex in set: {16, 64, 256}
 
-Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
+Save result to :../exp/search/benchmark-Benchmark-Compact-deep-1000000.csv
 Method: Compact
 parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
 Building Index using IndexCompactGraph
-All the forward batch nn #: 2139643
-Theoratical backward batch nn #: 2139643
-Sum of forward batch nn #: 1761581
+
+All the forward batch nn #: 21400003
+Theoratical backward batch nn #: 21400003
+Sum of forward batch nn #: 30576967
 Max. forward batch nn #: 0
-Avg. forward nn #: 17.6158
-Avg. forward batch #: 3.24261
-Max. reverse nn #: 0
-Avg. reverse nn #: 0
-Avg. reverse batch #: 0
-Avg. delta nn #: 17.6158
-# Build Index Time: 42.9838060s
-Total # of Neighbors: 1761581
+Avg. forward nn #: 30.577
+Avg. forward batch #: 3.29016
+Avg. delta nn #: 30.577
+Forward batch: 0[(0,494878,504640,999999)]
+vertex in set: {525880, 504640, 478085, 468234, 494878, 43109, 57753, 521229, 50724, 390834, 664164, 722440, 320618, 528487, 373691, 834025}
+
+Forward batch: 1[(390835,498707,510755,586007)]
+vertex in set: {498689, 495350, 473494, 498707, 452194, 440557, 513869, 419466, 407895, 545256, 510755}
+
+Forward batch: 2[(473495,499652,500503,510754)]
+vertex in set: {500914, 500503, 481355, 500506, 473542, 482236, 474592, 479616, 475235, 499652, 486930, 499487}
+
+Forward batch: 3[(486931,500000,2147483647,500913)]
+vertex in set: {490409, 491719, 490300}
+
+
+# Build Index Time: 806.2608220s
+Total # of Neighbors: 30576967
 
 Search ef: 16
 ========================
-range: 100       recall: 0.0151  QPS: 490918    Comps: 1         Internal Search Time: 0.0020    CalDist Time: 0.0006
-range: 500       recall: 0.0864  QPS: 98512     Comps: 21        Internal Search Time: 0.0102    CalDist Time: 0.0054
-range: 1000      recall: 0.2543  QPS: 57055     Comps: 46        Internal Search Time: 0.0175    CalDist Time: 0.0105
-range: 5000      recall: 0.5340  QPS: 38549     Comps: 112       Internal Search Time: 0.0259    CalDist Time: 0.0183
-range: 10000     recall: 0.5176  QPS: 35025     Comps: 142       Internal Search Time: 0.0286    CalDist Time: 0.0206
-range: 50000     recall: 0.4583  QPS: 29178     Comps: 210       Internal Search Time: 0.0343    CalDist Time: 0.0261
-range: 100000    recall: 0.4946  QPS: 26401     Comps: 253       Internal Search Time: 0.0379    CalDist Time: 0.0303
+range: 1000      recall: 0.0119  QPS: 167842    Comps: 7         Internal Search Time: 0.0060    CalDist Time: 0.0031
+range: 5000      recall: 0.3721  QPS: 29438     Comps: 80        Internal Search Time: 0.0340    CalDist Time: 0.0238
+range: 10000     recall: 0.5609  QPS: 24095     Comps: 120       Internal Search Time: 0.0415    CalDist Time: 0.0311
+range: 50000     recall: 0.6813  QPS: 16132     Comps: 213       Internal Search Time: 0.0620    CalDist Time: 0.0512
+range: 100000    recall: 0.6648  QPS: 14349     Comps: 249       Internal Search Time: 0.0697    CalDist Time: 0.0590
+range: 500000    recall: 0.5831  QPS: 12570     Comps: 298       Internal Search Time: 0.0796    CalDist Time: 0.0698
+range: 1000000   recall: 0.6774  QPS: 11747     Comps: 351       Internal Search Time: 0.0851    CalDist Time: 0.0767
 ========================
-# total query time: 0.1621780s
+# total query time: 0.3851480s
 
 Search ef: 64
 ========================
-range: 100       recall: 0.0151  QPS: 655308    Comps: 1         Internal Search Time: 0.0015    CalDist Time: 0.0005
-range: 500       recall: 0.1565  QPS: 40019     Comps: 52        Internal Search Time: 0.0250    CalDist Time: 0.0123
-range: 1000      recall: 0.4865  QPS: 22403     Comps: 123       Internal Search Time: 0.0446    CalDist Time: 0.0255
-range: 5000      recall: 0.7921  QPS: 14905     Comps: 263       Internal Search Time: 0.0671    CalDist Time: 0.0447
-range: 10000     recall: 0.7886  QPS: 13133     Comps: 335       Internal Search Time: 0.0761    CalDist Time: 0.0528
-range: 50000     recall: 0.7496  QPS: 10783     Comps: 515       Internal Search Time: 0.0927    CalDist Time: 0.0688
-range: 100000    recall: 0.7738  QPS: 9762      Comps: 620       Internal Search Time: 0.1024    CalDist Time: 0.0788
+range: 1000      recall: 0.0147  QPS: 110314    Comps: 11        Internal Search Time: 0.0091    CalDist Time: 0.0047
+range: 5000      recall: 0.6228  QPS: 12049     Comps: 186       Internal Search Time: 0.0830    CalDist Time: 0.0534
+range: 10000     recall: 0.7987  QPS: 9945      Comps: 267       Internal Search Time: 0.1006    CalDist Time: 0.0703
+range: 50000     recall: 0.8960  QPS: 6635      Comps: 489       Internal Search Time: 0.1507    CalDist Time: 0.1188
+range: 100000    recall: 0.8782  QPS: 5739      Comps: 579       Internal Search Time: 0.1742    CalDist Time: 0.1421
+range: 500000    recall: 0.8415  QPS: 4971      Comps: 705       Internal Search Time: 0.2012    CalDist Time: 0.1737
+range: 1000000   recall: 0.8849  QPS: 4540      Comps: 832       Internal Search Time: 0.2203    CalDist Time: 0.1955
 ========================
-# total query time: 0.4146950s
+# total query time: 0.9464290s
 
 Search ef: 256
 ========================
-range: 100       recall: 0.0151  QPS: 658328    Comps: 1         Internal Search Time: 0.0015    CalDist Time: 0.0005
-range: 500       recall: 0.1907  QPS: 23705     Comps: 87        Internal Search Time: 0.0422    CalDist Time: 0.0196
-range: 1000      recall: 0.6431  QPS: 7225      Comps: 344       Internal Search Time: 0.1384    CalDist Time: 0.0710
-range: 5000      recall: 0.9247  QPS: 4591      Comps: 741       Internal Search Time: 0.2178    CalDist Time: 0.1350
-range: 10000     recall: 0.9345  QPS: 4028      Comps: 931       Internal Search Time: 0.2483    CalDist Time: 0.1614
-range: 50000     recall: 0.9262  QPS: 3431      Comps: 1479      Internal Search Time: 0.2915    CalDist Time: 0.2042
-range: 100000    recall: 0.9402  QPS: 3005      Comps: 1818      Internal Search Time: 0.3328    CalDist Time: 0.2437
+range: 1000      recall: 0.0152  QPS: 107538    Comps: 12        Internal Search Time: 0.0093    CalDist Time: 0.0048
+range: 5000      recall: 0.7521  QPS: 4089      Comps: 519       Internal Search Time: 0.2446    CalDist Time: 0.1431
+range: 10000     recall: 0.9037  QPS: 3291      Comps: 733       Internal Search Time: 0.3038    CalDist Time: 0.1948
+range: 50000     recall: 0.9732  QPS: 2168      Comps: 1362      Internal Search Time: 0.4613    CalDist Time: 0.3436
+range: 100000    recall: 0.9686  QPS: 1925      Comps: 1634      Internal Search Time: 0.5195    CalDist Time: 0.4046
+range: 500000    recall: 0.9561  QPS: 1661      Comps: 2065      Internal Search Time: 0.6019    CalDist Time: 0.5040
+range: 1000000   recall: 0.9704  QPS: 1483      Comps: 2447      Internal Search Time: 0.6742    CalDist Time: 0.5819
 ========================
-# total query time: 1.2780570s
+# total query time: 2.8225050s
 
-这个是加了pruning再加缩range的版本点就特别少了
-Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
-Method: Compact
-parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
-Building Index using IndexCompactGraph
-All the forward batch nn #: 2139643
-Theoratical backward batch nn #: 2139643
-Sum of forward batch nn #: 1606319
-Max. forward batch nn #: 0
-Avg. forward nn #: 16.0632
-Avg. forward batch #: 4.23929
-Max. reverse nn #: 0
-Avg. reverse nn #: 0
-Avg. reverse batch #: 0
-Avg. delta nn #: 16.0632
-# Build Index Time: 43.0640370s
-Total # of Neighbors: 1606319
 
-Search ef: 16
-========================
-range: 100       recall: 0.0085  QPS: 575374    Comps: 1         Internal Search Time: 0.0017    CalDist Time: 0.0005
-range: 500       recall: 0.0259  QPS: 163800    Comps: 9         Internal Search Time: 0.0061    CalDist Time: 0.0027
-range: 1000      recall: 0.0909  QPS: 71434     Comps: 29        Internal Search Time: 0.0140    CalDist Time: 0.0075
-range: 5000      recall: 0.3653  QPS: 38512     Comps: 88        Internal Search Time: 0.0260    CalDist Time: 0.0172
-range: 10000     recall: 0.4006  QPS: 37612     Comps: 111       Internal Search Time: 0.0266    CalDist Time: 0.0182
-range: 50000     recall: 0.4127  QPS: 31890     Comps: 178       Internal Search Time: 0.0314    CalDist Time: 0.0230
-range: 100000    recall: 0.4896  QPS: 28069     Comps: 234       Internal Search Time: 0.0356    CalDist Time: 0.0278
-========================
-# total query time: 0.1471390s
-
-Search ef: 64
-========================
-range: 100       recall: 0.0085  QPS: 721501    Comps: 1         Internal Search Time: 0.0014    CalDist Time: 0.0003
-range: 500       recall: 0.0345  QPS: 114521    Comps: 14        Internal Search Time: 0.0087    CalDist Time: 0.0039
-range: 1000      recall: 0.2093  QPS: 27280     Comps: 83        Internal Search Time: 0.0367    CalDist Time: 0.0188
-range: 5000      recall: 0.6402  QPS: 15638     Comps: 213       Internal Search Time: 0.0639    CalDist Time: 0.0401
-range: 10000     recall: 0.6651  QPS: 14247     Comps: 269       Internal Search Time: 0.0702    CalDist Time: 0.0461
-range: 50000     recall: 0.6727  QPS: 12055     Comps: 424       Internal Search Time: 0.0830    CalDist Time: 0.0592
-range: 100000    recall: 0.7450  QPS: 10377     Comps: 557       Internal Search Time: 0.0964    CalDist Time: 0.0725
-========================
-# total query time: 0.3653850s
-
-Search ef: 256
-========================
-range: 100       recall: 0.0085  QPS: 707214    Comps: 1         Internal Search Time: 0.0014    CalDist Time: 0.0003
-range: 500       recall: 0.0395  QPS: 87260     Comps: 19        Internal Search Time: 0.0115    CalDist Time: 0.0050
-range: 1000      recall: 0.3291  QPS: 9287      Comps: 236       Internal Search Time: 0.1077    CalDist Time: 0.0514
-range: 5000      recall: 0.8151  QPS: 4958      Comps: 607       Internal Search Time: 0.2017    CalDist Time: 0.1182
-range: 10000     recall: 0.8411  QPS: 4325      Comps: 762       Internal Search Time: 0.2312    CalDist Time: 0.1424
-range: 50000     recall: 0.8561  QPS: 3723      Comps: 1218      Internal Search Time: 0.2686    CalDist Time: 0.1808
-range: 100000    recall: 0.9100  QPS: 3188      Comps: 1613      Internal Search Time: 0.3136    CalDist Time: 0.2234
-========================
-# total query time: 1.1414100s
-
-上面的都是有bug的 一个是getDataByExternal 写成了getDatabyInternal 还有就是calInnerrange的时候 innerange两边搞放了
-下面是 pruning + 2*Mcurmax + Outrange只增不减 效果看上去非常好
-
+bug 修复完之后好像更差了 无语
 Load vecs from: ../data/deep10M.fvecs
-# of vecs: 100000
-Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs...    Done!
+# of vecs: 1000000
+Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs...    Done!
 index K:
 vertex in set: {8}
 ef construction:
@@ -302,130 +85,64 @@ vertex in set: {100}
 search ef:
 vertex in set: {16, 64, 256}
 
-Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
+Save result to :../exp/search/benchmark-Benchmark-Compact-deep-1000000.csv
 Method: Compact
 parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
 Building Index using IndexCompactGraph
-HIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIHIAll the forward batch nn #: 2139643
-Theoratical backward batch nn #: 2139643
-Sum of forward batch nn #: 3055253
+First point340710
+
+All the forward batch nn #: 21396517
+Theoratical backward batch nn #: 21396517
+Sum of forward batch nn #: 30222137
 Max. forward batch nn #: 0
-Avg. forward nn #: 30.5525
-Avg. forward batch #: 3.24373
-Max. reverse nn #: 0
-Avg. reverse nn #: 0
-Avg. reverse batch #: 0
-Avg. delta nn #: 30.5525
-Forward batch: 0[(0,48666,55586,99999)]
-vertex in set: {44019, 17510, 47522, 78339, 48666, 44339, 55586, 66351, 62838, 91825}
+Avg. forward nn #: 30.2221
+Avg. forward batch #: 3.27276
+Avg. delta nn #: 30.2221
+Forward batch: 0[(0,499487,528487,999999)]
+vertex in set: {540978, 57753, 499487, 47689, 390834, 584168, 320618, 719617, 528487, 373691, 920197}
 
-Forward batch: 1[(26032,49806,50196,98466)]
-vertex in set: {50464, 53009, 49806, 37738, 49660, 52778, 49530, 49237, 50935, 50196, 53113, 50397, 48316}
+Forward batch: 1[(499488,499652,513869,719616)]
+vertex in set: {499652, 541130, 513869, 697373, 650686, 586008, 629005, 667676, 604578}
 
-Forward batch: 2[(46238,49817,50186,53390)]
-vertex in set: {48983, 46780, 52886, 52957, 52180, 49817, 47267, 50186, 50257}
+Forward batch: 2[(499488,500000,510755,513868)]
+vertex in set: {513699, 510755}
 
 
-# Build Index Time: 50.8280250s
-Total # of Neighbors: 3055253
+# Build Index Time: 814.6823080s
+Total # of Neighbors: 30222137
 
 Search ef: 16
 ========================
-range: 100       recall: 0.0467  QPS: 326797    Comps: 4         Internal Search Time: 0.0031    CalDist Time: 0.0014
-range: 500       recall: 0.4754  QPS: 53810     Comps: 52        Internal Search Time: 0.0186    CalDist Time: 0.0116
-range: 1000      recall: 0.6822  QPS: 46326     Comps: 80        Internal Search Time: 0.0216    CalDist Time: 0.0147
-range: 5000      recall: 0.8132  QPS: 32738     Comps: 159       Internal Search Time: 0.0305    CalDist Time: 0.0231
-range: 10000     recall: 0.7923  QPS: 29738     Comps: 193       Internal Search Time: 0.0336    CalDist Time: 0.0261
-range: 50000     recall: 0.7160  QPS: 26598     Comps: 248       Internal Search Time: 0.0376    CalDist Time: 0.0302
-range: 100000    recall: 0.7772  QPS: 24805     Comps: 286       Internal Search Time: 0.0403    CalDist Time: 0.0338
+range: 1000      recall: 0.0084  QPS: 172592    Comps: 7         Internal Search Time: 0.0058    CalDist Time: 0.0030
+range: 5000      recall: 0.3533  QPS: 29339     Comps: 81        Internal Search Time: 0.0341    CalDist Time: 0.0234
+range: 10000     recall: 0.5534  QPS: 23802     Comps: 120       Internal Search Time: 0.0420    CalDist Time: 0.0312
+range: 50000     recall: 0.6642  QPS: 16368     Comps: 207       Internal Search Time: 0.0611    CalDist Time: 0.0501
+range: 100000    recall: 0.6545  QPS: 14566     Comps: 241       Internal Search Time: 0.0687    CalDist Time: 0.0577
+range: 500000    recall: 0.5893  QPS: 12968     Comps: 283       Internal Search Time: 0.0771    CalDist Time: 0.0674
+range: 1000000   recall: 0.6729  QPS: 11774     Comps: 348       Internal Search Time: 0.0849    CalDist Time: 0.0767
 ========================
-# total query time: 0.1909250s
+# total query time: 0.3815320s
 
 Search ef: 64
 ========================
-range: 100       recall: 0.0472  QPS: 372995    Comps: 4         Internal Search Time: 0.0027    CalDist Time: 0.0012
-range: 500       recall: 0.7090  QPS: 22205     Comps: 126       Internal Search Time: 0.0450    CalDist Time: 0.0262
-range: 1000      recall: 0.8785  QPS: 18415     Comps: 189       Internal Search Time: 0.0543    CalDist Time: 0.0342
-range: 5000      recall: 0.9631  QPS: 12625     Comps: 377       Internal Search Time: 0.0792    CalDist Time: 0.0560
-range: 10000     recall: 0.9530  QPS: 11400     Comps: 457       Internal Search Time: 0.0877    CalDist Time: 0.0647
-range: 50000     recall: 0.9237  QPS: 10090     Comps: 594       Internal Search Time: 0.0991    CalDist Time: 0.0775
-range: 100000    recall: 0.9454  QPS: 9032      Comps: 699       Internal Search Time: 0.1107    CalDist Time: 0.0900
+range: 1000      recall: 0.0110  QPS: 117758    Comps: 11        Internal Search Time: 0.0085    CalDist Time: 0.0043
+range: 5000      recall: 0.6095  QPS: 11937     Comps: 188       Internal Search Time: 0.0838    CalDist Time: 0.0538
+range: 10000     recall: 0.7970  QPS: 9877      Comps: 266       Internal Search Time: 0.1012    CalDist Time: 0.0705
+range: 50000     recall: 0.8846  QPS: 6691      Comps: 477       Internal Search Time: 0.1494    CalDist Time: 0.1173
+range: 100000    recall: 0.8785  QPS: 5914      Comps: 557       Internal Search Time: 0.1691    CalDist Time: 0.1375
+range: 500000    recall: 0.8334  QPS: 5253      Comps: 667       Internal Search Time: 0.1904    CalDist Time: 0.1640
+range: 1000000   recall: 0.8898  QPS: 4673      Comps: 823       Internal Search Time: 0.2140    CalDist Time: 0.1907
 ========================
-# total query time: 0.4838470s
+# total query time: 0.9240620s
 
 Search ef: 256
 ========================
-range: 100       recall: 0.0472  QPS: 362319    Comps: 4         Internal Search Time: 0.0028    CalDist Time: 0.0012
-range: 500       recall: 0.7956  QPS: 7432      Comps: 322       Internal Search Time: 0.1346    CalDist Time: 0.0683
-range: 1000      recall: 0.9399  QPS: 5725      Comps: 506       Internal Search Time: 0.1747    CalDist Time: 0.0987
-range: 5000      recall: 0.9956  QPS: 3785      Comps: 1033      Internal Search Time: 0.2642    CalDist Time: 0.1717
-range: 10000     recall: 0.9936  QPS: 3507      Comps: 1257      Internal Search Time: 0.2851    CalDist Time: 0.1943
-range: 50000     recall: 0.9891  QPS: 3171      Comps: 1696      Internal Search Time: 0.3154    CalDist Time: 0.2321
-range: 100000    recall: 0.9911  QPS: 2837      Comps: 2000      Internal Search Time: 0.3525    CalDist Time: 0.2715
+range: 1000      recall: 0.0113  QPS: 110387    Comps: 11        Internal Search Time: 0.0091    CalDist Time: 0.0045
+range: 5000      recall: 0.7462  QPS: 4261      Comps: 519       Internal Search Time: 0.2347    CalDist Time: 0.1368
+range: 10000     recall: 0.9065  QPS: 3302      Comps: 729       Internal Search Time: 0.3028    CalDist Time: 0.1923
+range: 50000     recall: 0.9712  QPS: 2235      Comps: 1328      Internal Search Time: 0.4475    CalDist Time: 0.3308
+range: 100000    recall: 0.9729  QPS: 1983      Comps: 1572      Internal Search Time: 0.5042    CalDist Time: 0.3888
+range: 500000    recall: 0.9534  QPS: 1718      Comps: 1951      Internal Search Time: 0.5820    CalDist Time: 0.4853
+range: 1000000   recall: 0.9682  QPS: 1506      Comps: 2403      Internal Search Time: 0.6642    CalDist Time: 0.5758
 ========================
-# total query time: 1.5349460s
-
-
-下面这个是outrange 会被缩小 很快就不行了
-Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
-Method: Compact
-parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
-Building Index using IndexCompactGraph
-All the forward batch nn #: 2139643
-Theoratical backward batch nn #: 2139643
-Sum of forward batch nn #: 2063564
-Max. forward batch nn #: 0
-Avg. forward nn #: 20.6356
-Avg. forward batch #: 3.19066
-Max. reverse nn #: 0
-Avg. reverse nn #: 0
-Avg. reverse batch #: 0
-Avg. delta nn #: 20.6356
-Forward batch: 0[(0,48666,55586,99999)]
-vertex in set: {44019, 17510, 47522, 78339, 48666, 44339, 55586, 66351, 62838, 91825}
-
-Forward batch: 1[(48667,49817,50186,55585)]
-vertex in set: {53009, 49817, 49806, 50186, 52778, 49530, 49237, 50196, 53113}
-
-Forward batch: 2[(49818,50000,50000,50185)]
-ERROR: EMPTY VECTOR!
-
-
-# Build Index Time: 44.0143380s
-Total # of Neighbors: 2063564
-
-Search ef: 16
-========================
-range: 100       recall: 0.0371  QPS: 351000    Comps: 3         Internal Search Time: 0.0028    CalDist Time: 0.0011
-range: 500       recall: 0.2976  QPS: 60533     Comps: 39        Internal Search Time: 0.0165    CalDist Time: 0.0098
-range: 1000      recall: 0.4693  QPS: 52729     Comps: 60        Internal Search Time: 0.0190    CalDist Time: 0.0123
-range: 5000      recall: 0.6114  QPS: 37144     Comps: 112       Internal Search Time: 0.0269    CalDist Time: 0.0192
-range: 10000     recall: 0.5747  QPS: 36072     Comps: 135       Internal Search Time: 0.0277    CalDist Time: 0.0204
-range: 50000     recall: 0.6639  QPS: 29748     Comps: 211       Internal Search Time: 0.0336    CalDist Time: 0.0267
-range: 100000    recall: 0.7751  QPS: 25206     Comps: 283       Internal Search Time: 0.0397    CalDist Time: 0.0335
-========================
-# total query time: 0.1719300s
-
-Search ef: 64
-========================
-range: 100       recall: 0.0371  QPS: 460193    Comps: 3         Internal Search Time: 0.0022    CalDist Time: 0.0008
-range: 500       recall: 0.5391  QPS: 24524     Comps: 103       Internal Search Time: 0.0408    CalDist Time: 0.0229
-range: 1000      recall: 0.7582  QPS: 20270     Comps: 152       Internal Search Time: 0.0493    CalDist Time: 0.0299
-range: 5000      recall: 0.8660  QPS: 15014     Comps: 270       Internal Search Time: 0.0666    CalDist Time: 0.0454
-range: 10000     recall: 0.8454  QPS: 13819     Comps: 320       Internal Search Time: 0.0724    CalDist Time: 0.0513
-range: 50000     recall: 0.8905  QPS: 11428     Comps: 501       Internal Search Time: 0.0875    CalDist Time: 0.0673
-range: 100000    recall: 0.9449  QPS: 9114      Comps: 691       Internal Search Time: 0.1097    CalDist Time: 0.0896
-========================
-# total query time: 0.4336010s
-
-Search ef: 256
-========================
-range: 100       recall: 0.0371  QPS: 444840    Comps: 3         Internal Search Time: 0.0022    CalDist Time: 0.0008
-range: 500       recall: 0.6744  QPS: 8403      Comps: 279       Internal Search Time: 0.1190    CalDist Time: 0.0586
-range: 1000      recall: 0.8809  QPS: 6506      Comps: 431       Internal Search Time: 0.1537    CalDist Time: 0.0838
-range: 5000      recall: 0.9690  QPS: 4468      Comps: 781       Internal Search Time: 0.2238    CalDist Time: 0.1417
-range: 10000     recall: 0.9640  QPS: 4303      Comps: 916       Internal Search Time: 0.2324    CalDist Time: 0.1532
-range: 50000     recall: 0.9798  QPS: 3570      Comps: 1441      Internal Search Time: 0.2801    CalDist Time: 0.2046
-range: 100000    recall: 0.9909  QPS: 2950      Comps: 1974      Internal Search Time: 0.3390    CalDist Time: 0.2618
-========================
-# total query time: 1.3558400s
+# total query time: 2.7523350s

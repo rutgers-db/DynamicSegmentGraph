@@ -59,30 +59,51 @@ namespace Compact
             return outrange.first == left_range.first && outrange.second == right_range.second;
         }
 
+        /**
+         * @brief 计算以Pivot ID的内部范围以及更新外部范围
+         *
+         * 此函数计算给定的pivotID相对于其他点的最小和最大的外部ID，
+         * 并更新整个范围内的左边界和右边界值。
+         *
+         * @param target_external_id 目标点的外部ID
+         */
         void cal_innerrange(int target_external_id)
         {
-            int tmp_min = std::numeric_limits<int>::max();
-            int tmp_max = -1;
-            left_range.second = target_external_id;
-            right_range.first = target_external_id;
+            int tmp_min = std::numeric_limits<int>::max(); // 初始化临时最小值为int的最大值
+            int tmp_max = -1;                              // 初始化临时最大值为-1
+
+            left_range.second = target_external_id; // 设置左范围的上限为目标ID
+            right_range.first = target_external_id; // 设置右范围的下限为目标ID
+
             for (auto &point_external_id : nns_id)
-            {
+            { // 遍历所有邻居节点的外部ID
                 if (point_external_id > target_external_id)
-                    tmp_min = std::min(tmp_min, point_external_id);
+                    tmp_min = std::min(tmp_min, point_external_id); // 更新临时最小值
+
                 if (point_external_id < target_external_id)
-                    tmp_max = std::max(tmp_max, point_external_id);
+                    tmp_max = std::max(tmp_max, point_external_id); // 更新临时最大值
+
+                // 更新外部范围
+                right_range.second = std::max(right_range.second, point_external_id);
+                left_range.first = std::min(left_range.first, point_external_id);
             }
-            if (tmp_min != std::numeric_limits<int>::max())
-                left_range.second = tmp_max;
-            if (tmp_max != -1)
+
+            if (tmp_min != std::numeric_limits<int>::max()) // 如果有比目标大的ID，则设置右范围的下限
                 right_range.first = tmp_min;
-            
+
+            if (tmp_max != -1) // 如果有比目标小的ID，则设置左范围的上限
+                left_range.second = tmp_max;
         }
 
-        bool judge_if_in_innerrange(int pivot_external_id, int point_external_id){
+        bool judge_if_in_innerrange(int pivot_external_id, int point_external_id)
+        {
             int left_bound = left_range.second == pivot_external_id ? left_range.first : left_range.second;
             int right_bound = right_range.first == pivot_external_id ? right_range.second : right_range.first;
             return point_external_id >= left_bound && point_external_id <= right_bound;
+        }
+
+        bool judge_if_in_outrange(int point_external_id){
+            return point_external_id >= left_range.first && point_external_id <= right_range.second;
         }
     };
 
@@ -90,7 +111,8 @@ namespace Compact
     {
         vector<BatchNeighbors> forward_nns;
 
-        int countNeighborOfOneBatch(){
+        int countNeighborOfOneBatch()
+        {
             int temp_size = 0;
             // 累加每个节点的前向邻居数量
             for (const auto &nns : forward_nns)
@@ -131,12 +153,12 @@ namespace Compact
 
         int max_external_id_ = -1;
         int min_external_id_ = std::numeric_limits<int>::max();
-        
+
         // log
         size_t forward_batch_nn_amount = 0;
         size_t backward_batch_theoratical_nn_amount = 0;
         size_t drop_points_ = 0;
-    
+
         // 指向BaseIndex::IndexParams类型的常量指针，存储索引参数
         const BaseIndex::IndexParams *params;
 
@@ -288,23 +310,25 @@ namespace Compact
 
         void addNegativeEdges(const dist_t cur_dist, int cur_external_id, int target_external_id)
         {
+            // if (target_external_id == 72974)
+            //     cout << "hi";
             auto &target_batches = compact_graph->at(target_external_id).forward_nns;
             const int pre_nns_amount = compact_graph->at(target_external_id).countNeighborOfOneBatch();
 
             unsigned batch_size = target_batches.size();
             unsigned cnt = 0;
-            pair<int,int> outrange = {min_external_id_, max_external_id_};
+            pair<int, int> outrange = {min_external_id_, max_external_id_};
             vector<pair<int, dist_t>> to_insert_points = {{cur_external_id, cur_dist}};
             bool if_outrange_equal;
             while (cnt < batch_size)
-            {   
+            {
                 auto &batch = target_batches[cnt];
                 if_outrange_equal = batch.if_outrange_equal(outrange);
-                if(if_outrange_equal && to_insert_points.size() == 0)
+                if (if_outrange_equal && to_insert_points.size() == 0)
                     break;
-                
+
                 update_batch(outrange, batch, target_external_id, to_insert_points, if_outrange_equal);
-                pair<int,int> cur_inner_range = {batch.left_range.second, batch.right_range.first};
+                pair<int, int> cur_inner_range = {batch.left_range.second, batch.right_range.first};
 
                 // TODO: Can it moved inside "If"
                 // if updated means next outrange need to be aligned with current inner range
@@ -316,9 +340,11 @@ namespace Compact
             }
 
             // If still left points, create a new batch
-            if(to_insert_points.size() > 0){
-                target_batches.emplace_back(batch_size, outrange.first, target_external_id , target_external_id, outrange.second);
-                for(auto &point : to_insert_points){
+            if (to_insert_points.size() > 0)
+            {
+                target_batches.emplace_back(batch_size, outrange.first, target_external_id, target_external_id, outrange.second);
+                for (auto &point : to_insert_points)
+                {
                     target_batches[batch_size].nns_id.emplace_back(point.first);
                 }
                 target_batches[batch_size].cal_innerrange(target_external_id);
@@ -326,14 +352,13 @@ namespace Compact
 
             const int now_nns_amount = compact_graph->at(target_external_id).countNeighborOfOneBatch();
             // assert(pre_nns_amount == now_nns_amount - 1);
-            
         }
 
         void update_batch(pair<int, int> &outrange, BatchNeighbors &batch, int target_external_id, vector<pair<int, dist_t>> &to_insert_points, bool if_outrange_equal)
         {
             // Check whether need to update the outrange
             if (if_outrange_equal == false)
-            {   
+            {
                 // Todo: Need to debate whether need to shrink the outrange to prune some points
                 // batch.left_range.first = outrange.first;
                 // batch.right_range.second = outrange.second;
@@ -345,9 +370,9 @@ namespace Compact
             // TODO: Maybe the passed cur_range is a larger range and curerent top_k_indices is not up to k elements (the last layer)
             // We can just push the outer elements into the top_k_indices (But it is not important to update the minimum range)
 
-            std::priority_queue<std::pair<dist_t, int> > max_dist_heap;
+            std::priority_queue<std::pair<dist_t, int>> max_dist_heap;
             for (auto &nn_id : batch.nns_id)
-            {  
+            {
                 if (nn_id >= batch.left_range.first && nn_id <= batch.right_range.second)
                 {
                     dist_t cur_dist = fstdistfunc_(getDataByLabel((size_t)target_external_id), getDataByLabel((size_t)nn_id), dist_func_param_);
@@ -355,7 +380,7 @@ namespace Compact
                 }
             }
             size_t Mcurmax = 2 * maxM0_;
-        
+
             // if it already not full, not need to check the distance
             auto max_dist = max_dist_heap.size() >= Mcurmax ? max_dist_heap.top().first : std::numeric_limits<dist_t>::max();
             vector<pair<int, dist_t>> to_pass_points;
@@ -364,35 +389,45 @@ namespace Compact
             {
                 if (point.second > max_dist)
                 // if the point distance is too far, just drop it, except it is not in current compressed range
-                {   
-                    if(batch.judge_if_in_innerrange(target_external_id, point.first)){
+                {
+                    if (batch.judge_if_in_innerrange(target_external_id, point.first))
+                    {
                         to_pass_points.emplace_back(point);
                     }
-                }else{
+                }
+                else
+                {
                     max_dist_heap.emplace(point.second, point.first);
                 }
             }
-           
+
             // check whether we need pruning? try not pruning
-            if(max_dist_heap.size() > Mcurmax){
-                while (max_dist_heap.size() > Mcurmax)
-                {   
-                    auto [distance, point_index] = max_dist_heap.top(); // 解构赋值以提高可读性
-                    max_dist_heap.pop();
-                    dropped_points.emplace_back(point_index, distance);
-                }
+            if (max_dist_heap.size() > Mcurmax)
+            {
+                // We should just pop the maxheap
+                // we need to prune first
+                // while (max_dist_heap.size() > Mcurmax)
+                // {
+                //     auto [distance, point_index] = max_dist_heap.top(); // 解构赋值以提高可读性
+                //     max_dist_heap.pop();
+                //     dropped_points.emplace_back(point_index, distance);
+                // }
 
                 // Start pruning
                 vector<std::pair<dist_t, int>> return_list;
-                std::priority_queue<std::pair<dist_t, int> > queue_closest;
+                std::priority_queue<std::pair<dist_t, int>> queue_closest;
                 while (max_dist_heap.size() > 0)
                 {
                     queue_closest.emplace(-max_dist_heap.top().first,
-                                        max_dist_heap.top().second);
+                                          max_dist_heap.top().second);
                     max_dist_heap.pop();
                 }
                 while (queue_closest.size())
                 {
+                    // Reach limit just break
+                    if (return_list.size() >= Mcurmax)
+                        break;
+
                     // 获取当前队列顶部的元素
                     std::pair<dist_t, int> current_pair = queue_closest.top();
 
@@ -417,7 +452,12 @@ namespace Compact
                         if (curdist < dist_to_query)
                         {
                             good = false;
-                            dropped_points.emplace_back(current_pair.second, current_pair.first);
+                            // try try this will lead more points into the next batch
+                            // if dominated point is dominated by a point outer than it, then we still need it if the query range is "inner"
+                            // auto cur_external_id = current_pair.second;
+                            // auto dominate_external_id = second_pair.second;
+                            // if((cur_external_id > target_external_id && dominate_external_id > cur_external_id) || (cur_external_id < target_external_id && dominate_external_id < cur_external_id) )
+                            dropped_points.emplace_back(current_pair.second, dist_to_query);
                             break;
                         }
                     }
@@ -427,6 +467,15 @@ namespace Compact
                     }
                 }
 
+                // push the rest points in queue_closest into dropped_points
+                while (queue_closest.size())
+                {
+                    std::pair<dist_t, int> current_pair = queue_closest.top();
+                    // remember in the queue closest the distance is negative
+                    dropped_points.emplace_back(current_pair.second, -current_pair.first);
+                    queue_closest.pop();
+                }
+
                 // update batch nnds_id
                 batch.nns_id.clear();
                 for (auto &point : return_list)
@@ -434,7 +483,9 @@ namespace Compact
                     batch.nns_id.emplace_back(point.second);
                 }
                 batch.cal_innerrange(target_external_id);
-            }else{
+            }
+            else
+            {
                 // not need to do prune
                 // just push the maxheap list into the batch.nns_id
                 batch.nns_id.clear();
@@ -445,7 +496,7 @@ namespace Compact
                 }
                 batch.cal_innerrange(target_external_id);
             }
-            
+
             // update outrange
             if (batch.left_range.second != target_external_id)
             {
@@ -459,8 +510,8 @@ namespace Compact
             // try to put qualified points into the to_pass_point
             for (auto &point : dropped_points)
             {
-                if(batch.judge_if_in_innerrange(target_external_id, point.first))
-                // if (point.first > batch.left_range.second and point.first < batch.right_range.first)
+                if (batch.judge_if_in_innerrange(target_external_id, point.first))
+                    // if (point.first > batch.left_range.second and point.first < batch.right_range.first)
                     to_pass_points.emplace_back(point);
             }
             to_insert_points.swap(to_pass_points);
@@ -573,14 +624,15 @@ namespace Compact
                         one_batch.nns_id.swap(return_external_list);
                         compact_graph->at(external_id).forward_nns.emplace_back(one_batch);
                         // add reverse edge
-                        for(auto i = 0; i < one_batch.nns_id.size(); i++){
-                            auto point_dist = - return_list[i].first;
+                        for (auto i = 0; i < one_batch.nns_id.size(); i++)
+                        {
+                            auto point_dist = -return_list[i].first;
                             auto target_external_id = one_batch.nns_id[i];
                             addNegativeEdges(point_dist, external_id, target_external_id);
                         }
 
                         backward_batch_theoratical_nn_amount += return_list.size();
-                        
+
                         return_list.clear(); // 这里会清空return list
                         return_external_list.clear();
                         iter_counter = 0;
@@ -666,10 +718,11 @@ namespace Compact
                     forward_batch_nn_amount += return_external_list.size();
                     one_batch.nns_id.swap(return_external_list);
                     compact_graph->at(external_id).forward_nns.emplace_back(one_batch);
-                   
+
                     // add reverse edges
-                    for(auto i = 0; i < one_batch.nns_id.size(); i++){
-                        auto point_dist = - return_list[i].first;
+                    for (auto i = 0; i < one_batch.nns_id.size(); i++)
+                    {
+                        auto point_dist = -return_list[i].first;
                         auto target_external_id = one_batch.nns_id[i];
                         addNegativeEdges(point_dist, external_id, target_external_id);
                     }
@@ -834,7 +887,6 @@ namespace Compact
             cout << endl;
         }
 
-        
         /**
          * @brief 计算图中的邻居节点数量统计信息
          *
@@ -871,9 +923,9 @@ namespace Compact
 
             // 打印日志（如果启用）
             if (isLog)
-            {   
-                
-                 cout << "Sum of forward batch nn #: " << index_info->nodes_amount << endl;    
+            {
+
+                cout << "Sum of forward batch nn #: " << index_info->nodes_amount << endl;
                 cout << "Max. forward batch nn #: " << max_batch_counter << endl;
                 cout << "Avg. forward nn #: " << index_info->nodes_amount / static_cast<float>(data_wrapper->data_size) << endl;
                 cout << "Avg. forward batch #: " << batch_counter / static_cast<float>(data_wrapper->data_size) << endl;
@@ -914,13 +966,15 @@ namespace Compact
             std::iota(permutation.begin(), permutation.end(), 0);
 
             // Step 2: Shuffle the sequence
-            std::random_device rd; // obtain a random number from hardware
+            std::random_device rd;    // obtain a random number from hardware
             unsigned int seed = 2024; // fix the seed for debug
-            std::mt19937 g(seed);  // seed the generator
+            // std::mt19937 g(rd());
+            std::mt19937 g(seed);     // seed the generator
             std::shuffle(permutation.begin(), permutation.end(), g);
 
             // Step 3: Traverse the shuffled sequence
 
+            cout << "First point" << permutation[0] << endl;
             for (size_t i : permutation)
             {
                 hnsw.addPoint(data_wrapper->nodes.at(i).data(), i);
@@ -929,8 +983,8 @@ namespace Compact
             gettimeofday(&tt2, NULL);
             index_info->index_time = CountTime(tt1, tt2);
 
-            cout << "All the forward batch nn #: " <<  hnsw.forward_batch_nn_amount << endl;
-            cout << "Theoratical backward batch nn #: " <<  hnsw.backward_batch_theoratical_nn_amount << endl;
+            cout << "All the forward batch nn #: " << hnsw.forward_batch_nn_amount << endl;
+            cout << "Theoratical backward batch nn #: " << hnsw.backward_batch_theoratical_nn_amount << endl;
 
             // count neighbors number
             countNeighbrs();
@@ -1053,7 +1107,6 @@ namespace Compact
                     decompressForwardPath(neighbor_iterators,
                                           directed_indexed_arr[current_node_id].forward_nns,
                                           query_bound.first, query_bound.second);
-
                 }
                 gettimeofday(&tt2, NULL);                              // 结束时间记录
                 AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
@@ -1061,7 +1114,7 @@ namespace Compact
                 // 处理邻居集合
                 gettimeofday(&tt1, NULL); // 开始时间记录
                 unsigned cnt_positive_through_neighbors = 0;
-                const auto Mcurmax = 2 * index_params_->K; //  也需要看看效果 不过现在反向边和正向边放在一起，当然得扩大成2K
+                const auto Mcurmax = 2 * index_params_->K; // 也需要看看效果 不过现在反向边和正向边放在一起，当然得扩大成2K // 也可以试试不加这个条件，理论上应该只会提升时间和recall 不会降低recall和time吧
                 for (auto batch_it : neighbor_iterators)
                 {
                     for (auto candidate_id : *batch_it)

@@ -145,6 +145,8 @@ def insert_point2compress_ranges(compress_ranges, insert_points, array, k, pivot
             range_if_update = True
         compress_ranges[cnt] = updated_cr     
         cnt += 1
+    
+    # TODO: 最后可能还有insert_points 需要新开一个compress range to store the rest points
 
     return compress_ranges
     

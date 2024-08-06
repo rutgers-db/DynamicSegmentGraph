@@ -150,6 +150,7 @@ int main(int argc, char **argv)
                          << endl;
                     gettimeofday(&t1, NULL);
                     index.buildIndex(&i_params);
+                    index.printOnebatch();
                     gettimeofday(&t2, NULL);
                     logTime(t1, t2, "Build Index Time");
                     cout << "Total # of Neighbors: " << index.index_info->nodes_amount
@@ -168,7 +169,7 @@ int main(int argc, char **argv)
                             /**
                              * 对于每个查询ID，执行范围过滤搜索并更新结果记录器。
                              */
-                            for (int idx = 0; idx < data_wrapper.query_ids.size(); idx++)
+                            for (unsigned idx = 0; idx < data_wrapper.query_ids.size(); idx++)
                             {
                                 int one_id = data_wrapper.query_ids.at(idx);
                                 s_params.query_range =

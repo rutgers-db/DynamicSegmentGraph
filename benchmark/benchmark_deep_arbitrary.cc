@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     for (int i = 0; i < argc; i++)
     {
         string arg = argv[i];
-        // if (arg == "-dataset") dataset = string(argv[i + 1]);
+        if (arg == "-dataset") dataset = string(argv[i + 1]);
         if (arg == "-N")
             data_size = atoi(argv[i + 1]);
         if (arg == "-dataset_path")

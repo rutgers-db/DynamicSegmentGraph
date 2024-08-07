@@ -1,0 +1,69 @@
+# of vecs: 100000
+Loading Groundtruth from../groundtruth/yt8m_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 64, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-yt8m-audio-100000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexCompactGraph
+Max. forward batch nn #: 0
+Avg. forward nn #: 15.7002
+Avg. forward batch #: 3.56024
+Max. reverse nn #: 607
+Avg. reverse nn #: 15.7002
+Avg. reverse batch #: 1
+Avg. delta nn #: 31.4004
+Forward batch: 0[(0,448675004799999)]
+vertex in set: {99797, 57411, 10036, 74084, 13389, 50047, 44867}
+
+Forward batch: 1[(44868,500005000050046)]
+vertex in set: {49680, 49730, 46188, 47774}
+
+
+Reverse batch: 
+vertex in set: {18649}
+
+
+# Build Index Time: 38.8603830s
+Total # of Neighbors: 3140038
+
+Search ef: 16
+========================
+range: 100       recall: 0.0418  QPS: 370233    Comps: 2         Internal Search Time: 0.0027    CalDist Time: 0.0010
+range: 500       recall: 0.3878  QPS: 56651     Comps: 50        Internal Search Time: 0.0177    CalDist Time: 0.0117
+range: 1000      recall: 0.6169  QPS: 40843     Comps: 104       Internal Search Time: 0.0245    CalDist Time: 0.0179
+range: 5000      recall: 0.8401  QPS: 24309     Comps: 226       Internal Search Time: 0.0411    CalDist Time: 0.0331
+range: 10000     recall: 0.8813  QPS: 20518     Comps: 299       Internal Search Time: 0.0487    CalDist Time: 0.0404
+range: 50000     recall: 0.8858  QPS: 14803     Comps: 474       Internal Search Time: 0.0676    CalDist Time: 0.0597
+range: 100000    recall: 0.9099  QPS: 12801     Comps: 578       Internal Search Time: 0.0781    CalDist Time: 0.0715
+========================
+# total query time: 0.2870780s
+
+Search ef: 64
+========================
+range: 100       recall: 0.0418  QPS: 455789    Comps: 2         Internal Search Time: 0.0022    CalDist Time: 0.0007
+range: 500       recall: 0.4944  QPS: 25399     Comps: 101       Internal Search Time: 0.0394    CalDist Time: 0.0233
+range: 1000      recall: 0.7539  QPS: 16235     Comps: 232       Internal Search Time: 0.0616    CalDist Time: 0.0418
+range: 5000      recall: 0.9392  QPS: 9023      Comps: 574       Internal Search Time: 0.1108    CalDist Time: 0.0852
+range: 10000     recall: 0.9505  QPS: 7678      Comps: 711       Internal Search Time: 0.1302    CalDist Time: 0.1032
+range: 50000     recall: 0.9472  QPS: 5815      Comps: 1069      Internal Search Time: 0.1720    CalDist Time: 0.1467
+range: 100000    recall: 0.9675  QPS: 4864      Comps: 1311      Internal Search Time: 0.2056    CalDist Time: 0.1825
+========================
+# total query time: 0.7280970s
+
+Search ef: 256
+========================
+range: 100       recall: 0.0418  QPS: 451671    Comps: 2         Internal Search Time: 0.0022    CalDist Time: 0.0007
+range: 500       recall: 0.5493  QPS: 9171      Comps: 185       Internal Search Time: 0.1090    CalDist Time: 0.0507
+range: 1000      recall: 0.8195  QPS: 5535      Comps: 478       Internal Search Time: 0.1807    CalDist Time: 0.1055
+range: 5000      recall: 0.9660  QPS: 2855      Comps: 1639      Internal Search Time: 0.3502    CalDist Time: 0.2595
+range: 10000     recall: 0.9761  QPS: 2357      Comps: 2266      Internal Search Time: 0.4243    CalDist Time: 0.3274
+range: 50000     recall: 0.9619  QPS: 1877      Comps: 3215      Internal Search Time: 0.5328    CalDist Time: 0.4359
+range: 100000    recall: 0.9739  QPS: 1617      Comps: 3788      Internal Search Time: 0.6183    CalDist Time: 0.5267
+========================
+# total query time: 2.2241700s

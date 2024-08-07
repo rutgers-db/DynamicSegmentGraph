@@ -970,7 +970,193 @@ namespace base_hnsw
                                 CompareByFirst> &top_candidates,
             int level, bool isUpdate)
         {
-            return 0; // ??? why return 0
+            size_t Mcurmax = maxM0_; // 最大邻接数量
+            tableint next_closest_entry_point = 0; // 下一个最近入口点
+
+            // 邻居选择容器初始化 这个邻居是对整个图的邻居 也就是说对整个图他本身整个range的信息他有 但是sub range 的信息我是自己额外存的
+            std::vector<tableint> selectedNeighbors;
+            selectedNeighbors.reserve(M_);
+
+            {
+                // MAX_POS recursive pruning, combining into connect function.
+
+                // 处理优先级队列：从最近到最远排序候选者
+                std::priority_queue<std::pair<dist_t, tableint>> queue_closest;
+                while (!top_candidates.empty())
+                {
+                    queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second);
+                    top_candidates.pop();
+                }
+                // Now top_candidates is empty
+
+                // 初始化变量
+               
+                unsigned iter_counter = 0;
+                unsigned batch_counter = 0;
+                std::vector<std::pair<dist_t, int>> return_list;
+
+                // Need a buffer candidates to store neighbors (external_id, dist_t,
+                // internal_id)
+                vector<pair<int, pair<dist_t, tableint>>> buffer_candidates;
+
+                // 主循环处理候选者队列直到为空
+                while (!queue_closest.empty())
+                {
+                    // If return list size meet M or current window exceed ef_construction, end this batch, enter the new batch
+                    if (return_list.size() >= Mcurmax ||
+                        iter_counter >= ef_basic_construction_)
+                    {
+                        // The first batch, also use for original HNSW constructing
+                        next_closest_entry_point =
+                            return_list.front()
+                                .second; // TODO: check whether the nearest neighbor
+                        for (std::pair<dist_t, int> curent_pair : return_list)
+                        {
+                            selectedNeighbors.push_back((tableint)curent_pair.second);
+                        }
+                        break;
+                        
+                    }
+
+                    std::pair<dist_t, tableint> curent_pair = queue_closest.top(); // 当前离我最近的点
+                    dist_t dist_to_query = -curent_pair.first;
+                    queue_closest.pop();
+
+                    bool good = true;
+
+                    // 查看会不会被在return list的给prune掉
+                    for (std::pair<dist_t, int> second_pair : return_list)
+                    {
+                        dist_t curdist = fstdistfunc_(getDataByInternalId(second_pair.second),
+                                                      getDataByInternalId(curent_pair.second),
+                                                      dist_func_param_);
+
+                        if (curdist < dist_to_query)
+                        {
+                            good = false;
+                            break;
+                        }
+                    }
+
+                    if (good)
+                    {
+                        return_list.emplace_back(curent_pair.first, (int)curent_pair.second);
+                    }
+                }
+
+                if (selectedNeighbors.empty()) // 这种情况是上面的while 跑完了 但是一个batch都没满 所以需要单独处理
+                {
+                    // The first batch, also use for original HNSW constructing
+                    next_closest_entry_point = return_list.front().second;
+                    for (std::pair<dist_t, int> curent_pair : return_list)
+                    {
+                        selectedNeighbors.push_back(curent_pair.second);
+                    }
+                }
+            }
+
+            // 把找到的selectedNeighbors放进cur_c的邻接列表
+            {
+                linklistsizeint *ll_cur;
+                ll_cur = get_linklist0(cur_c);
+
+                if (*ll_cur && !isUpdate)
+                {
+                    throw std::runtime_error(
+                        "The newly inserted element should have blank link list");
+                }
+                setListCount(ll_cur, selectedNeighbors.size());
+                tableint *data = (tableint *)(ll_cur + 1);
+                for (size_t idx = 0; idx < selectedNeighbors.size(); idx++)
+                {
+                    if (data[idx] && !isUpdate)
+                        throw std::runtime_error("Possible memory corruption");
+                    if (level > element_levels_[selectedNeighbors[idx]])
+                        throw std::runtime_error(
+                            "Trying to make a link on a non-existent level");
+
+                    data[idx] = selectedNeighbors[idx];
+                }
+            }
+
+            for (size_t idx = 0; idx < selectedNeighbors.size(); idx++)
+            {
+                std::unique_lock<std::mutex> lock(
+                    link_list_locks_[selectedNeighbors[idx]]);
+
+                linklistsizeint *ll_other;
+                ll_other = get_linklist0(selectedNeighbors[idx]);
+
+                size_t sz_link_list_other = getListCount(ll_other);
+
+                if (sz_link_list_other > Mcurmax)
+                    throw std::runtime_error("Bad value of sz_link_list_other");
+                if (selectedNeighbors[idx] == cur_c)
+                    throw std::runtime_error("Trying to connect an element to itself");
+                if (level > element_levels_[selectedNeighbors[idx]])
+                    throw std::runtime_error(
+                        "Trying to make a link on a non-existent level");
+
+                tableint *data = (tableint *)(ll_other + 1);
+
+                bool is_cur_c_present = false;
+                if (isUpdate)
+                {
+                    for (size_t j = 0; j < sz_link_list_other; j++)
+                    {
+                        if (data[j] == cur_c)
+                        {
+                            is_cur_c_present = true;
+                            break;
+                        }
+                    }
+                }
+                // If cur_c is already present in the neighboring connections of
+                // `selectedNeighbors[idx]` then no need to modify any connections or
+                // run the heuristics.
+                if (!is_cur_c_present)
+                {
+                    if (sz_link_list_other < Mcurmax)
+                    {
+                        data[sz_link_list_other] = cur_c;
+                        setListCount(ll_other, sz_link_list_other + 1);
+                    }
+                    else
+                    {
+                        // finding the "weakest" element to replace it with the new one
+                        dist_t d_max = fstdistfunc_(
+                            getDataByInternalId(cur_c),
+                            getDataByInternalId(selectedNeighbors[idx]), dist_func_param_);
+                        // Heuristic:
+                        std::priority_queue<std::pair<dist_t, tableint>,
+                                            std::vector<std::pair<dist_t, tableint>>,
+                                            CompareByFirst>
+                            candidates;
+                        candidates.emplace(d_max, cur_c);
+
+                        for (size_t j = 0; j < sz_link_list_other; j++)
+                        {
+                            candidates.emplace(
+                                fstdistfunc_(getDataByInternalId(data[j]),
+                                             getDataByInternalId(selectedNeighbors[idx]),
+                                             dist_func_param_),
+                                data[j]);
+                        }
+
+                        getNeighborsByHeuristic2(candidates, Mcurmax);
+
+                        int indx = 0;
+                        while (candidates.size() > 0)
+                        {
+                            data[indx] = candidates.top().second;
+                            candidates.pop();
+                            indx++;
+                        }
+                        setListCount(ll_other, indx);
+                    }
+                }
+            }
+            return next_closest_entry_point;
         }
 
         /**

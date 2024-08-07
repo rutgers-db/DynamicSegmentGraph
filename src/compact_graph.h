@@ -307,7 +307,6 @@ namespace Compact
 
             return top_candidates;
         }
-
         void addNegativeEdges(const dist_t cur_dist, int cur_external_id, int target_external_id)
         {
             // if (target_external_id == 72974)
@@ -516,7 +515,20 @@ namespace Compact
             }
             to_insert_points.swap(to_pass_points);
         }
+        
+        void addRangeEdges(const void *data_point, labeltype label){
+            tableint label_c;
+            auto search = label_lookup_.find(label);
+            if (search == label_lookup_.end() || isMarkedDeleted(search->second))
+            {
+                throw std::runtime_error("Label not found");
+            }
+            label_c = search->second;
 
+            auto currObj = label_c;
+            auto top_candidates = searchBaseLayerLevel0(currObj, data_point, 0);
+            getRangeEdges(data_point, label_c, top_candidates, 0, 0);
+        }
         /**
          * @file src/compact_graph.h
          * @brief 互连新元素并递归地应用启发式剪枝算法并且对插入元素的attribute没有要求
@@ -525,7 +537,7 @@ namespace Compact
          * 并通过优先队列处理候选邻居以优化连接过程。
          */
 
-        virtual tableint mutuallyConnectNewElementLevel0(
+        void getRangeEdges(
             const void *data_point, /**< 当前数据点 */
             tableint cur_c,         /**< 当前节点的内部标识符 */
             std::priority_queue<std::pair<dist_t, tableint>,
@@ -591,18 +603,6 @@ namespace Compact
 
                         // reset batch, add current batch;
                         // no breaking because recursivly visiting the candidates.
-
-                        if (batch_counter == 0)
-                        {
-                            // The first batch, also use for original HNSW constructing
-                            next_closest_entry_point =
-                                return_list.front()
-                                    .second; // TODO: check whether the nearest neighbor
-                            for (std::pair<dist_t, int> curent_pair : return_list)
-                            {
-                                selectedNeighbors.push_back((tableint)curent_pair.second);
-                            }
-                        }
 
                         for (pair<int, pair<dist_t, tableint>> curent_buffer :
                              buffer_candidates)
@@ -701,15 +701,7 @@ namespace Compact
                     }
                 }
 
-                if (batch_counter == 0 && return_list.size()) // 这种情况是上面的while 跑完了 但是一个batch都没满 所以需要单独处理
-                {
-                    // The first batch, also use for original HNSW constructing
-                    next_closest_entry_point = return_list.front().second;
-                    for (std::pair<dist_t, int> curent_pair : return_list)
-                    {
-                        selectedNeighbors.push_back(curent_pair.second);
-                    }
-                }
+                
 
                 if (!return_list.empty() && external_lr_most.first <= external_id && external_id <= external_lr_most.second) // 这里肯定会进的 因为最后还是batch没打满 离插入点的attribute维度上最近的点们，很可能凑不齐M或者ef construction个 然后这里也得进OneSegmentNeighbors
                 {
@@ -719,7 +711,7 @@ namespace Compact
                     one_batch.nns_id.swap(return_external_list);
                     compact_graph->at(external_id).forward_nns.emplace_back(one_batch);
 
-                    // add reverse edges
+                    // // add reverse edges
                     for (auto i = 0; i < one_batch.nns_id.size(); i++)
                     {
                         auto point_dist = -return_list[i].first;
@@ -729,127 +721,6 @@ namespace Compact
                     backward_batch_theoratical_nn_amount += return_list.size();
                 }
             }
-
-            // 把找到的selectedNeighbors放进cur_c的邻接列表
-            {
-                linklistsizeint *ll_cur;
-                ll_cur = get_linklist0(cur_c);
-
-                if (*ll_cur && !isUpdate)
-                {
-                    throw std::runtime_error(
-                        "The newly inserted element should have blank link list");
-                }
-                setListCount(ll_cur, selectedNeighbors.size());
-                tableint *data = (tableint *)(ll_cur + 1);
-                for (size_t idx = 0; idx < selectedNeighbors.size(); idx++)
-                {
-                    if (data[idx] && !isUpdate)
-                        throw std::runtime_error("Possible memory corruption");
-                    if (level > element_levels_[selectedNeighbors[idx]])
-                        throw std::runtime_error(
-                            "Trying to make a link on a non-existent level");
-
-                    data[idx] = selectedNeighbors[idx];
-                }
-            }
-
-            for (size_t idx = 0; idx < selectedNeighbors.size(); idx++)
-            {
-                std::unique_lock<std::mutex> lock(
-                    link_list_locks_[selectedNeighbors[idx]]);
-
-                linklistsizeint *ll_other;
-                ll_other = get_linklist0(selectedNeighbors[idx]);
-
-                size_t sz_link_list_other = getListCount(ll_other);
-
-                if (sz_link_list_other > Mcurmax)
-                    throw std::runtime_error("Bad value of sz_link_list_other");
-                if (selectedNeighbors[idx] == cur_c)
-                    throw std::runtime_error("Trying to connect an element to itself");
-                if (level > element_levels_[selectedNeighbors[idx]])
-                    throw std::runtime_error(
-                        "Trying to make a link on a non-existent level");
-
-                tableint *data = (tableint *)(ll_other + 1);
-
-                bool is_cur_c_present = false;
-                if (isUpdate)
-                {
-                    for (size_t j = 0; j < sz_link_list_other; j++)
-                    {
-                        if (data[j] == cur_c)
-                        {
-                            is_cur_c_present = true;
-                            break;
-                        }
-                    }
-                }
-
-                // 这里就正常跑就完事了
-                // If cur_c is already present in the neighboring connections of
-                // `selectedNeighbors[idx]` then no need to modify any connections or
-                // run the heuristics.
-                if (!is_cur_c_present)
-                {
-                    if (sz_link_list_other < Mcurmax)
-                    {
-                        data[sz_link_list_other] = cur_c;
-                        setListCount(ll_other, sz_link_list_other + 1);
-                    }
-                    else
-                    {
-                        // finding the "weakest" element to replace it with the new one
-                        dist_t d_max = fstdistfunc_(
-                            getDataByInternalId(cur_c),
-                            getDataByInternalId(selectedNeighbors[idx]), dist_func_param_);
-                        // Heuristic:
-                        std::priority_queue<std::pair<dist_t, tableint>,
-                                            std::vector<std::pair<dist_t, tableint>>,
-                                            CompareByFirst>
-                            candidates;
-                        candidates.emplace(d_max, cur_c);
-
-                        for (size_t j = 0; j < sz_link_list_other; j++)
-                        {
-                            candidates.emplace(
-                                fstdistfunc_(getDataByInternalId(data[j]),
-                                             getDataByInternalId(selectedNeighbors[idx]),
-                                             dist_func_param_),
-                                data[j]);
-                        }
-
-                        getNeighborsByHeuristic2(candidates, Mcurmax);
-
-                        int indx = 0;
-                        while (candidates.size() > 0)
-                        {
-                            data[indx] = candidates.top().second;
-                            candidates.pop();
-                            indx++;
-                        }
-                        setListCount(ll_other, indx);
-                    }
-                }
-            }
-
-            // Update: integrate this step in processing reverse edges.
-            // just add reverse nns, no pruning, no processing
-            // for (auto &batch : compact_graph->at(external_id).forward_nns) {
-            //   if (batch.nns.empty()) {
-            //     continue;
-            //   }
-
-            //   for (auto nn : batch.nns) {
-            //     // reverse_nns_vecs.at(nn.first).emplace_back(
-            //     //     make_pair(external_id, nn.second));
-            //     batch.nns_id.emplace_back(nn.first);  // TODO: put this during
-            //     pruning
-            //   }
-            // }
-
-            return next_closest_entry_point;
         }
     };
 
@@ -978,6 +849,13 @@ namespace Compact
             for (size_t i : permutation)
             {
                 hnsw.addPoint(data_wrapper->nodes.at(i).data(), i);
+            }
+
+            // Step 4: Get Compressed Edges
+
+            for (size_t i : permutation)
+            {
+                hnsw.addRangeEdges(data_wrapper->nodes.at(i).data(), i);
             }
 
             gettimeofday(&tt2, NULL);

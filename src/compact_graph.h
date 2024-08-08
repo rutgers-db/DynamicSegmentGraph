@@ -109,6 +109,8 @@ namespace Compact
 
     struct DirectedBatchNeighbors
     {
+        vector<pair<int,float>> forward_edges;
+        vector<pair<int,float>> back_edges;
         vector<BatchNeighbors> forward_nns;
 
         int countNeighborOfOneBatch()
@@ -149,10 +151,11 @@ namespace Compact
 
             // 设置最大扩展因子为索引参数中的ef_max值
             ef_max_ = index_params.ef_max;
+            max_external_id_ = max_elements;
         }
 
-        int max_external_id_ = -1;
-        int min_external_id_ = std::numeric_limits<int>::max();
+        int max_external_id_;
+        int min_external_id_ = 0;
 
         // log
         size_t forward_batch_nn_amount = 0;
@@ -309,9 +312,17 @@ namespace Compact
         }
         void addNegativeEdges(const dist_t cur_dist, int cur_external_id, int target_external_id)
         {
-            // if (target_external_id == 72974)
-            //     cout << "hi";
+            if(target_external_id == cur_external_id)
+                return;
+            // check whether the inserted point is already in the batches
             auto &target_batches = compact_graph->at(target_external_id).forward_nns;
+            for(auto & batch: target_batches){
+                for(auto nn_id:batch.nns_id){
+                    if(nn_id == cur_external_id)
+                        return;
+                }
+            }
+
             const int pre_nns_amount = compact_graph->at(target_external_id).countNeighborOfOneBatch();
 
             unsigned batch_size = target_batches.size();
@@ -527,8 +538,41 @@ namespace Compact
 
             auto currObj = label_c;
             auto top_candidates = searchBaseLayerLevel0(currObj, data_point, 0);
-            getRangeEdges(data_point, label_c, top_candidates, 0, 0);
+            // getRangeEdges(data_point, label_c, top_candidates, 0, 0);
+            auto& forward_vec = compact_graph->at(label).forward_edges;
+            while (!top_candidates.empty())
+            {   
+                if((int)top_candidates.top().second == label_c){
+                    top_candidates.pop();
+                    continue;
+                }
+                forward_vec.emplace_back( (int)top_candidates.top().second, top_candidates.top().first);
+                auto cand_external_id = getExternalLabel(top_candidates.top().second);
+                // reverse edge
+                auto& back_vec = compact_graph->at(cand_external_id).back_edges;
+                back_vec.emplace_back((int)label_c, top_candidates.top().first);
+                top_candidates.pop();
+            }
         }
+
+        void addRevRangeEdges(const void *data_point, labeltype label){
+            tableint label_c;
+            auto search = label_lookup_.find(label);
+            if (search == label_lookup_.end() || isMarkedDeleted(search->second))
+            {
+                throw std::runtime_error("Label not found");
+            }
+            label_c = search->second;
+
+            auto& batches = compact_graph->at(label).forward_nns;
+            for(auto & batch:batches){
+                for(auto & nn_id: batch.nns_id){
+                    auto dist = fstdistfunc_(getDataByLabel((size_t)label), getDataByLabel((size_t)nn_id), dist_func_param_);
+                    addNegativeEdges(dist, label, nn_id);
+                }
+            }
+        }
+
         /**
          * @file src/compact_graph.h
          * @brief 互连新元素并递归地应用启发式剪枝算法并且对插入元素的attribute没有要求
@@ -536,43 +580,35 @@ namespace Compact
          * 此函数用于连接新的数据点到图中的现有节点，
          * 并通过优先队列处理候选邻居以优化连接过程。
          */
-
         void getRangeEdges(
             const void *data_point, /**< 当前数据点 */
-            tableint cur_c,         /**< 当前节点的内部标识符 */
-            std::priority_queue<std::pair<dist_t, tableint>,
-                                std::vector<std::pair<dist_t, tableint>>,
-                                CompareByFirst> &top_candidates, /**< 候选邻居列表 */
-            int level,                                           /**< layer level */
-            bool isUpdate)                                       /**< 是否是更新已有的点 还是插入新的点 */
+            tableint cur_c         /**< 当前节点的内部标识符 */ )                                       /**< 是否是更新已有的点 还是插入新的点 */
         {
             size_t Mcurmax = maxM0_; // 最大邻接数量
 
             // 获取当前节点的外部标签
             int external_id = getExternalLabel(cur_c);
-            tableint next_closest_entry_point = 0; // 下一个最近入口点
-
-            // 更新目前所有节点的最大和最小外部标签值
-            if (external_id > max_external_id_)
-                max_external_id_ = external_id;
-            if (external_id < min_external_id_)
-                min_external_id_ = external_id;
-
-            // 邻居选择容器初始化 这个邻居是对整个图的邻居 也就是说对整个图他本身整个range的信息他有 但是sub range 的信息我是自己额外存的
-            std::vector<tableint> selectedNeighbors;
-            selectedNeighbors.reserve(M_);
 
             {
                 // MAX_POS recursive pruning, combining into connect function.
 
                 // 处理优先级队列：从最近到最远排序候选者
                 std::priority_queue<std::pair<dist_t, tableint>> queue_closest;
-                while (!top_candidates.empty())
+                auto& forward_vec = compact_graph->at(external_id).forward_edges;
+                for(auto& point: forward_vec)
                 {
-                    queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second);
-                    top_candidates.pop();
+                    queue_closest.emplace(-point.second, point.first);
                 }
-                // Now top_candidates is empty
+                auto& back_vec = compact_graph->at(external_id).back_edges;
+                for(auto& point: back_vec)
+                {
+                    queue_closest.emplace(-point.second, point.first);
+                }
+
+                // remove the same point
+                // if the same point, must the distance is 0, then in the top
+                while(queue_closest.top().second == cur_c)
+                    queue_closest.pop();
 
                 // 初始化变量
                 pair<int, int> external_lr_most = {min_external_id_, max_external_id_}; // keeps track of the furthest (bidirectional) external ID encountered
@@ -623,13 +659,6 @@ namespace Compact
                         forward_batch_nn_amount += return_external_list.size();
                         one_batch.nns_id.swap(return_external_list);
                         compact_graph->at(external_id).forward_nns.emplace_back(one_batch);
-                        // add reverse edge
-                        for (auto i = 0; i < one_batch.nns_id.size(); i++)
-                        {
-                            auto point_dist = -return_list[i].first;
-                            auto target_external_id = one_batch.nns_id[i];
-                            addNegativeEdges(point_dist, external_id, target_external_id);
-                        }
 
                         backward_batch_theoratical_nn_amount += return_list.size();
 
@@ -710,14 +739,6 @@ namespace Compact
                     forward_batch_nn_amount += return_external_list.size();
                     one_batch.nns_id.swap(return_external_list);
                     compact_graph->at(external_id).forward_nns.emplace_back(one_batch);
-
-                    // // add reverse edges
-                    for (auto i = 0; i < one_batch.nns_id.size(); i++)
-                    {
-                        auto point_dist = -return_list[i].first;
-                        auto target_external_id = one_batch.nns_id[i];
-                        addNegativeEdges(point_dist, external_id, target_external_id);
-                    }
                     backward_batch_theoratical_nn_amount += return_list.size();
                 }
             }
@@ -856,6 +877,20 @@ namespace Compact
             for (size_t i : permutation)
             {
                 hnsw.addRangeEdges(data_wrapper->nodes.at(i).data(), i);
+            }
+
+            // Step 4: Get Compressed Edges
+
+            for (size_t i : permutation)
+            {
+                hnsw.getRangeEdges(data_wrapper->nodes.at(i).data(), i);
+            }
+
+            // Step 5: Add Reverse Compressed Edges
+
+            for (size_t i : permutation)
+            {
+                hnsw.addRevRangeEdges(data_wrapper->nodes.at(i).data(), i);
             }
 
             gettimeofday(&tt2, NULL);

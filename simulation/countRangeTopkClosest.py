@@ -13,9 +13,37 @@ import random
 import hashlib
 import math
 from collections import defaultdict
-
-
+import matplotlib.pyplot as plt
 from collections import Counter
+
+def visualize_counter(counter_data):
+    """
+    接收一个Counter对象，绘制其条形图。
+    
+    参数:
+    counter_data (Counter): 包含位置和计数的Counter对象。
+    """
+    # 准备 x 和 y 的数据
+    x = list(counter_data.keys())
+    y = list(counter_data.values())
+
+    # 创建条形图
+    plt.figure(figsize=(10, 6))  # 可根据需要调整图形大小
+    plt.bar(x, y)
+
+    # 添加标题和轴标签
+    plt.title('Position Counts Visualization')
+    plt.xlabel('Position')
+    plt.ylabel('Count')
+
+    # 自动旋转x轴的标签以防止重叠
+    plt.xticks(rotation=90)
+
+    # 调整布局以适应所有的x轴标签
+    plt.tight_layout()
+
+    # 显示图形
+    plt.show()
 
 def generate_frequency_ranges(max_freq):
     """
@@ -177,11 +205,11 @@ def simulate(n, pivot):
     for range_label, percentage in distribution.items():
         print(f"{range_label} 次出现: {percentage:.2f}%")
     print(f"pos unique的数量: {len(position_counts)}")
-    # print(f"pos unique的分布: {position_counts}")
-
+    print(f"pos unique的分布: {position_counts}")
+    visualize_counter(position_counts)
 
 if __name__ == "__main__":
-    n = 1 << 10 # Example value for n, which is 1024
+    n = 1 << 20 # Example value for n, which is 1024
     # the value of k is log2(n)
     pivot = int(n / 2)  # Simulate the case where pivot is in the middle of the array
     # pivot = -1 # Simulate the case where pivot is at the beginning of the array

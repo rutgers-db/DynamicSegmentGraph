@@ -8,7 +8,7 @@
 方法：通过哈希映射存储每个独特的前K个最小值的位置组合，并统计其出现频率。
 
 """
-
+import numpy as np
 import random
 import hashlib
 import math
@@ -146,73 +146,99 @@ def hash_top_k_min_positions(positions):
     return m.hexdigest()
 
 
-def simulate(n, pivot):
+def simulate(n, pivot, k):
     if pivot < -1 or pivot >= n:
         raise ValueError("pivot must be between -1 and n-1")
     
-    k = int(math.log2(n)) # 前K个最小值，k = log2(n)
-    
-    random.seed(42)
+    # random.seed(42)
     
     # 步骤1：生成随机正浮点数数组
     arr = generate_random_float_array(n)
     # print(f"生成的数组: {arr}")
     
-    # 步骤2：创建哈希映射以存储独特的前K个最小值位置
-    top_k_min_hash_map = defaultdict(int)
-    position_counts = Counter()
+    # # 步骤2：创建哈希映射以存储独特的前K个最小值位置
+    # top_k_min_hash_map = defaultdict(int)
+    # position_counts = Counter()
 
-    # 步骤3：遍历所有可能的范围
-    # 这个步骤3 需要考虑 pivot为-1 和pivot 为 n-1的情况
-    if 0 <= pivot < n - 1:
-        # 遍历以pivot为中心的所有可能子数组
-        for left in range(pivot + 1):
-            for right in range(pivot + 1, n):
-                sub_arr = arr[left:right + 1]
-                top_k_min_pos = top_k_min_positions(sub_arr, min(k, len(sub_arr)))
-                adjusted_pos = [left + pos for pos in top_k_min_pos]  # 调整位置相对于原数组
-                position_counts.update(adjusted_pos)
-                hash_value = hash_top_k_min_positions(adjusted_pos)
-                top_k_min_hash_map[hash_value] = top_k_min_hash_map.get(hash_value, 0) + 1
+    # # 步骤3：遍历所有可能的范围
+    # # 这个步骤3 需要考虑 pivot为-1 和pivot 为 n-1的情况
+    # if 0 <= pivot < n - 1:
+    #     # 遍历以pivot为中心的所有可能子数组
+    #     for left in range(pivot + 1):
+    #         for right in range(pivot + 1, n):
+    #             sub_arr = arr[left:right + 1]
+    #             top_k_min_pos = top_k_min_positions(sub_arr, min(k, len(sub_arr)))
+    #             adjusted_pos = [left + pos for pos in top_k_min_pos]  # 调整位置相对于原数组
+    #             position_counts.update(adjusted_pos)
+    #             hash_value = hash_top_k_min_positions(adjusted_pos)
+    #             top_k_min_hash_map[hash_value] = top_k_min_hash_map.get(hash_value, 0) + 1
 
-    elif pivot == -1:
-        # 处理pivot为-1的情况
-        for right in range(n):
-            sub_arr = arr[:right + 1]
-            top_k_min_pos = top_k_min_positions(sub_arr, min(k, len(sub_arr)))
-            position_counts.update(top_k_min_pos)
-            hash_value = hash_top_k_min_positions(top_k_min_pos)
-            top_k_min_hash_map[hash_value] = top_k_min_hash_map.get(hash_value, 0) + 1
+    # elif pivot == -1:
+    #     # 处理pivot为-1的情况
+    #     for right in range(n):
+    #         sub_arr = arr[:right + 1]
+    #         top_k_min_pos = top_k_min_positions(sub_arr, min(k, len(sub_arr)))
+    #         position_counts.update(top_k_min_pos)
+    #         hash_value = hash_top_k_min_positions(top_k_min_pos)
+    #         top_k_min_hash_map[hash_value] = top_k_min_hash_map.get(hash_value, 0) + 1
 
-    else:  # pivot == n - 1
-        # 处理pivot为n-1的情况
-        for left in range(n):
-            sub_arr = arr[left:]
-            top_k_min_pos = top_k_min_positions(sub_arr, min(k, len(sub_arr)))
-            adjusted_pos = [left + pos for pos in top_k_min_pos]  # 调整位置相对于原数组
-            position_counts.update(adjusted_pos)
-            hash_value = hash_top_k_min_positions(adjusted_pos)
-            top_k_min_hash_map[hash_value] = top_k_min_hash_map.get(hash_value, 0) + 1
+    # else:  # pivot == n - 1
+    #     # 处理pivot为n-1的情况
+    #     for left in range(n):
+    #         sub_arr = arr[left:]
+    #         top_k_min_pos = top_k_min_positions(sub_arr, min(k, len(sub_arr)))
+    #         adjusted_pos = [left + pos for pos in top_k_min_pos]  # 调整位置相对于原数组
+    #         position_counts.update(adjusted_pos)
+    #         hash_value = hash_top_k_min_positions(adjusted_pos)
+    #         top_k_min_hash_map[hash_value] = top_k_min_hash_map.get(hash_value, 0) + 1
 
-    # 步骤4：计算结果
-    unique_top_k_count = len(top_k_min_hash_map)
-    count_each_hash = dict(top_k_min_hash_map)
+    # # 步骤4：计算结果
+    # unique_top_k_count = len(top_k_min_hash_map)
+    # count_each_hash = dict(top_k_min_hash_map)
     
-    print(f"总独特前-K个最小值: {unique_top_k_count}")
-    # print(f"每个哈希对应的范围数量: {count_each_hash}") 
-    distribution = calculate_range_percentage_distribution(count_each_hash)
-    print("频次范围分布占比:")
-    for range_label, percentage in distribution.items():
-        print(f"{range_label} 次出现: {percentage:.2f}%")
-    print(f"pos unique的数量: {len(position_counts)}")
-    print(f"pos unique的分布: {position_counts}")
-    visualize_counter(position_counts)
+    # print(f"总独特前-K个最小值: {unique_top_k_count}")
+    # # print(f"每个哈希对应的范围数量: {count_each_hash}") 
+    # distribution = calculate_range_percentage_distribution(count_each_hash)
+    # print("频次范围分布占比:")
+    # for range_label, percentage in distribution.items():
+    #     print(f"{range_label} 次出现: {percentage:.2f}%")
+    # print(f"pos unique的数量: {len(position_counts)}")
+    # print(f"pos unique的分布: {position_counts}")
+    # visualize_counter(position_counts)
+    
+    # verify the unique top k counts equal to two side minleap count
+    
+    count_valid_i = 0
+    for i in range(pivot):
+        # 取 i 右边的数字
+        right_numbers = np.array(arr[i + 1: pivot])
+
+        # 计算比a[i]小的数量
+        count_smaller = np.sum(right_numbers < arr[i])
+
+        # 如果小于k-1, 则count_valid_i加1
+        if count_smaller <= k - 1:
+            count_valid_i += 1
+    for i in range(pivot+1, n):
+        # 取 i zuo边的数字
+        left_numbers = np.array(arr[pivot + 1: i - 1])
+
+        # 计算比a[i]小的数量
+        count_smaller = np.sum(left_numbers < arr[i])
+
+        # 如果小于k-1, 则count_valid_i加1
+        if count_smaller <= k - 1:
+            count_valid_i += 1
+    
+    print(f"count top k unique verification{count_valid_i}")
 
 if __name__ == "__main__":
-    n = 1 << 20 # Example value for n, which is 1024
+    n = 1 << 12 # Example value for n, which is 1024
     # the value of k is log2(n)
     pivot = int(n / 2)  # Simulate the case where pivot is in the middle of the array
+    
+    k = 8 # k = int(math.log2(n))
     # pivot = -1 # Simulate the case where pivot is at the beginning of the array
     # pivot = n - 1 # Simulate the case where pivot is at the end of the array
     print(f"Simulate n:{n} pivot:{pivot}")
-    simulate(n, pivot)
+    simulate(n, pivot, k)

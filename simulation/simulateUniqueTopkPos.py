@@ -1,6 +1,6 @@
 import numpy as np
 
-def simulate_expectation(N, k, simulations=100):
+def simulate_expectation(N, k, simulations=50):
     count_valid_i = 0
 
     for _ in range(simulations):
@@ -21,7 +21,7 @@ def simulate_expectation(N, k, simulations=100):
     return count_valid_i / (simulations)
 
 # 设置参数
-N = 10000000    # 数组长度
+N = 1 << 11    # 数组长度
 k = 8       # k值
 expectation = simulate_expectation(N, k)
-print(f'The expected number of indices i with at most {k-1} numbers smaller on the right is: {expectation}')
+print(f'The expected number of indices i in {N} length array with at most {k-1} numbers smaller on the right is: {expectation}')

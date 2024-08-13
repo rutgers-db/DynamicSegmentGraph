@@ -1,0 +1,130 @@
+在全局搜索，没用onlinedomination 是这样的
+zhencan@U-75W324KW-2106 build % ../script/test_onlinedominate.sh   
+Load vecs from: ../data/deep10M.fvecs
+# of vecs: 100000
+Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.fullrange.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 64, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexOnlineDominationGraph
+First point75354
+# Build Index Time: 31.8449290s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 100000    recall: 0.6557  QPS: inf       Comps: 0         Internal Search Time: 0.0000    CalDist Time: 0.0000
+========================
+# total query time: 0.0208570s
+
+Search ef: 64
+========================
+range: 100000    recall: 0.8733  QPS: inf       Comps: 0         Internal Search Time: 0.0000    CalDist Time: 0.0000
+========================
+# total query time: 0.0531970s
+
+Search ef: 256
+========================
+range: 100000    recall: 0.9625  QPS: inf       Comps: 0         Internal Search Time: 0.0000    CalDist Time: 0.0000
+========================
+# total query time: 0.1685460s
+
+只有把index k 增加到16 才有一些dominate k小的话都找不到dominate关系 以下是build的时候会构建domination关系但是search时不用的情况
+
+# Build Index Time: 49.8051680s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 100000    recall: 0.8043  QPS: 29609     Comps: 329       Internal Search Time: 0.0000    CalDist Time: 0.0000
+========================
+# total query time: 0.0342030s
+
+Search ef: 64
+========================
+range: 100000    recall: 0.9633  QPS: 10915     Comps: 780       Internal Search Time: 0.0001    CalDist Time: 0.0000
+========================
+# total query time: 0.0924210s
+
+Search ef: 256
+========================
+range: 100000    recall: 0.9970  QPS: 3578      Comps: 2188      Internal Search Time: 0.0003    CalDist Time: 0.0000
+========================
+# total query time: 0.2824380s
+
+下面是加了在线prune的
+# Build Index Time: 49.8337550s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 100000    recall: 0.7971  QPS: 27830     Comps: 324       Internal Search Time: 0.000036  CalDist Time: 0.000000
+========================
+# total query time: 0.0363690s
+
+Search ef: 64
+========================
+range: 100000    recall: 0.9596  QPS: 11023     Comps: 768       Internal Search Time: 0.000091  CalDist Time: 0.000000
+========================
+# total query time: 0.0915000s
+
+Search ef: 256
+========================
+range: 100000    recall: 0.9968  QPS: 3610      Comps: 2158      Internal Search Time: 0.000277  CalDist Time: 0.000000
+========================
+# total query time: 0.2769780s
+可以看到效果比不加在线prune好 但是几乎一样，而且也不会更慢
+
+增加index k 到 64看看 是不是和neighbor list长度相关性大一些呢
+parameters: ef_construction ( 100 )  index-k( 64)  ef_max (500) 
+Building Index using IndexOnlineDominationGraph
+First point75354
+# Build Index Time: 84.6721870s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 100000    recall: 0.8408  QPS: 16619     Comps: 560       Internal Search Time: 0.000060  CalDist Time: 0.000000
+========================
+# total query time: 0.0606360s
+
+Search ef: 64
+========================
+range: 100000    recall: 0.9778  QPS: 6272      Comps: 1425      Internal Search Time: 0.000159  CalDist Time: 0.000000
+========================
+# total query time: 0.1602060s
+
+Search ef: 256
+========================
+range: 100000    recall: 0.9990  QPS: 2052      Comps: 3989      Internal Search Time: 0.000487  CalDist Time: 0.000000
+========================
+# total query time: 0.4906420s
+
+这个是不带在线prune的  目前就是明显是感觉这个在线prune是没什么开销的
+# Build Index Time: 88.3431170s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 100000    recall: 0.9212  QPS: 15165     Comps: 647       Internal Search Time: 0.000066  CalDist Time: 0.000000
+========================
+# total query time: 0.0663950s
+
+Search ef: 64
+========================
+range: 100000    recall: 0.9938  QPS: 5556      Comps: 1657      Internal Search Time: 0.000180  CalDist Time: 0.000000
+========================
+# total query time: 0.1807410s
+
+Search ef: 256
+========================
+range: 100000    recall: 0.9998  QPS: 1930      Comps: 4499      Internal Search Time: 0.000518  CalDist Time: 0.000000
+========================
+# total query time: 0.5211050s

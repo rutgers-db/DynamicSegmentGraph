@@ -1,64 +1,6 @@
-Load vecs from: ../data/deep10M.fvecs
-# of vecs: 100000
-Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs...    Done!
-index K:
-vertex in set: {8}
-ef construction:
-vertex in set: {100}
-search ef:
-vertex in set: {16, 64, 256}
-
-Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
-Method: Compact
-parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
-Building Index using IndexCompactGraph
-Max. forward batch nn #: 0
-Avg. forward nn #: 21.3788
-Avg. forward batch #: 3.17808
-Max. reverse nn #: 254
-Avg. reverse nn #: 21.3788
-Avg. reverse batch #: 1
-Avg. delta nn #: 42.7576
-# Build Index Time: 34.8987820s
-Total # of Neighbors: 4275758
-
-Search ef: 16
-========================
-range: 100       recall: 0.0549  QPS: 227739    Comps: 4         Internal Search Time: 0.0044    CalDist Time: 0.0021
-range: 500       recall: 0.5421  QPS: 48931     Comps: 58        Internal Search Time: 0.0204    CalDist Time: 0.0125
-range: 1000      recall: 0.7402  QPS: 43102     Comps: 90        Internal Search Time: 0.0232    CalDist Time: 0.0155
-range: 5000      recall: 0.8688  QPS: 27789     Comps: 212       Internal Search Time: 0.0360    CalDist Time: 0.0278
-range: 10000     recall: 0.8761  QPS: 23521     Comps: 282       Internal Search Time: 0.0425    CalDist Time: 0.0342
-range: 50000     recall: 0.8587  QPS: 17163     Comps: 484       Internal Search Time: 0.0583    CalDist Time: 0.0504
-range: 100000    recall: 0.8810  QPS: 13926     Comps: 615       Internal Search Time: 0.0718    CalDist Time: 0.0646
-========================
-# total query time: 0.2624330s
-
-Search ef: 64
-========================
-range: 100       recall: 0.0550  QPS: 290360    Comps: 5         Internal Search Time: 0.0034    CalDist Time: 0.0013
-range: 500       recall: 0.7485  QPS: 20200     Comps: 135       Internal Search Time: 0.0495    CalDist Time: 0.0270
-range: 1000      recall: 0.9037  QPS: 17096     Comps: 210       Internal Search Time: 0.0585    CalDist Time: 0.0348
-range: 5000      recall: 0.9785  QPS: 10903     Comps: 490       Internal Search Time: 0.0917    CalDist Time: 0.0652
-range: 10000     recall: 0.9790  QPS: 9154      Comps: 661       Internal Search Time: 0.1092    CalDist Time: 0.0821
-range: 50000     recall: 0.9790  QPS: 6563      Comps: 1176      Internal Search Time: 0.1524    CalDist Time: 0.1267
-range: 100000    recall: 0.9809  QPS: 5227      Comps: 1512      Internal Search Time: 0.1913    CalDist Time: 0.1670
-========================
-# total query time: 0.6616020s
-
-Search ef: 256
-========================
-range: 100       recall: 0.0550  QPS: 283607    Comps: 5         Internal Search Time: 0.0035    CalDist Time: 0.0013
-range: 500       recall: 0.8207  QPS: 6586      Comps: 335       Internal Search Time: 0.1518    CalDist Time: 0.0732
-range: 1000      recall: 0.9486  QPS: 5328      Comps: 539       Internal Search Time: 0.1877    CalDist Time: 0.0991
-range: 5000      recall: 0.9982  QPS: 3521      Comps: 1268      Internal Search Time: 0.2840    CalDist Time: 0.1829
-range: 10000     recall: 0.9977  QPS: 2982      Comps: 1700      Internal Search Time: 0.3354    CalDist Time: 0.2294
-range: 50000     recall: 0.9986  QPS: 2196      Comps: 3154      Internal Search Time: 0.4553    CalDist Time: 0.3554
-range: 100000    recall: 0.9988  QPS: 1757      Comps: 4116      Internal Search Time: 0.5691    CalDist Time: 0.4724
-========================
-# total query time: 1.9929890s
-
-加进来的反向边非常重要 我测试了如果反向边最后少了一些（每次取邻居限制2K个并且正向边优先的话） 精度会降的很明显， 下面是不限制每次取的数量 反向边取满的到结果才和上面差不多 （之前也是反向边取满
+这个是还没有实现在线prune的版本，只能说非常成功，速度慢是因为没有prune，估计实现在线prune后的速度会快很多
+最大range表现不好应该是因为我每次是从当前min和max来取的range， 这里可以改成就从0和max elements 重新试一下吧
+range小表现不好是因为我search了一次，再专门在里面search一次估计会很好 但是没必要了
 
 Load vecs from: ../data/deep10M.fvecs
 # of vecs: 100000
@@ -75,58 +17,48 @@ Method: Compact
 parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
 Building Index using IndexCompactGraph
 First point75354
-All the forward batch nn #: 2139643
-Theoratical backward batch nn #: 2139643
-Sum of forward batch nn #: 2139643
-Max. forward batch nn #: 0
-Avg. forward nn #: 21.3964
-Avg. forward batch #: 3.18019
-Avg. delta nn #: 21.3964
-Forward batch: 0[(2,40665,71407,99956)]
-vertex in set: {33261, 12763, 71407, 39195, 98923, 37738, 36984, 40665}
-
-Forward batch: 1[(40666,46237,53391,71406)]
-vertex in set: {57436, 69020, 60550, 46237, 66186, 53391, 41617, 68016}
-
-Forward batch: 2[(46238,50000,50000,53390)]
-vertex in set: {47267, 52180, 52957, 52886, 46780, 48983}
-
-
-# Build Index Time: 34.8983610s
-Total # of Neighbors: 2139643
+All the forward batch nn #: 0
+Theoratical backward batch nn #: 0
+Sum of forward batch nn #: 9635742
+Avg. forward nn #: 96.3574
+Avg. delta nn #: 96.3574
+Print one batch
+[33261,2,99956], [12763,2,99956], [32002,2,99956], [57436,2,99956], [73798,2,99956], [9568,2,99956], [61892,2,99956], [71407,2,99956], [12216,2,99956], [11395,2,99956], [39195,2,99956], [54153,2,99956], [69020,11396,99956], [89497,32003,99956], [98923,33262,99956], [37738,2,98922], [40527,9569,99956], [44899,11396,99956], [33644,12217,71406], [17957,12764,57435], [18803,17958,57435], [39259,18804,89496], [36599,32003,69019], [47267,33262,99956], [52938,33262,98922], [46237,33645,89496], [46153,36600,73797], [48723,37739,98922], [49474,39196,98922], [40665,39260,57435], [42033,40528,57435], [49316,40666,89496], [42149,42034,54152], [51340,42034,89496], [49312,42150,71406], [47251,44900,57435], [48876,46154,69019], [48432,46238,57435], [48983,47252,69019], [50048,47252,73797], [49603,47268,73797], [49439,48433,69019], [49713,48724,73797], [49163,48877,52937], [49945,48984,73797], [49787,49164,71406], [49723,49313,69019], [49329,49317,51339], [53052,2,99956], [60388,47268,88112], [5942,2,99956], [77194,37739,88112], [61630,2,99956], [53134,35043,89243], [29130,2,99956], [60068,2,99956], [59407,47351,87178], [51390,45455,76266], [22965,2,99956], [47931,2,99956], [79690,43594,88112], [54593,46154,79862], [49998,48724,74689], [50345,49082,70173], [98467,2,99956], [50145,46154,90413], [50186,42407,95122], [53244,49475,59406], [54561,48724,58502], [50487,47268,81937], [50844,37739,92240], [50377,44853,66312], [52772,49330,53090], [50112,47351,81834], [64149,22966,96002], [59273,0,99956], [53855,48877,61984], [18202,0,99956], [59164,42407,69965], [81008,0,99956], [71409,37739,79862], [59900,45465,66931], [78984,18804,99956], [49660,0,99956], [25304,0,99956], [55105,39260,81007], [81770,22298,99956], [49817,34094,99932], [51030,49475,59406], [27745,0,99956], [35824,0,98466], [63451,36607,83419], [50948,49999,51019], [55586,0,99956], [68484,42631,91586], [72837,0,99988], [50935,0,99988], [67683,44900,81769], [57455,48535,69197], [52327,49475,54152], [73095,42970,91921], [92384,0,99988], [63095,42407,76912], [50257,18203,98466], [65834,19937,88641], [51732,49475,52326], [90457,0,99993], [51641,48724,87413], [83919,9569,99993], [65394,5274,83918], [70943,27746,89348], [5818,0,99993], [50785,49475,59560], [61186,49661,70942], [50633,48724,79862], [83609,18203,99993], [56874,0,99993], [50879,49999,51029], [49842,47256,87413], [47184,39569,75986], [50853,48124,64006], [25022,0,99996], [59487,44900,60124], [65682,31305,73797], [52090,49818,52937], [53331,48720,61629], [53009,8624,97769], [78339,29534,96518], [27826,0,99996], [56514,47185,59064], [49806,0,99996], [49530,28426,74066], [55483,46917,58479], [56090,48491,83115], [50956,31305,92896], [50397,41272,96518], [50599,45339,76912], [49673,46917,75898], [51475,45156,99996], [52042,45329,68580], [59534,33106,81467], [49765,46238,95435], [95106,0,99996], [57366,33106,96518], [55365,33106,81769], [58566,25305,72836], [50404,49322,59006], [52667,43723,69880], [51275,49170,55098], [50616,44900,79951], [55154,46148,60802], [50464,36464,87172], [50905,49096,61594], [51294,49096,53330], [56413,45339,91272], [49237,0,99999], [53722,45017,81467], [50196,48780,99079], [53024,45721,75481], [54924,43545,75986], [60915,40031,69479], [44339,0,99999], [62838,0,99999], [91825,0,99999], [51915,44710,74066], [53210,47932,61169], [49799,43545,82125], [52244,49176,57365], [55173,31395,91824], [50934,37905,92896], [17510,0,99999], [51835,49989,52910], [32478,0,99999], [52778,46560,81535], [38609,0,99999], [48361,43545,81007], [73504,47788,77122], [59304,46034,69302], [47522,30332,97675], [62848,37905,77829], [50443,49176,55364], [66351,0,99999], [15823,0,99999], 
+# Build Index Time: 35.7771210s
+Total # of Neighbors: 9635742
 
 Search ef: 16
 ========================
-range: 100       recall: 0.0500  QPS: 229410    Comps: 4         Internal Search Time: 0.0044    CalDist Time: 0.0024
-range: 500       recall: 0.5378  QPS: 49841     Comps: 57        Internal Search Time: 0.0201    CalDist Time: 0.0133
-range: 1000      recall: 0.7416  QPS: 42483     Comps: 92        Internal Search Time: 0.0235    CalDist Time: 0.0166
-range: 5000      recall: 0.8782  QPS: 28241     Comps: 213       Internal Search Time: 0.0354    CalDist Time: 0.0284
-range: 10000     recall: 0.8727  QPS: 24128     Comps: 285       Internal Search Time: 0.0414    CalDist Time: 0.0342
-range: 50000     recall: 0.8600  QPS: 17295     Comps: 497       Internal Search Time: 0.0578    CalDist Time: 0.0508
-range: 100000    recall: 0.8695  QPS: 14558     Comps: 597       Internal Search Time: 0.0687    CalDist Time: 0.0624
+range: 100       recall: 0.2767  QPS: 100402    Comps: 19        Internal Search Time: 0.0100    CalDist Time: 0.0033
+range: 500       recall: 0.8304  QPS: 40672     Comps: 91        Internal Search Time: 0.0246    CalDist Time: 0.0129
+range: 1000      recall: 0.9019  QPS: 32395     Comps: 147       Internal Search Time: 0.0309    CalDist Time: 0.0177
+range: 5000      recall: 0.9174  QPS: 19225     Comps: 294       Internal Search Time: 0.0520    CalDist Time: 0.0334
+range: 10000     recall: 0.8953  QPS: 16502     Comps: 344       Internal Search Time: 0.0606    CalDist Time: 0.0402
+range: 50000     recall: 0.8643  QPS: 13390     Comps: 454       Internal Search Time: 0.0747    CalDist Time: 0.0531
+range: 100000    recall: 0.7881  QPS: 15653     Comps: 357       Internal Search Time: 0.0639    CalDist Time: 0.0445
 ========================
-# total query time: 0.2570830s
+# total query time: 0.3226340s
 
 Search ef: 64
 ========================
-range: 100       recall: 0.0506  QPS: 293427    Comps: 4         Internal Search Time: 0.0034    CalDist Time: 0.0015
-range: 500       recall: 0.7482  QPS: 20505     Comps: 136       Internal Search Time: 0.0488    CalDist Time: 0.0294
-range: 1000      recall: 0.9043  QPS: 17154     Comps: 210       Internal Search Time: 0.0583    CalDist Time: 0.0378
-range: 5000      recall: 0.9810  QPS: 10850     Comps: 491       Internal Search Time: 0.0922    CalDist Time: 0.0689
-range: 10000     recall: 0.9774  QPS: 9069      Comps: 666       Internal Search Time: 0.1103    CalDist Time: 0.0862
-range: 50000     recall: 0.9777  QPS: 6455      Comps: 1194      Internal Search Time: 0.1549    CalDist Time: 0.1319
-range: 100000    recall: 0.9770  QPS: 5053      Comps: 1499      Internal Search Time: 0.1979    CalDist Time: 0.1759
+range: 100       recall: 0.3338  QPS: 54831     Comps: 32        Internal Search Time: 0.0182    CalDist Time: 0.0049
+range: 500       recall: 0.9621  QPS: 15981     Comps: 197       Internal Search Time: 0.0626    CalDist Time: 0.0271
+range: 1000      recall: 0.9836  QPS: 12565     Comps: 313       Internal Search Time: 0.0796    CalDist Time: 0.0387
+range: 5000      recall: 0.9852  QPS: 7187      Comps: 612       Internal Search Time: 0.1391    CalDist Time: 0.0798
+range: 10000     recall: 0.9810  QPS: 6144      Comps: 722       Internal Search Time: 0.1628    CalDist Time: 0.0968
+range: 50000     recall: 0.9731  QPS: 5600      Comps: 972       Internal Search Time: 0.1786    CalDist Time: 0.1151
+range: 100000    recall: 0.9381  QPS: 6174      Comps: 776       Internal Search Time: 0.1620    CalDist Time: 0.1048
 ========================
-# total query time: 0.6709690s
+# total query time: 0.8089400s
 
 Search ef: 256
 ========================
-range: 100       recall: 0.0506  QPS: 296209    Comps: 4         Internal Search Time: 0.0034    CalDist Time: 0.0015
-range: 500       recall: 0.8203  QPS: 6827      Comps: 335       Internal Search Time: 0.1465    CalDist Time: 0.0798
-range: 1000      recall: 0.9510  QPS: 5432      Comps: 540       Internal Search Time: 0.1841    CalDist Time: 0.1093
-range: 5000      recall: 0.9978  QPS: 3562      Comps: 1271      Internal Search Time: 0.2807    CalDist Time: 0.1935
-range: 10000     recall: 0.9974  QPS: 3002      Comps: 1714      Internal Search Time: 0.3331    CalDist Time: 0.2414
-range: 50000     recall: 0.9984  QPS: 2168      Comps: 3190      Internal Search Time: 0.4612    CalDist Time: 0.3716
-range: 100000    recall: 0.9978  QPS: 1756      Comps: 4106      Internal Search Time: 0.5695    CalDist Time: 0.4833
+range: 100       recall: 0.3338  QPS: 55903     Comps: 32        Internal Search Time: 0.0179    CalDist Time: 0.0047
+range: 500       recall: 0.9878  QPS: 5107      Comps: 430       Internal Search Time: 0.1958    CalDist Time: 0.0632
+range: 1000      recall: 0.9980  QPS: 3933      Comps: 703       Internal Search Time: 0.2543    CalDist Time: 0.0945
+range: 5000      recall: 0.9984  QPS: 2449      Comps: 1448      Internal Search Time: 0.4084    CalDist Time: 0.1885
+range: 10000     recall: 0.9985  QPS: 2243      Comps: 1720      Internal Search Time: 0.4459    CalDist Time: 0.2109
+range: 50000     recall: 0.9977  QPS: 1961      Comps: 2392      Internal Search Time: 0.5099    CalDist Time: 0.2780
+range: 100000    recall: 0.9832  QPS: 2199      Comps: 1975      Internal Search Time: 0.4547    CalDist Time: 0.2536
 ========================
-# total query time: 1.9842770s
+# total query time: 2.2936590s

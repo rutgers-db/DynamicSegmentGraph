@@ -585,7 +585,7 @@ namespace Compact
          */
         void countNeighbrs()
         {   
-            unsigned max_nns_len = 0;
+            size_t max_nns_len = 0;
             // 如果有向图索引不为空，则开始处理
             if (!directed_indexed_arr.empty())
             {

@@ -37,14 +37,14 @@ using std::to_string;
 using std::vector;
 using std::tuple;
 void log_result_recorder(
-    const std::map<int, tuple<double, double, double>> &result_recorder,
+    const std::map<int, tuple<double, double, double, double>> &result_recorder,
     const std::map<int, float> &comparison_recorder, const int amount)
 {
     // 遍历结果记录器
     for (const auto& item : result_recorder)
     {
         // 解构元组以访问各个成员
-        const auto& [recall, calDistTime, internal_search_time] = item.second;
+        const auto& [recall, calDistTime, internal_search_time, fetch_nn_time] = item.second;
 
         // 打印范围、召回率、QPS和比较次数
         std::cout << std::setiosflags(std::ios::fixed) << std::setprecision(4)
@@ -54,6 +54,7 @@ void log_result_recorder(
                   << (amount / result_recorder.size()) / internal_search_time << "\t"
                   << "Comps: " << comparison_recorder.at(item.first) / (amount / result_recorder.size()) << std::setprecision(4)
                   << "\t Internal Search Time: " << internal_search_time
+                  << "\t Fetch NN Time: " << fetch_nn_time
                   << "\t CalDist Time: " << calDistTime << std::endl; // 新增一行显示CalDist时间
     }
 }
@@ -150,7 +151,7 @@ int main(int argc, char **argv)
                          << endl;
                     gettimeofday(&t1, NULL);
                     index.buildIndex(&i_params);
-                    index.printOnebatch();
+                    // index.printOnebatch();
                     gettimeofday(&t2, NULL);
                     logTime(t1, t2, "Build Index Time");
                     cout << "Total # of Neighbors: " << index.index_info->nodes_amount
@@ -163,7 +164,7 @@ int main(int argc, char **argv)
                         for (auto one_searchef : searchef_para_range_list)
                         {
                             s_params.search_ef = one_searchef;
-                            std::map<int, std::tuple<double, double, double>> result_recorder; // first->precision, second-> caldist time, third->query_time
+                            std::map<int, std::tuple<double, double, double, double>> result_recorder; // first->precision, second-> caldist time, third->query_time
                             std::map<int, float> comparison_recorder;
                             gettimeofday(&tt3, NULL);
                             /**
@@ -187,6 +188,7 @@ int main(int argc, char **argv)
                                 std::get<0>(result_recorder[s_params.query_range]) += search_info.precision;
                                 std::get<1>(result_recorder[s_params.query_range]) += search_info.cal_dist_time;
                                 std::get<2>(result_recorder[s_params.query_range]) += search_info.internal_search_time;
+                                std::get<3>(result_recorder[s_params.query_range]) += search_info.fetch_nns_time;
                                 comparison_recorder[s_params.query_range] += search_info.total_comparison;
                             }
 

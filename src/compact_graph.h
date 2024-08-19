@@ -27,17 +27,20 @@
 using namespace base_hnsw;
 
 namespace Compact
-{
+{   
+    template <typename dist_t>
     struct CompressedPoint
     {
         // 使用初始化列表构造函数，简化赋值操作并提高效率
-        CompressedPoint(unsigned _external_id, unsigned l, unsigned r)
-            : external_id(_external_id), left_bound(l), right_bound(r) {}
+        CompressedPoint(unsigned _external_id, unsigned l, unsigned r, dist_t _dist)
+            : external_id(_external_id), left_bound(l), right_bound(r), dist(_dist) {}
 
         // 默认构造函数
         CompressedPoint() {}
 
         unsigned external_id, left_bound, right_bound;
+        dist_t dist;
+        size_t flag = 0;
 
         bool if_in_compressed_range(const unsigned center_external_id, const unsigned query_L, const unsigned query_R) const
         {
@@ -45,11 +48,24 @@ namespace Compact
             auto right_inner = std::max(center_external_id, external_id);
             return (query_L <= left_inner && query_R >= right_inner) && (left_bound <= query_L && right_bound >= query_R);
         }
+
+        bool if_not_dominated(const size_t &cur_dom_relation)
+        {   
+            // 换成bool return
+            return (flag & cur_dom_relation) == 0;
+        }
+
+        // 重载小于运算符 (<)，用于按照距离从小到大排序
+        bool operator<(const CompressedPoint &other) const
+        {
+            return this->dist < other.dist;
+        }
     };
 
+    template <typename dist_t>
     struct DirectedPointNeighbors
     {
-        vector<CompressedPoint> nns;
+        vector<CompressedPoint<dist_t>> nns;
 
         size_t countNeighbors()
         {
@@ -97,7 +113,7 @@ namespace Compact
         const BaseIndex::IndexParams *params;
 
         // 存储指向段图邻居列表的指针，表示图结构中的边信息
-        vector<DirectedPointNeighbors> *compact_graph;
+        vector<DirectedPointNeighbors<dist_t>> *compact_graph;
 
         /**
          * 在构建HNSW图时优化搜索过程，保留更多邻居节点信息。
@@ -256,7 +272,7 @@ namespace Compact
             complete = false;
         }
 
-        void get_selectedNeighbors(tableint passed_c, dist_t dist_to_query, const unsigned & Mcurmax)
+        void get_selectedNeighbors(tableint passed_c, dist_t dist_to_query, const unsigned &Mcurmax)
         {
             if (complete)
                 return;
@@ -302,7 +318,7 @@ namespace Compact
 
         void generate_compressed_neighbors(
             std::priority_queue<std::pair<dist_t, tableint>> &queue_closest,
-            unsigned center_external_id, const unsigned & index_k)
+            unsigned center_external_id, const unsigned &index_k)
         {
             if (queue_closest.size() == 0)
             {
@@ -310,13 +326,14 @@ namespace Compact
             }
 
             auto arr_size = index_k + 1; // maintain a arr of size k+1
-            SortedArrayBase * right_sortedarr = new MinSortedArray(arr_size);
-            SortedArrayBase * left_sortedarr = new MaxSortedArray(arr_size);
+            SortedArrayBase *right_sortedarr = new MinSortedArray(arr_size);
+            SortedArrayBase *left_sortedarr = new MaxSortedArray(arr_size);
 
             unsigned cur_rank;
             // unsigned tmp_left_bound = min_external_id_ == 0 ? 0 : min_external_id_ - 1;                                                              // consider we have 0 as min external id
             // unsigned tmp_right_bound = max_external_id_ == std::numeric_limits<int>::max() ? std::numeric_limits<int>::max() : max_external_id_ + 1; // consider we have too maximum value as max external id
-            unsigned tmp_left_bound = 0; unsigned tmp_right_bound = max_elements_;
+            unsigned tmp_left_bound = 0;
+            unsigned tmp_right_bound = max_elements_;
             left_sortedarr->addPoint(tmp_left_bound, cur_rank);
             right_sortedarr->addPoint(tmp_right_bound, cur_rank);
 
@@ -324,14 +341,14 @@ namespace Compact
             {
                 std::pair<dist_t, tableint> curent_pair = queue_closest.top(); // 当前离我最近的点
                 dist_t dist_to_query = -curent_pair.first;
-                
+
                 queue_closest.pop();
                 /*这里调用回掉函数*/
                 get_selectedNeighbors(curent_pair.second, dist_to_query, index_k);
                 unsigned current_external_id = getExternalLabel(curent_pair.second);
-                SortedArrayBase * cur_sortedarr;
-                SortedArrayBase * other_sortedarr;
-                
+                SortedArrayBase *cur_sortedarr;
+                SortedArrayBase *other_sortedarr;
+
                 // 根据当前外部ID与中心外部ID的关系选择当前排序数组和另一个排序数组
                 if (current_external_id > center_external_id)
                 {
@@ -356,9 +373,9 @@ namespace Compact
                     unsigned R = std::max(bound_1, bound_2);
 
                     // generate the compressed point
-                    assert(L <= current_external_id);
-                    assert(R >= center_external_id);
-                    compact_graph->at(center_external_id).nns.emplace_back(current_external_id, L, R);
+                    // assert(L <= current_external_id);
+                    // assert(R >= center_external_id);
+                    compact_graph->at(center_external_id).nns.emplace_back(current_external_id, L, R, dist_to_query);
                 }
             }
 
@@ -373,9 +390,29 @@ namespace Compact
             {
                 auto rev_point_id = point.external_id;
                 auto &rev_nns = compact_graph->at(rev_point_id).nns;
-                rev_nns.emplace_back(center_external_id, point.left_bound, point.right_bound);
+                rev_nns.emplace_back(center_external_id, point.left_bound, point.right_bound, point.dist);
             }
             return;
+        }
+
+        void gen_domination_relationship(unsigned center_external_id){
+            auto & nns = compact_graph->at(center_external_id).nns;
+            std::sort(nns.begin(), nns.end());
+            for(unsigned i = 1; i < nns.size(); i++ ){
+                size_t tmp_flag = 0;
+                auto cur_dist = nns[i].dist;
+                unsigned j_limit = std::min(i, static_cast<unsigned>(64));
+                for(unsigned j = 0; j < j_limit; j++){
+                    // calculate distance
+                    auto tmp_dist = fstdistfunc_(getDataByLabel(nns[i].external_id),
+                                             getDataByLabel(nns[j].external_id),
+                                             dist_func_param_);
+                    if(tmp_dist < cur_dist){
+                        tmp_flag |= (1 << j);
+                    }
+                }
+                nns[i].flag = tmp_flag;
+            }
         }
 
         /**
@@ -547,7 +584,7 @@ namespace Compact
     class IndexCompactGraph : public BaseIndex
     {
     public:
-        vector<DirectedPointNeighbors> directed_indexed_arr;
+        vector<DirectedPointNeighbors<float>> directed_indexed_arr;
 
         IndexCompactGraph(base_hnsw::SpaceInterface<float> *s,
                           const DataWrapper *data)
@@ -566,7 +603,7 @@ namespace Compact
         const BaseIndex::IndexParams *index_params_;
 
         void printOnebatch()
-        {   
+        {
             cout << "Print one batch" << endl;
             for (auto cp :
                  directed_indexed_arr[data_wrapper->data_size / 2].nns)
@@ -584,7 +621,7 @@ namespace Compact
          * 平均反向邻居数、最大反向邻居数以及相关批处理计数。
          */
         void countNeighbrs()
-        {   
+        {
             size_t max_nns_len = 0;
             // 如果有向图索引不为空，则开始处理
             if (!directed_indexed_arr.empty())
@@ -648,7 +685,12 @@ namespace Compact
             {
                 hnsw.addPoint(data_wrapper->nodes.at(i).data(), i);
             }
-
+            
+            // generate online domination relationship
+            // for (size_t i : permutation)
+            // {
+            //     hnsw.gen_domination_relationship(i);
+            // }
             gettimeofday(&tt2, NULL);
             index_info->index_time = CountTime(tt1, tt2);
 
@@ -658,10 +700,10 @@ namespace Compact
             // count neighbors number
             countNeighbrs();
 
-            if (index_params->print_one_batch)
-            {
-                printOnebatch();
-            }
+            // if (index_params->print_one_batch)
+            // {
+            //     printOnebatch();
+            // }
         };
 
         /**
@@ -755,9 +797,18 @@ namespace Compact
 
                 gettimeofday(&tt1, NULL);
                 {
-                    for(const auto& cp: directed_indexed_arr[current_node_id].nns){
-                        if(cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second) ){
+                    // size_t visited_flag = 0;
+                    for(unsigned i = 0; i < directed_indexed_arr[current_node_id].nns.size(); i++){
+                        auto & cp = directed_indexed_arr[current_node_id].nns[i];
+                        if (cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second))
+                        {   
                             neighbors_in_range.emplace_back(cp.external_id);
+                            // if(cp.if_not_dominated(visited_flag)){
+                            //     neighbors_in_range.emplace_back(cp.external_id);
+                            //     if(i < 64){
+                            //         visited_flag |= 1 << i;
+                            //     }
+                            // }
                         }
                     }
                 }
@@ -770,7 +821,7 @@ namespace Compact
                 // TODO whether we need to limit the neighbors
                 // unsigned cnt_positive_through_neighbors = 0;
                 // const auto Mcurmax = 2 * index_params_->K; // 也需要看看效果 不过现在反向边和正向边放在一起，当然得扩大成2K // 也可以试试不加这个条件，理论上应该只会提升时间和recall 不会降低recall和time吧
-                
+
                 for (auto candidate_id : neighbors_in_range)
                 {
                     // if (candidate_id < query_bound.first || candidate_id > query_bound.second) // 忽略越界节点
@@ -787,8 +838,8 @@ namespace Compact
 
                         // 计算距离
                         float dist = fstdistfunc_(query.data(),
-                                                    data_wrapper->nodes[candidate_id].data(),
-                                                    dist_func_param_);
+                                                  data_wrapper->nodes[candidate_id].data(),
+                                                  dist_func_param_);
 
                         num_search_comparison++; // 更新比较次数
                         if (top_candidates.size() < search_params->search_ef || lower_bound > dist)
@@ -806,7 +857,7 @@ namespace Compact
                         }
                     }
                 }
-                
+
                 gettimeofday(&tt2, NULL);                             // 结束时间记录
                 AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
             }

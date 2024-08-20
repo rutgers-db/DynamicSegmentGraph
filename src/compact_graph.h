@@ -27,7 +27,7 @@
 using namespace base_hnsw;
 
 namespace Compact
-{   
+{
     template <typename dist_t>
     struct CompressedPoint
     {
@@ -50,7 +50,7 @@ namespace Compact
         }
 
         bool if_not_dominated(const size_t &cur_dom_relation)
-        {   
+        {
             // 换成bool return
             return (flag & cur_dom_relation) == 0;
         }
@@ -395,19 +395,23 @@ namespace Compact
             return;
         }
 
-        void gen_domination_relationship(unsigned center_external_id){
-            auto & nns = compact_graph->at(center_external_id).nns;
+        void gen_domination_relationship(unsigned center_external_id)
+        {
+            auto &nns = compact_graph->at(center_external_id).nns;
             std::sort(nns.begin(), nns.end());
-            for(unsigned i = 1; i < nns.size(); i++ ){
+            for (unsigned i = 1; i < nns.size(); i++)
+            {
                 size_t tmp_flag = 0;
                 auto cur_dist = nns[i].dist;
                 unsigned j_limit = std::min(i, static_cast<unsigned>(64));
-                for(unsigned j = 0; j < j_limit; j++){
+                for (unsigned j = 0; j < j_limit; j++)
+                {
                     // calculate distance
                     auto tmp_dist = fstdistfunc_(getDataByLabel(nns[i].external_id),
-                                             getDataByLabel(nns[j].external_id),
-                                             dist_func_param_);
-                    if(tmp_dist < cur_dist){
+                                                 getDataByLabel(nns[j].external_id),
+                                                 dist_func_param_);
+                    if (tmp_dist < cur_dist)
+                    {
                         tmp_flag |= (1 << j);
                     }
                 }
@@ -685,18 +689,22 @@ namespace Compact
             {
                 hnsw.addPoint(data_wrapper->nodes.at(i).data(), i);
             }
-            
+            timeval tt3;
+            gettimeofday(&tt3, NULL);
             // generate online domination relationship
+            // cout << "Points Added, now generateing domination relationship" << endl;
+            // gettimeofday(&tt1, NULL);
             // for (size_t i : permutation)
             // {
             //     hnsw.gen_domination_relationship(i);
             // }
+
             gettimeofday(&tt2, NULL);
             index_info->index_time = CountTime(tt1, tt2);
-
+            
             cout << "All the forward batch nn #: " << hnsw.forward_batch_nn_amount << endl;
             cout << "Theoratical backward batch nn #: " << hnsw.backward_batch_theoratical_nn_amount << endl;
-
+            cout << "Domination relationship generation cost time: " << CountTime(tt3, tt2) << endl;
             // count neighbors number
             countNeighbrs();
 
@@ -738,6 +746,7 @@ namespace Compact
             search_info->internal_search_time = 0;
             search_info->cal_dist_time = 0;
             search_info->fetch_nns_time = 0;
+            search_info->path_counter = 0;
             num_search_comparison = 0;
 
             // 初始化三个entry points
@@ -797,18 +806,21 @@ namespace Compact
 
                 gettimeofday(&tt1, NULL);
                 {
-                    // size_t visited_flag = 0;
-                    for(unsigned i = 0; i < directed_indexed_arr[current_node_id].nns.size(); i++){
-                        auto & cp = directed_indexed_arr[current_node_id].nns[i];
+                    size_t visited_flag = 0;
+                    for (unsigned i = 0; i < directed_indexed_arr[current_node_id].nns.size(); i++)
+                    {
+                        auto &cp = directed_indexed_arr[current_node_id].nns[i];
                         if (cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second))
-                        {   
-                            neighbors_in_range.emplace_back(cp.external_id);
-                            // if(cp.if_not_dominated(visited_flag)){
-                            //     neighbors_in_range.emplace_back(cp.external_id);
-                            //     if(i < 64){
-                            //         visited_flag |= 1 << i;
-                            //     }
-                            // }
+                        {
+                            // neighbors_in_range.emplace_back(cp.external_id);
+                            if (cp.if_not_dominated(visited_flag))
+                            {
+                                neighbors_in_range.emplace_back(cp.external_id);
+                                if (i < 64)
+                                {
+                                    visited_flag |= 1 << i;
+                                }
+                            }
                         }
                     }
                 }
@@ -875,7 +887,7 @@ namespace Compact
                 top_candidates.pop();
             }
             search_info->total_comparison += num_search_comparison; // 更新总比较次数
-
+            search_info->path_counter += hop_counter;
 #ifdef LOG_DEBUG_MODE
             print_set(res);
             cout << l_bound << "," << r_bound << endl;

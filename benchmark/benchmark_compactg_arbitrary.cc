@@ -38,21 +38,24 @@ using std::vector;
 using std::tuple;
 void log_result_recorder(
     const std::map<int, tuple<double, double, double, double>> &result_recorder,
-    const std::map<int, float> &comparison_recorder, const int amount)
+    const std::map<int, std::tuple<float, float>> &comparison_recorder, const int amount)
 {
     // 遍历结果记录器
     for (const auto& item : result_recorder)
     {
         // 解构元组以访问各个成员
         const auto& [recall, calDistTime, internal_search_time, fetch_nn_time] = item.second;
-
+        const auto& [comps, hops] = comparison_recorder.at(item.first);
+        const auto cur_range_amount = amount / result_recorder.size();
         // 打印范围、召回率、QPS和比较次数
         std::cout << std::setiosflags(std::ios::fixed) << std::setprecision(4)
                   << "range: " << item.first
-                  << "\t recall: " << recall / (amount / result_recorder.size())
+                  << "\t recall: " << recall / cur_range_amount
                   << "\t QPS: " << std::setprecision(0)
-                  << (amount / result_recorder.size()) / internal_search_time << "\t"
-                  << "Comps: " << comparison_recorder.at(item.first) / (amount / result_recorder.size()) << std::setprecision(4)
+                  << cur_range_amount / internal_search_time << "\t"
+                  << "Comps: " << comps / cur_range_amount << std::setprecision(4)
+                  << "\t Hops: " << hops / cur_range_amount << std::setprecision(4)
+                  << "\t Avg. Fetched NN Per Point: " << comps / hops
                   << "\t Internal Search Time: " << internal_search_time
                   << "\t Fetch NN Time: " << fetch_nn_time
                   << "\t CalDist Time: " << calDistTime << std::endl; // 新增一行显示CalDist时间
@@ -165,7 +168,7 @@ int main(int argc, char **argv)
                         {
                             s_params.search_ef = one_searchef;
                             std::map<int, std::tuple<double, double, double, double>> result_recorder; // first->precision, second-> caldist time, third->query_time
-                            std::map<int, float> comparison_recorder;
+                            std::map<int, std::tuple<float, float>> comparison_recorder;
                             gettimeofday(&tt3, NULL);
                             /**
                              * 对于每个查询ID，执行范围过滤搜索并更新结果记录器。
@@ -189,7 +192,8 @@ int main(int argc, char **argv)
                                 std::get<1>(result_recorder[s_params.query_range]) += search_info.cal_dist_time;
                                 std::get<2>(result_recorder[s_params.query_range]) += search_info.internal_search_time;
                                 std::get<3>(result_recorder[s_params.query_range]) += search_info.fetch_nns_time;
-                                comparison_recorder[s_params.query_range] += search_info.total_comparison;
+                                std::get<0>(comparison_recorder[s_params.query_range]) += search_info.total_comparison;
+                                std::get<1>(comparison_recorder[s_params.query_range]) += search_info.path_counter;
                             }
 
                             cout << endl

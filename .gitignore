@@ -3,3 +3,4 @@ build
 test.dSYM
 data
 groundtruth
+.venv

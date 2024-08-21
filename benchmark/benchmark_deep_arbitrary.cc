@@ -21,7 +21,7 @@
 #include "index_base.h"
 #include "logger.h"
 #include "reader.h"
-#include "segment_graph_2d.h"
+#include "index_recursion_batch.h"
 #include "utils.h"
 #include <iomanip>
 
@@ -132,8 +132,8 @@ int main(int argc, char **argv)
                                                 ef_construction, ef_max);
                 {
                     cout << endl;
-                    i_params.recursion_type = BaseIndex::IndexParams::MAX_POS;
-                    SeRF::IndexSegmentGraph2D index(&ss, &data_wrapper);
+                    i_params.recursion_type = BaseIndex::IndexParams::MIN_POS;  // Mention here
+                    rangeindex::RecursionIndex index(&ss, &data_wrapper);
                     // rangeindex::RecursionIndex index(&ss, &data_wrapper);
                     BaseIndex::SearchInfo search_info(&data_wrapper, &i_params, "SeRF_2D",
                                                       "benchmark");

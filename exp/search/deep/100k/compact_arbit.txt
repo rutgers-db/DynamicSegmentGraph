@@ -186,3 +186,132 @@ range: 50000     recall: 0.9899  QPS: 1799      Comps: 1406      Hops: 261.8580 
 range: 100000    recall: 0.9852  QPS: 1504      Comps: 1601      Hops: 262.5680  Avg. Fetched NN Per Point: 6.0972       Internal Search Time: 0.6651    Fetch NN Time: 0.2429   CalDist Time: 0.3814
 ========================
 # total query time: 2.5874750s
+
+这个是在线prune 如果本身不到2 indexK个就不会prune的
+(.venv) zhencan@U-75W324KW-2106 build % ../script/run_compactgraph.zsh
+Load vecs from: ../data/deep10M.fvecs
+# of vecs: 100000
+Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 64, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexCompactGraph
+First point75354
+Points Added, now generateing domination relationship
+All the forward batch nn #: 0
+Theoratical backward batch nn #: 0
+Domination relationship generation cost time: 25.2177
+Max. nns length of one point802
+Sum of forward nn #: 9635742
+Avg. forward nn #: 96.3574
+Avg. delta nn #: 96.3574
+# Build Index Time: 62.3642590s
+Total # of Neighbors: 9635742
+
+Search ef: 16
+========================
+range: 100       recall: 0.2766  QPS: 88976     Comps: 19        Hops: 15.8840   Avg. Fetched NN Per Point: 1.2012       Internal Search Time: 0.0112    Fetch NN Time: 0.0063   CalDist Time: 0.0035
+range: 500       recall: 0.8177  QPS: 43076     Comps: 86        Hops: 20.6970   Avg. Fetched NN Per Point: 4.1578       Internal Search Time: 0.0232    Fetch NN Time: 0.0088   CalDist Time: 0.0125
+range: 1000      recall: 0.8692  QPS: 34939     Comps: 123       Hops: 20.3700   Avg. Fetched NN Per Point: 6.0189       Internal Search Time: 0.0286    Fetch NN Time: 0.0100   CalDist Time: 0.0167
+range: 5000      recall: 0.8322  QPS: 23693     Comps: 171       Hops: 21.9410   Avg. Fetched NN Per Point: 7.8139       Internal Search Time: 0.0422    Fetch NN Time: 0.0164   CalDist Time: 0.0236
+range: 10000     recall: 0.8010  QPS: 22464     Comps: 185       Hops: 22.6350   Avg. Fetched NN Per Point: 8.1839       Internal Search Time: 0.0445    Fetch NN Time: 0.0181   CalDist Time: 0.0242
+range: 50000     recall: 0.7745  QPS: 19587     Comps: 242       Hops: 24.5020   Avg. Fetched NN Per Point: 9.8678       Internal Search Time: 0.0511    Fetch NN Time: 0.0195   CalDist Time: 0.0290
+range: 100000    recall: 0.7599  QPS: 19202     Comps: 273       Hops: 25.1220   Avg. Fetched NN Per Point: 10.8641      Internal Search Time: 0.0521    Fetch NN Time: 0.0161   CalDist Time: 0.0333
+========================
+# total query time: 0.2588830s
+
+Search ef: 64
+========================
+range: 100       recall: 0.3338  QPS: 50388     Comps: 32        Hops: 34.0820   Avg. Fetched NN Per Point: 0.9282       Internal Search Time: 0.0198    Fetch NN Time: 0.0118   CalDist Time: 0.0050
+range: 500       recall: 0.9585  QPS: 17126     Comps: 191       Hops: 66.7900   Avg. Fetched NN Per Point: 2.8549       Internal Search Time: 0.0584    Fetch NN Time: 0.0250   CalDist Time: 0.0266
+range: 1000      recall: 0.9774  QPS: 13610     Comps: 275       Hops: 66.6650   Avg. Fetched NN Per Point: 4.1316       Internal Search Time: 0.0735    Fetch NN Time: 0.0301   CalDist Time: 0.0363
+range: 5000      recall: 0.9661  QPS: 9125      Comps: 396       Hops: 68.2110   Avg. Fetched NN Per Point: 5.8017       Internal Search Time: 0.1096    Fetch NN Time: 0.0477   CalDist Time: 0.0541
+range: 10000     recall: 0.9556  QPS: 8492      Comps: 433       Hops: 69.1060   Avg. Fetched NN Per Point: 6.2663       Internal Search Time: 0.1178    Fetch NN Time: 0.0520   CalDist Time: 0.0579
+range: 50000     recall: 0.9440  QPS: 7618      Comps: 563       Hops: 70.8760   Avg. Fetched NN Per Point: 7.9429       Internal Search Time: 0.1313    Fetch NN Time: 0.0542   CalDist Time: 0.0690
+range: 100000    recall: 0.9369  QPS: 7439      Comps: 634       Hops: 71.7300   Avg. Fetched NN Per Point: 8.8451       Internal Search Time: 0.1344    Fetch NN Time: 0.0454   CalDist Time: 0.0812
+========================
+# total query time: 0.6506500s
+
+Search ef: 256
+========================
+range: 100       recall: 0.3338  QPS: 52458     Comps: 32        Hops: 34.3000   Avg. Fetched NN Per Point: 0.9243       Internal Search Time: 0.0191    Fetch NN Time: 0.0112   CalDist Time: 0.0048
+range: 500       recall: 0.9874  QPS: 5312      Comps: 427       Hops: 258.0850  Avg. Fetched NN Per Point: 1.6546       Internal Search Time: 0.1882    Fetch NN Time: 0.0925   CalDist Time: 0.0649
+range: 1000      recall: 0.9967  QPS: 4368      Comps: 661       Hops: 257.5610  Avg. Fetched NN Per Point: 2.5675       Internal Search Time: 0.2290    Fetch NN Time: 0.1071   CalDist Time: 0.0899
+range: 5000      recall: 0.9961  QPS: 2802      Comps: 1066      Hops: 258.5660  Avg. Fetched NN Per Point: 4.1226       Internal Search Time: 0.3569    Fetch NN Time: 0.1691   CalDist Time: 0.1533
+range: 10000     recall: 0.9935  QPS: 2594      Comps: 1181      Hops: 259.2520  Avg. Fetched NN Per Point: 4.5565       Internal Search Time: 0.3854    Fetch NN Time: 0.1825   CalDist Time: 0.1688
+range: 50000     recall: 0.9931  QPS: 2355      Comps: 1564      Hops: 261.1580  Avg. Fetched NN Per Point: 5.9891       Internal Search Time: 0.4246    Fetch NN Time: 0.1897   CalDist Time: 0.2003
+range: 100000    recall: 0.9897  QPS: 2312      Comps: 1761      Hops: 261.9000  Avg. Fetched NN Per Point: 6.7236       Internal Search Time: 0.4325    Fetch NN Time: 0.1602   CalDist Time: 0.2379
+========================
+# total query time: 2.0423210s
+
+这是prune的时候只会prune到2K个
+
+(.venv) zhencan@U-75W324KW-2106 build % ../script/run_compactgraph.zsh
+Load vecs from: ../data/deep10M.fvecs
+# of vecs: 100000
+Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 64, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-deep-100000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexCompactGraph
+First point75354
+Points Added, now generateing domination relationship
+All the forward batch nn #: 0
+Theoratical backward batch nn #: 0
+Domination relationship generation cost time: 25.4304
+Max. nns length of one point802
+Sum of forward nn #: 9635742
+Avg. forward nn #: 96.3574
+Avg. delta nn #: 96.3574
+# Build Index Time: 61.2261220s
+Total # of Neighbors: 9635742
+
+Search ef: 16
+========================
+range: 100       recall: 0.2766  QPS: 86798     Comps: 19        Hops: 15.8840   Avg. Fetched NN Per Point: 1.2012       Internal Search Time: 0.0115    Fetch NN Time: 0.0064   CalDist Time: 0.0037
+range: 500       recall: 0.8249  QPS: 42143     Comps: 89        Hops: 20.5660   Avg. Fetched NN Per Point: 4.3159       Internal Search Time: 0.0237    Fetch NN Time: 0.0086   CalDist Time: 0.0132
+range: 1000      recall: 0.8848  QPS: 33144     Comps: 133       Hops: 20.1060   Avg. Fetched NN Per Point: 6.6185       Internal Search Time: 0.0302    Fetch NN Time: 0.0100   CalDist Time: 0.0182
+range: 5000      recall: 0.8658  QPS: 21628     Comps: 208       Hops: 21.0730   Avg. Fetched NN Per Point: 9.8911       Internal Search Time: 0.0462    Fetch NN Time: 0.0161   CalDist Time: 0.0279
+range: 10000     recall: 0.8369  QPS: 20096     Comps: 227       Hops: 21.7140   Avg. Fetched NN Per Point: 10.4680      Internal Search Time: 0.0498    Fetch NN Time: 0.0176   CalDist Time: 0.0300
+range: 50000     recall: 0.8015  QPS: 17655     Comps: 279       Hops: 23.6620   Avg. Fetched NN Per Point: 11.7717      Internal Search Time: 0.0566    Fetch NN Time: 0.0193   CalDist Time: 0.0346
+range: 100000    recall: 0.7860  QPS: 18130     Comps: 303       Hops: 24.4940   Avg. Fetched NN Per Point: 12.3551      Internal Search Time: 0.0552    Fetch NN Time: 0.0158   CalDist Time: 0.0367
+========================
+# total query time: 0.2794750s
+
+Search ef: 64
+========================
+range: 100       recall: 0.3338  QPS: 51637     Comps: 32        Hops: 34.0820   Avg. Fetched NN Per Point: 0.9282       Internal Search Time: 0.0194    Fetch NN Time: 0.0114   CalDist Time: 0.0050
+range: 500       recall: 0.9606  QPS: 17039     Comps: 195       Hops: 66.7300   Avg. Fetched NN Per Point: 2.9176       Internal Search Time: 0.0587    Fetch NN Time: 0.0250   CalDist Time: 0.0269
+range: 1000      recall: 0.9810  QPS: 13456     Comps: 294       Hops: 66.4350   Avg. Fetched NN Per Point: 4.4240       Internal Search Time: 0.0743    Fetch NN Time: 0.0295   CalDist Time: 0.0379
+range: 5000      recall: 0.9744  QPS: 8411      Comps: 473       Hops: 67.4850   Avg. Fetched NN Per Point: 7.0127       Internal Search Time: 0.1189    Fetch NN Time: 0.0477   CalDist Time: 0.0635
+range: 10000     recall: 0.9671  QPS: 6539      Comps: 527       Hops: 68.2250   Avg. Fetched NN Per Point: 7.7180       Internal Search Time: 0.1529    Fetch NN Time: 0.0566   CalDist Time: 0.0879
+range: 50000     recall: 0.9539  QPS: 6553      Comps: 651       Hops: 70.0750   Avg. Fetched NN Per Point: 9.2858       Internal Search Time: 0.1526    Fetch NN Time: 0.0558   CalDist Time: 0.0881
+range: 100000    recall: 0.9432  QPS: 6863      Comps: 706       Hops: 71.1140   Avg. Fetched NN Per Point: 9.9214       Internal Search Time: 0.1457    Fetch NN Time: 0.0459   CalDist Time: 0.0910
+========================
+# total query time: 0.7287890s
+
+Search ef: 256
+========================
+range: 100       recall: 0.3338  QPS: 49714     Comps: 32        Hops: 34.3000   Avg. Fetched NN Per Point: 0.9243       Internal Search Time: 0.0201    Fetch NN Time: 0.0118   CalDist Time: 0.0051
+range: 500       recall: 0.9877  QPS: 5234      Comps: 429       Hops: 258.0500  Avg. Fetched NN Per Point: 1.6624       Internal Search Time: 0.1911    Fetch NN Time: 0.0938   CalDist Time: 0.0663
+range: 1000      recall: 0.9975  QPS: 4224      Comps: 683       Hops: 257.4920  Avg. Fetched NN Per Point: 2.6536       Internal Search Time: 0.2368    Fetch NN Time: 0.1094   CalDist Time: 0.0949
+range: 5000      recall: 0.9978  QPS: 2648      Comps: 1223      Hops: 258.2170  Avg. Fetched NN Per Point: 4.7370       Internal Search Time: 0.3776    Fetch NN Time: 0.1692   CalDist Time: 0.1738
+range: 10000     recall: 0.9968  QPS: 2340      Comps: 1382      Hops: 258.7890  Avg. Fetched NN Per Point: 5.3417       Internal Search Time: 0.4273    Fetch NN Time: 0.1874   CalDist Time: 0.2047
+range: 50000     recall: 0.9955  QPS: 2166      Comps: 1782      Hops: 260.5570  Avg. Fetched NN Per Point: 6.8377       Internal Search Time: 0.4618    Fetch NN Time: 0.1934   CalDist Time: 0.2331
+range: 100000    recall: 0.9922  QPS: 2094      Comps: 1939      Hops: 261.4990  Avg. Fetched NN Per Point: 7.4165       Internal Search Time: 0.4775    Fetch NN Time: 0.1642   CalDist Time: 0.2775
+========================
+# total query time: 2.1992270s

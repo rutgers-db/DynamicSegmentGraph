@@ -704,7 +704,7 @@ namespace Compact
 #endif
             gettimeofday(&tt2, NULL);
             index_info->index_time = CountTime(tt1, tt2);
-            
+
             cout << "All the forward batch nn #: " << hnsw.forward_batch_nn_amount << endl;
             cout << "Theoratical backward batch nn #: " << hnsw.backward_batch_theoratical_nn_amount << endl;
             cout << "Domination relationship generation cost time: " << CountTime(tt3, tt2) << endl;
@@ -805,30 +805,70 @@ namespace Compact
                 }
 
                 // search cw on the fly
-                vector<unsigned> neighbors_in_range;
-
+                const auto Mcurmax = 2 * index_params_->K;
+                vector<unsigned> nn_ids_in_range;
+                nn_ids_in_range.reserve(Mcurmax);
                 gettimeofday(&tt1, NULL);
                 {
-                    size_t visited_flag = 0;
                     for (unsigned i = 0; i < directed_indexed_arr[current_node_id].nns.size(); i++)
                     {
                         auto &cp = directed_indexed_arr[current_node_id].nns[i];
                         if (cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second))
                         {
 #ifdef OnlinePrune
-                            if (cp.if_not_dominated(visited_flag))
-                            {
-                                neighbors_in_range.emplace_back(cp.external_id);
-                                if (i < 64)
-                                {
-                                    visited_flag |= 1 << i;
-                                }
-                            }
-#else
-                            neighbors_in_range.emplace_back(cp.external_id);
+                            nn_ids_in_range.emplace_back(i);
+#elif
+                            nn_ids_in_range.emplace_back(cp.external_id);
 #endif
                         }
                     }
+#ifdef OnlinePrune
+                    // TODO: prune all of them or just prune to Mcurmax neighbros left
+                    if (nn_ids_in_range.size() > Mcurmax)
+                    {
+                        size_t visited_flag = 0;
+                        size_t cnt = 0;
+
+                        // for (unsigned i = 0; i < nn_ids_in_range.size(); i++)
+                        // {
+                        //     auto nn_id = nn_ids_in_range[i];
+                        //     auto &cp = directed_indexed_arr[current_node_id].nns[nn_id];
+                        //     if (cp.if_not_dominated(visited_flag))
+                        //     {
+                        //         nn_ids_in_range[cnt++] = cp.external_id;
+                        //         if (nn_id < 64)
+                        //         {
+                        //             visited_flag |= 1 << nn_id;
+                        //         }
+                        //     }
+                        // }
+                        // Left these neighbors to make sure at least Mcurmax neighbors
+                        for (unsigned i = 0; i < nn_ids_in_range.size(); i++)
+                        {
+                            auto nn_id = nn_ids_in_range[i];
+                            auto &cp = directed_indexed_arr[current_node_id].nns[nn_id];
+                            auto left_cnt = nn_ids_in_range.size() - i;
+                            if (cnt + left_cnt <= Mcurmax || cp.if_not_dominated(visited_flag))
+                            {
+                                nn_ids_in_range[cnt++] = cp.external_id;
+                                if (nn_id < 64)
+                                {
+                                    visited_flag |= 1 << nn_id;
+                                }
+                            }
+                        }
+                        nn_ids_in_range.resize(cnt); // now pruned external ids are stored in nn_ids_in_range
+                    }
+                    else
+                    {
+                        for (unsigned i = 0; i < nn_ids_in_range.size(); i++)
+                        {
+                            auto nn_id = nn_ids_in_range[i];
+                            auto &cp = directed_indexed_arr[current_node_id].nns[nn_id];
+                            nn_ids_in_range[i] = cp.external_id;
+                        }
+                    }
+#endif
                 }
                 gettimeofday(&tt2, NULL);                              // 结束时间记录
                 AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
@@ -838,9 +878,8 @@ namespace Compact
 
                 // TODO whether we need to limit the neighbors
                 // unsigned cnt_positive_through_neighbors = 0;
-                // const auto Mcurmax = 2 * index_params_->K; // 也需要看看效果 不过现在反向边和正向边放在一起，当然得扩大成2K // 也可以试试不加这个条件，理论上应该只会提升时间和recall 不会降低recall和time吧
 
-                for (auto candidate_id : neighbors_in_range)
+                for (auto candidate_id : nn_ids_in_range)
                 {
                     // if (candidate_id < query_bound.first || candidate_id > query_bound.second) // 忽略越界节点
                     //     continue;

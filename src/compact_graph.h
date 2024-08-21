@@ -26,6 +26,8 @@
 #include "sorted_array.h"
 using namespace base_hnsw;
 
+#define OnlinePrune
+
 namespace Compact
 {
     template <typename dist_t>
@@ -692,13 +694,14 @@ namespace Compact
             timeval tt3;
             gettimeofday(&tt3, NULL);
             // generate online domination relationship
-            // cout << "Points Added, now generateing domination relationship" << endl;
-            // gettimeofday(&tt1, NULL);
-            // for (size_t i : permutation)
-            // {
-            //     hnsw.gen_domination_relationship(i);
-            // }
-
+#ifdef OnlinePrune
+            cout << "Points Added, now generateing domination relationship" << endl;
+            gettimeofday(&tt1, NULL);
+            for (size_t i : permutation)
+            {
+                hnsw.gen_domination_relationship(i);
+            }
+#endif
             gettimeofday(&tt2, NULL);
             index_info->index_time = CountTime(tt1, tt2);
             
@@ -812,7 +815,7 @@ namespace Compact
                         auto &cp = directed_indexed_arr[current_node_id].nns[i];
                         if (cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second))
                         {
-                            // neighbors_in_range.emplace_back(cp.external_id);
+#ifdef OnlinePrune
                             if (cp.if_not_dominated(visited_flag))
                             {
                                 neighbors_in_range.emplace_back(cp.external_id);
@@ -821,6 +824,9 @@ namespace Compact
                                     visited_flag |= 1 << i;
                                 }
                             }
+#else
+                            neighbors_in_range.emplace_back(cp.external_id);
+#endif
                         }
                     }
                 }

@@ -65,6 +65,8 @@ int main(int argc, char **argv)
     else if (data_size == 1000000)
     {
         size_symbol = "1m";
+    }else if (data_size == 10000000){
+        size_symbol = "10m";
     }
 
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
@@ -79,9 +81,9 @@ int main(int argc, char **argv)
     //     +
     //               "-num1000-k10.arbitrary.cvs");
 
-    data_wrapper.generateHalfBoundedQueriesAndGroundtruthBenchmark(
-        true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol +
-                  "-num1000-k10.halfbounded.cvs");
+    // data_wrapper.generateHalfBoundedQueriesAndGroundtruthBenchmark(
+    //     true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol +
+    //               "-num1000-k10.halfbounded.cvs");
     data_wrapper.generateRangeFilteringQueriesAndGroundtruthBenchmark(
         true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol +
                   "-num1000-k10.arbitrary.cvs");

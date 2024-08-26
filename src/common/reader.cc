@@ -246,6 +246,10 @@ void ReadDataWrapper(const string &dataset, string &dataset_path,
     std::cerr << "Wrong Datset!" << endl;
     assert(false);
   }
+
+  if(raw_data.size() < data_size){
+    std::cerr << "Dataset Size not reach " << data_size <<" the size: "<< raw_data.size() << endl;
+  }
 }
 
 void Split(std::string &s, std::string &delim, std::vector<std::string> *ret) {

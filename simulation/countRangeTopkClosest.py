@@ -233,7 +233,7 @@ def simulate(n, pivot, k):
     print(f"count top k unique verification{count_valid_i}")
 
 if __name__ == "__main__":
-    n = 1 << 12 # Example value for n, which is 1024
+    n = 760 # 1 << 12 # Example value for n, which is 1024
     # the value of k is log2(n)
     pivot = int(n / 2)  # Simulate the case where pivot is in the middle of the array
     

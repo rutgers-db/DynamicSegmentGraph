@@ -3,7 +3,7 @@ from countRangeTopkClosest import hash_top_k_min_positions, calculate_range_perc
 from collections import defaultdict
 import json
 
-def process_lines(file_path):
+def process_lines(file_path, if_load_dominate = True):
     """
     处理每一行数据，解析并存储邻居信息及支配关系。
     
@@ -26,7 +26,11 @@ def process_lines(file_path):
         
         # 跳过距离字段，直接处理支配关系
         dominated_nns = list(map(int, parts[2:]))
-        points_dominate_me.append(dominated_nns)
+        if if_load_dominate == True:
+            points_dominate_me.append(dominated_nns)
+        else:
+            # TODO: We can see the result if there is no dominationship
+            points_dominate_me.append([])
         
         # if first_part == 2597:
         #     print(f'Neighbor ID: {first_part}, Distance: {second_part}, NNs dominate it: {dominated_nns}')
@@ -38,9 +42,9 @@ K = 8
 pivot_id = 2048
 domination_file_path = '/Users/zhencan/WorkPlace/Serf_V2/simulation/sample_data/sampled_neighbors_domination.txt'
 if_save = True
-
+if_load_dominate = True
 # Data Read
-nns, points_dominate_me = process_lines(domination_file_path)
+nns, points_dominate_me = process_lines(domination_file_path, if_load_dominate)
 
 # Data Preprocessing
 sorted_nns = sorted(nns, key=lambda x: x[0])
@@ -122,8 +126,10 @@ def analyze_top_k_distribution(top_k_min_hash_map):
 top_k_min_hash_map = defaultdict(lambda: [[], 0])
 
 # # # Bruteforce Method
-# for i in range(0, pivot_pos):
+# for i in range(0, pivot_pos + 1):
 #     for j in range(pivot_pos - 1, len(sorted_nns)):
+#         if i > j:
+#             continue
 #         # Get the topK values With Pruning
 #         pruned_topk_nnids = get_pruned_topk_nn_ids(i, j)
 #         # Add to the hash map

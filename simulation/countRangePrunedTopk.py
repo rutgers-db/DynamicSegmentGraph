@@ -1,6 +1,7 @@
 from bisect import bisect_left
 from countRangeTopkClosest import hash_top_k_min_positions, calculate_range_percentage_distribution
 from collections import defaultdict
+from collections import Counter
 import json
 
 def process_lines(file_path, if_load_dominate = True):
@@ -37,12 +38,11 @@ def process_lines(file_path, if_load_dominate = True):
 
     return nns, points_dominate_me
 
-
 K = 8
-pivot_id = 2048
+pivot_id = 2048 # 2048
 domination_file_path = '/Users/zhencan/WorkPlace/Serf_V2/simulation/sample_data/sampled_neighbors_domination.txt'
-if_save = True
-if_load_dominate = True
+if_save = False
+if_load_dominate = False
 # Data Read
 nns, points_dominate_me = process_lines(domination_file_path, if_load_dominate)
 
@@ -50,7 +50,12 @@ nns, points_dominate_me = process_lines(domination_file_path, if_load_dominate)
 sorted_nns = sorted(nns, key=lambda x: x[0])
 sorted_nn_ids = [x[0] for x in sorted_nns]
 pivot_pos = bisect_left(sorted_nns, (pivot_id, 0))
-print(f"基准点位置 {pivot_pos} 是在：{sorted_nns[pivot_pos][0]} and {sorted_nns[pivot_pos - 1][0]}之间的")
+if pivot_pos < len(sorted_nn_ids):
+    pivot_nn_id_after = sorted_nn_ids[pivot_pos]
+else:
+    pivot_nn_id_after = pivot_id
+print(f"基准点位置 {pivot_pos} 是在：{sorted_nn_ids[pivot_pos - 1]} and {pivot_nn_id_after} 之间的")
+print(f"第一个点的nnid {sorted_nn_ids[0]}  and 最后一个点的nnid {sorted_nn_ids[-1]}")
 
 def get_pruned_topk_nn_ids(start, end): # 闭区间
     """
@@ -99,63 +104,72 @@ def analyze_top_k_distribution(top_k_min_hash_map):
     :param top_k_min_hash_map: 字典，键是最小哈希值，值是出现次数。
     """
     unique_top_k_count = len(top_k_min_hash_map)
+    print(f"总独特前-K个最小值: {unique_top_k_count}")
+    
     # 创建一个新的字典，只包含计数信息
     simplified_top_k_min_hash_map = {}
-
+    # 创建一个新的计数器来有多少position会在prunedKNN里
+    position_counts = Counter()
     # 遍历现有的 top_k_min_hash_map
     for key, value in top_k_min_hash_map.items():
         # 假设 value 是一个形如 (list_of_data, count) 的元组
-        _, count = value
+        pruned_topk_nnids, count = value
+        position_counts.update(pruned_topk_nnids)
         
         # 将简化后的值存入新的字典
         simplified_top_k_min_hash_map[key] = count
 
     # 此时，simplified_top_k_min_hash_map 只包含了数字值
     count_each_hash = dict(simplified_top_k_min_hash_map)  # 确保副本，虽然在这里不是必需
-    
-    print(f"总独特前-K个最小值: {unique_top_k_count}")
-    
     # 计算频次范围分布占比
     distribution = calculate_range_percentage_distribution(count_each_hash)
     
     print("频次范围分布占比:")
     for range_label, percentage in distribution.items():
         print(f"{range_label} 次出现: {percentage:.2f}%")
-
+    print(f"pos unique的数量: {len(position_counts)}")
+    
 # Generate all the pruned topK values
 top_k_min_hash_map = defaultdict(lambda: [[], 0])
 
-# # # Bruteforce Method
-# for i in range(0, pivot_pos + 1):
-#     for j in range(pivot_pos - 1, len(sorted_nns)):
-#         if i > j:
-#             continue
-#         # Get the topK values With Pruning
-#         pruned_topk_nnids = get_pruned_topk_nn_ids(i, j)
-#         # Add to the hash map
-#         key = hash_top_k_min_positions(pruned_topk_nnids)
-#         top_k_min_hash_map[key][0] = pruned_topk_nnids
-#         top_k_min_hash_map[key][1] += 1
 
-# # Output the analysis of topk distribution
-# analyze_top_k_distribution(top_k_min_hash_map)
+# # Bruteforce Method
+for i in range(0, pivot_pos + 1):
+    for j in range(pivot_pos - 1, len(sorted_nns)):
+        if i > j:
+            continue
+        # Get the topK values With Pruning
+        pruned_topk_nnids = get_pruned_topk_nn_ids(i, j)
+        
+        # Add to the hash map
+        key = hash_top_k_min_positions(pruned_topk_nnids)
+        top_k_min_hash_map[key][0] = pruned_topk_nnids
+        top_k_min_hash_map[key][1] += 1
 
-# # Save the result
-# if if_save:
-#     with open('topk_results/top_k_bruteforce.json', 'w') as f:
-#         json.dump(top_k_min_hash_map, f)
+# Output the analysis of topk distribution
+analyze_top_k_distribution(top_k_min_hash_map)
+
+# Save the result
+if if_save:
+    with open('topk_results/top_k_bruteforce.json', 'w') as f:
+        json.dump(top_k_min_hash_map, f)
     
 # Optimized Generating Method
 dominate_nums = [0] * len(sorted_nns)
 top_k_min_hash_map.clear()
 
-# Push the initial boundary into the heap
+# # Push the initial boundary into the heap
 L_stack = []
 L_stack.append(-1)
 R_stack = []
 R_stack.append(len(sorted_nns))
 
 while L_stack[-1] <= R_stack[-1]:
+    if L_stack[-1] == pivot_pos and pivot_pos == len(sorted_nns):
+        break
+    if pivot_pos == 0 and R_stack[-1] == -1:
+        break    
+    
     pruned_topk_nn_ids = get_pruned_topk_nn_ids(L_stack[-1], R_stack[-1])
     # Get the leftmost and rightmost positions
     sorted_topk_nnids = sorted(pruned_topk_nn_ids)

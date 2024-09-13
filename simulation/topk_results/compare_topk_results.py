@@ -20,6 +20,18 @@ for key in opt_topk:
 
 print(f"{count} / {len(opt_topk)} = {count / len(opt_topk)}")
 
+count = 0
+id = 0
+for key in  bf_topk:
+    if key in opt_topk:
+        count += 1
+    else:
+        print(f"No.{id} - {key} not in opt_topk")
+        
+    id += 1
+
+print(f"{count} / {len(bf_topk)} = {count / len(bf_topk)}")
+
 # 找出有多少topk是有2597的 在bf_topk中
 count = 0
 for key in bf_topk:

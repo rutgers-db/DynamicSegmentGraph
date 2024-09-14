@@ -3,40 +3,8 @@ from countRangeTopkClosest import hash_top_k_min_positions, calculate_range_perc
 from collections import defaultdict
 from collections import Counter
 import json
+from IO import process_lines
 
-def process_lines(file_path, if_load_dominate = True):
-    """
-    处理每一行数据，解析并存储邻居信息及支配关系。
-    
-    :param lines: 包含数据行的列表，每行数据格式为 'id distance id1 id2 ...'
-    :return: (nns, points_dominate_me)，其中：
-             nns 是一个元组列表，每个元组包含 (neighbor_id, distance)；
-             points_dominate_me 是一个列表，每个元素对应一个点，
-             表示哪些点支配当前点。
-    """
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
-    nns = []
-    points_dominate_me = []
-
-    for line in lines:
-        parts = line.strip().split()
-        first_part = int(parts[0])
-        second_part = float(parts[1])
-        nns.append((first_part, second_part))
-        
-        # 跳过距离字段，直接处理支配关系
-        dominated_nns = list(map(int, parts[2:]))
-        if if_load_dominate == True:
-            points_dominate_me.append(dominated_nns)
-        else:
-            # TODO: We can see the result if there is no dominationship
-            points_dominate_me.append([])
-        
-        # if first_part == 2597:
-        #     print(f'Neighbor ID: {first_part}, Distance: {second_part}, NNs dominate it: {dominated_nns}')
-
-    return nns, points_dominate_me
 
 K = 8
 pivot_id = 2048 # 2048
@@ -97,37 +65,7 @@ def get_pruned_topk_nn_ids(start, end): # 闭区间
 
     return pruned_topk_nn_ids
 
-def analyze_top_k_distribution(top_k_min_hash_map):
-    """
-    分析并打印前K个最小哈希值的分布情况。
-    
-    :param top_k_min_hash_map: 字典，键是最小哈希值，值是出现次数。
-    """
-    unique_top_k_count = len(top_k_min_hash_map)
-    print(f"总独特前-K个最小值: {unique_top_k_count}")
-    
-    # 创建一个新的字典，只包含计数信息
-    simplified_top_k_min_hash_map = {}
-    # 创建一个新的计数器来有多少position会在prunedKNN里
-    position_counts = Counter()
-    # 遍历现有的 top_k_min_hash_map
-    for key, value in top_k_min_hash_map.items():
-        # 假设 value 是一个形如 (list_of_data, count) 的元组
-        pruned_topk_nnids, count = value
-        position_counts.update(pruned_topk_nnids)
-        
-        # 将简化后的值存入新的字典
-        simplified_top_k_min_hash_map[key] = count
 
-    # 此时，simplified_top_k_min_hash_map 只包含了数字值
-    count_each_hash = dict(simplified_top_k_min_hash_map)  # 确保副本，虽然在这里不是必需
-    # 计算频次范围分布占比
-    distribution = calculate_range_percentage_distribution(count_each_hash)
-    
-    print("频次范围分布占比:")
-    for range_label, percentage in distribution.items():
-        print(f"{range_label} 次出现: {percentage:.2f}%")
-    print(f"pos unique的数量: {len(position_counts)}")
     
 # Generate all the pruned topK values
 top_k_min_hash_map = defaultdict(lambda: [[], 0])

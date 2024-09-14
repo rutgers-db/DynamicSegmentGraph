@@ -158,7 +158,7 @@ namespace rangeindex
 
             std::vector<tableint> selectedNeighbors;
             selectedNeighbors.reserve(M_);
-            while (top_candidates.size() > 0)
+            while (top_candidates.size() > 0)  // now the top_candidates is pruned and max heap with positive distance
             {
                 selectedNeighbors.push_back(top_candidates.top().second);
 
@@ -200,7 +200,7 @@ namespace rangeindex
                 switch (params->recursion_type)
                 {
                 case BaseIndex::IndexParams::Recursion_Type_t::MIN_POS:
-                    external_left_most = addedNeighborPositions.front();
+                    external_left_most = addedNeighborPositions.front(); // choose the pruned knn's leftmost neighbor's position
                     break;
                 case BaseIndex::IndexParams::Recursion_Type_t::MID_POS:
                     external_left_most =

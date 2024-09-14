@@ -4,3 +4,4 @@ test.dSYM
 data
 groundtruth
 .venv
+__pycache__

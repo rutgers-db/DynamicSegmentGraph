@@ -63,12 +63,15 @@ def dfs(prefix_nbr_idx, M, L, R, lr, rl):
                 for j in range(i+1, len(nns)):
                     if nns[j][0] <= R and nns[j][0] >= L:
                         if current_V[j]:
+                            # Record domination calculation times
+                            cal_domination_count += 1
+                            cal_pair = i*len(nns) + j
+                            calculate_pair[cal_pair] += 1
+                            
                             if nns[i][0] in points_dominate_me[j]:
                                 current_V[j] = False
                                 tmp_dominated_arr += [j]
-                                cal_domination_count += 1
-                                cal_pair = i*len(nns) + j
-                                calculate_pair[cal_pair] += 1
+                                
                             
                 # 更新左侧范围边界
                 next_lr = min(nns[i][0], lr) if nns[i][0] < PIVOT_ID else lr

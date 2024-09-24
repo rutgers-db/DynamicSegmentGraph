@@ -5,3 +5,5 @@ data
 groundtruth
 .venv
 __pycache__
+*.zip
+.DS_Store

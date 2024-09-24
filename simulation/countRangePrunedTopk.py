@@ -3,13 +3,14 @@ from collections import defaultdict
 import json
 from IO import process_lines
 from util import hash_top_k_min_positions, analyze_top_k_distribution
+import time
 
 # 全局常量定义
 K = 8
 PIVOT_ID = 2048  # 基准点ID
 DOMINATION_FILE_PATH = '/Users/zhencan/WorkPlace/Serf_V2/simulation/sample_data/sampled_neighbors_domination.txt'
-IF_SAVE = False
-IF_LOAD_DOMINATE = False
+IF_SAVE = True
+IF_LOAD_DOMINATE = True
 
 # 数据读取
 nns, points_dominate_me = process_lines(DOMINATION_FILE_PATH, IF_LOAD_DOMINATE)
@@ -91,6 +92,8 @@ if IF_SAVE:
     with open('topk_results/top_k_bruteforce.json', 'w') as f:
         json.dump(top_k_min_hash_map, f)
         
+
+
 def process_range(pivot_pos, sorted_nns, sorted_nn_ids, pruned_topk_nn_ids, dominate_nums, L_stack, R_stack, top_k_min_hash_map):
     """
     处理指定范围内的数据，并更新相关统计信息。
@@ -106,6 +109,8 @@ def process_range(pivot_pos, sorted_nns, sorted_nn_ids, pruned_topk_nn_ids, domi
     top_k_min_hash_map: 存储top-k最小值分布的哈希表
     """
 
+    cnt_searchRange = 0
+    
     # 初始化左右边界栈
     L_stack.append(-1)
     R_stack.append(len(sorted_nns))
@@ -117,6 +122,7 @@ def process_range(pivot_pos, sorted_nns, sorted_nn_ids, pruned_topk_nn_ids, domi
         
         # 获取剪枝后的最近邻ID列表
         pruned_topk_nn_ids = get_pruned_topk_nn_ids(L_stack[-1], R_stack[-1])
+        cnt_searchRange = cnt_searchRange + 1
         
         # 获取最左侧和最右侧的位置索引
         sorted_topk_nnids = sorted(pruned_topk_nn_ids)
@@ -162,10 +168,12 @@ def process_range(pivot_pos, sorted_nns, sorted_nn_ids, pruned_topk_nn_ids, domi
         top_k_min_hash_map.setdefault(key, [None, 0])
         top_k_min_hash_map[key][0] = pruned_topk_nn_ids
         top_k_min_hash_map[key][1] += 1
+    
+    return cnt_searchRange
 
 def optimized_generating_method(sorted_nns, sorted_nn_ids, pivot_pos, top_k_min_hash_map, if_save=True):
     """
-    使用优化算法生成统计数据。
+    使用优化算法生成所有的prunedTopK。
     
     参数：
     sorted_nns: 排序后的邻居列表
@@ -180,8 +188,9 @@ def optimized_generating_method(sorted_nns, sorted_nn_ids, pivot_pos, top_k_min_
     # 清空哈希表
     top_k_min_hash_map.clear()
 
-    process_range(pivot_pos, sorted_nns, sorted_nn_ids, None, dominate_nums, L_stack, R_stack, top_k_min_hash_map)
-
+    cnt_searchRange = process_range(pivot_pos, sorted_nns, sorted_nn_ids, None, dominate_nums, L_stack, R_stack, top_k_min_hash_map)
+    print(cnt_searchRange)
+    
     # 输出分析结果
     analyze_top_k_distribution(top_k_min_hash_map)
 
@@ -190,4 +199,7 @@ def optimized_generating_method(sorted_nns, sorted_nn_ids, pivot_pos, top_k_min_
         with open(file_path, 'w') as f:
             json.dump(top_k_min_hash_map, f)
 
-optimized_generating_method(sorted_nns, sorted_nn_ids, pivot_pos, top_k_min_hash_map, True)
+# start_time = time.time()  # 记录开始时间
+# optimized_generating_method(sorted_nns, sorted_nn_ids, pivot_pos, top_k_min_hash_map, IF_SAVE)
+# end_time = time.time()  # 记录结束时间
+# print(f"函数耗时: {end_time - start_time:.6f} 秒")

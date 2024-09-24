@@ -1,10 +1,12 @@
 import json
 
+ground_truth_file_path = 'top_k_bruteforce.json'
+opt_topk_file_path = 'top_k_DFS.json' # top_k_Optimization.json
 # 加载数据
-with open('top_k_bruteforce.json', 'r') as f:
+with open(ground_truth_file_path, 'r') as f:
     bf_topk = json.load(f)
     
-with open('top_k_Optimization.json', 'r') as f:
+with open(opt_topk_file_path, 'r') as f:
     opt_topk = json.load(f)
     
 # 比较数据

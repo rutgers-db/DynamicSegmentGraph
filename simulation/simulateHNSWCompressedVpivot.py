@@ -13,7 +13,7 @@ import time
 M = 8
 PIVOT_ID = 2048  # 基准点ID
 DOMINATION_FILE_PATH = '/Users/zhencan/WorkPlace/Serf_V2/simulation/sample_data/sampled_neighbors_domination.txt'
-IF_SAVE = False
+IF_SAVE = True
 IF_LOAD_DOMINATE = True
 
 # 数据读取
@@ -57,40 +57,38 @@ def dfs(prefix_nbr_idx, M, L, R, lr, rl):
     last_nbr_idx = prefix_nbr_idx[-1] if prefix_nbr_idx else -1
     for i in range(last_nbr_idx + 1, len(nns)):
         if nns[i][0] <= R and nns[i][0] >= L:
-            if current_V[i]:
-                # check new dominate
-                tmp_dominated_arr = []
-                for j in range(i+1, len(nns)):
-                    if nns[j][0] <= R and nns[j][0] >= L:
-                        if current_V[j]:
-                            # Record domination calculation times
-                            cal_domination_count += 1
-                            cal_pair = i*len(nns) + j
-                            calculate_pair[cal_pair] += 1
-                            
-                            if nns[i][0] in points_dominate_me[j]:
-                                current_V[j] = False
-                                tmp_dominated_arr += [j]
-                                
-                            
-                # 更新左侧范围边界
-                next_lr = min(nns[i][0], lr) if nns[i][0] < PIVOT_ID else lr
-                # 更新右侧范围边界
-                next_rl = max(nns[i][0], rl) if nns[i][0] > PIVOT_ID else rl
-                
-                dfs(prefix_nbr_idx + [i], M, L, R, next_lr, next_rl)
-                prefix_set.add(hash_top_k_min_positions(prefix_nbr_idx + [i]))
-                # uncheck domination
-                for j in tmp_dominated_arr:
-                    current_V[j] = True
-                            
-                # update L and R
-                if nns[i][0] < lr:
-                    L = nns[i][0] + 1
-                elif nns[i][0] > rl:
-                    R = nns[i][0] - 1
-                else:
-                    break
+            # Iterate each nb in prefix_nbr and check its domination relationship with current closest nb
+            # Record domination calculation times
+            domination_flag = False
+            if prefix_nbr_idx:
+                for pre_nb_idx in prefix_nbr_idx:
+                    pre_nb = nns[pre_nb_idx][0]
+
+                    cal_domination_count += 1
+                    cal_pair = pre_nb_idx*len(nns) + i
+                    calculate_pair[cal_pair] += 1
+                    
+                    if pre_nb in points_dominate_me[i]:
+                        domination_flag = True
+                        break
+            
+            if domination_flag:
+                continue
+            # 更新左侧范围边界
+            next_lr = min(nns[i][0], lr) if nns[i][0] < PIVOT_ID else lr
+            # 更新右侧范围边界
+            next_rl = max(nns[i][0], rl) if nns[i][0] > PIVOT_ID else rl
+            
+            dfs(prefix_nbr_idx + [i], M, L, R, next_lr, next_rl)
+            prefix_set.add(hash_top_k_min_positions(prefix_nbr_idx + [i]))
+                        
+            # update L and R
+            if nns[i][0] < lr:
+                L = nns[i][0] + 1
+            elif nns[i][0] > rl:
+                R = nns[i][0] - 1
+            else:
+                break
                     
                 
 

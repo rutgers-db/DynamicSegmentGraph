@@ -234,3 +234,13 @@ def analyze_top_k_distribution(top_k_min_hash_map):
     for range_label, percentage in distribution.items():
         print(f"{range_label} 次出现: {percentage:.2f}%")
     print(f"pos unique的数量: {len(position_counts)}")
+    
+    # 查看position的频率分布
+    # 获取频率最低的几个元素（例如取前3个）
+    # num_lowest = 30 # 指定要获取多少个频率最低的元素
+    # lowest_freq_elements = position_counts.most_common()[:-num_lowest-1:-1]
+
+    # # 输出这些元素及其频率
+    # print("频率最低的几个元素及频率:")
+    # for elem, freq in lowest_freq_elements:
+    #     print(f"{elem}: {freq}")

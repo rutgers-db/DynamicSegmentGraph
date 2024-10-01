@@ -11,8 +11,8 @@ import time
 
 # 全局常量定义
 M = 8
-PIVOT_ID = 2048  # 基准点ID
-DOMINATION_FILE_PATH = '/Users/zhencan/WorkPlace/Serf_V2/simulation/sample_data/sampled_neighbors_domination.txt'
+PIVOT_ID = 2048   # 基准点ID 2048
+DOMINATION_FILE_PATH = './sample_data/sampled_neighbors_domination.txt'
 IF_SAVE = True
 IF_LOAD_DOMINATE = True
 
@@ -43,7 +43,7 @@ cal_domination_count = 0 # 计算 domination 的次数
 # initilize a dictionary to store the calculate pair key is a pair of int and the value is default 0
 calculate_pair = defaultdict(lambda: 0)
 prefix_set = set()
-
+unique_points_weight = defaultdict(lambda: 0)  # store how many path pass this point
 def dfs(prefix_nbr_idx, M, L, R, lr, rl):
     global cal_domination_count, top_k_min_hash_map, current_V
     if len(prefix_nbr_idx) == M:
@@ -93,7 +93,7 @@ def dfs(prefix_nbr_idx, M, L, R, lr, rl):
                 
 
 start_time = time.time()  # 记录开始时间
-dfs([], M, -1, max_nn_id + 1, PIVOT_ID, PIVOT_ID)
+dfs([], M, 0, max_nn_id + 1, PIVOT_ID, PIVOT_ID)
 end_time = time.time()  # 记录结束时间
 print(f"函数耗时: {end_time - start_time:.6f} 秒")
 print(f"计算domination的次数: {cal_domination_count}")

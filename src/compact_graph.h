@@ -24,459 +24,426 @@
 #include "data_wrapper.h"
 #include "index_base.h"
 #include "utils.h"
-#include "sorted_array.h"
 using namespace base_hnsw;
 
-// #define OnlinePrune
+namespace Compact {
+template <typename dist_t>
+struct CompressedPoint {
+    // 使用初始化列表构造函数，简化赋值操作并提高效率
+    // TODO: here it should be a tuple not a pair, there should be ll, lr, rl, rr
+    CompressedPoint(unsigned _external_id, unsigned l, unsigned r, dist_t _dist) :
+        external_id(_external_id), left_bound(l), right_bound(r), dist(_dist) {
+    }
 
-namespace Compact
-{
-    template <typename dist_t>
-    struct CompressedPoint
-    {
-        // 使用初始化列表构造函数，简化赋值操作并提高效率
-        CompressedPoint(unsigned _external_id, unsigned l, unsigned r, dist_t _dist)
-            : external_id(_external_id), left_bound(l), right_bound(r), dist(_dist) {}
+    // 默认构造函数
+    CompressedPoint() {
+    }
 
-        // 默认构造函数
-        CompressedPoint() {}
+    unsigned external_id, left_bound, right_bound;
+    dist_t dist;
+    size_t flag = 0;
 
-        unsigned external_id, left_bound, right_bound;
-        dist_t dist;
-        size_t flag = 0;
+    bool if_in_compressed_range(const unsigned center_external_id, const unsigned query_L, const unsigned query_R) const {
+        return (query_L <= left_bound && query_R >= right_bound);
+    }
 
-        bool if_in_compressed_range(const unsigned center_external_id, const unsigned query_L, const unsigned query_R) const
-        {
-            auto left_inner = std::min(center_external_id, external_id);
-            auto right_inner = std::max(center_external_id, external_id);
-            return (query_L <= left_inner && query_R >= right_inner) && (left_bound <= query_L && right_bound >= query_R);
-        }
+    bool if_not_dominated(const size_t &cur_dom_relation) {
+        // 换成bool return
+        return (flag & cur_dom_relation) == 0;
+    }
 
-        bool if_not_dominated(const size_t &cur_dom_relation)
-        {
-            // 换成bool return
-            return (flag & cur_dom_relation) == 0;
-        }
+    // 重载小于运算符 (<)，用于按照（距离） or （索引）从小到大排序
+    bool operator<(const CompressedPoint &other) const {
+        // return this->dist < other.dist;
+        return this->external_id < other.external_id;
+    }
+};
 
-        // 重载小于运算符 (<)，用于按照（距离） or （索引）从小到大排序
-        bool operator<(const CompressedPoint &other) const
-        {
-            // return this->dist < other.dist;
-            return this->external_id < other.external_id;
-        }
-    };
+template <typename dist_t>
+struct DirectedPointNeighbors {
+    vector<CompressedPoint<dist_t>> nns;
+    vector<CompressedPoint<dist_t>> rev_nns;
 
-    template <typename dist_t>
-    struct DirectedPointNeighbors
-    {
-        vector<CompressedPoint<dist_t>> nns;
+    size_t countNeighbors() {
+        return nns.size();
+    }
+};
 
-        size_t countNeighbors()
-        {
-            return nns.size();
-        }
-    };
+template <typename dist_t>
+class CompactHNSW : public HierarchicalNSW<float> {
+public:
+    /**
+     * 构造一个二维段图层次邻近搜索树（Hierarchical Navigable Small World graph）实例.
+     *
+     * @param index_params 索引参数配置对象，包含索引构建过程中的关键参数.
+     * @param s 距离计算空间接口，用于执行距离度量操作.
+     * @param max_elements 最大元素数量，即索引能容纳的最大数据点数.
+     * @param M 默认连接度，每个节点默认与其他M个节点相连.
+     * @param ef_construction 扩展因子，在构造过程中使用的查询效率参数.
+     * @param random_seed 随机种子，用于初始化随机数生成器.
+     */
+    CompactHNSW(const BaseIndex::IndexParams &index_params,
+                SpaceInterface<float> *s,
+                size_t max_elements,
+                size_t M = 16,
+                size_t ef_construction = 200,
+                size_t random_seed = 100) :
+        HierarchicalNSW(s, max_elements, M, index_params.ef_construction, random_seed) {
+        // 将传入的索引参数指针赋值给成员变量
+        params = &index_params;
 
-    template <typename dist_t>
-    class CompactHNSW : public HierarchicalNSW<float>
-    {
-    public:
-        /**
-         * 构造一个二维段图层次邻近搜索树（Hierarchical Navigable Small World graph）实例.
-         *
-         * @param index_params 索引参数配置对象，包含索引构建过程中的关键参数.
-         * @param s 距离计算空间接口，用于执行距离度量操作.
-         * @param max_elements 最大元素数量，即索引能容纳的最大数据点数.
-         * @param M 默认连接度，每个节点默认与其他M个节点相连.
-         * @param ef_construction 扩展因子，在构造过程中使用的查询效率参数.
-         * @param random_seed 随机种子，用于初始化随机数生成器.
-         */
-        CompactHNSW(const BaseIndex::IndexParams &index_params,
-                    SpaceInterface<float> *s, size_t max_elements,
-                    size_t M = 16, size_t ef_construction = 200,
-                    size_t random_seed = 100)
-            : HierarchicalNSW(s, max_elements, M, index_params.ef_construction,
-                              random_seed)
-        {
-            // 将传入的索引参数指针赋值给成员变量
-            params = &index_params;
+        // 设置最大扩展因子为索引参数中的ef_max值
+        ef_max_ = index_params.ef_max;
+    }
 
-            // 设置最大扩展因子为索引参数中的ef_max值
-            ef_max_ = index_params.ef_max;
-        }
+    unsigned max_external_id_ = 0;
+    unsigned min_external_id_ = std::numeric_limits<unsigned>::max();
 
-        unsigned max_external_id_ = 0;
-        unsigned min_external_id_ = std::numeric_limits<unsigned>::max();
+    // log
+    size_t forward_batch_nn_amount = 0;
+    size_t backward_batch_theoratical_nn_amount = 0;
+    size_t drop_points_ = 0;
 
-        // log
-        size_t forward_batch_nn_amount = 0;
-        size_t backward_batch_theoratical_nn_amount = 0;
-        size_t drop_points_ = 0;
+    size_t Mcurmax;
 
-        // 指向BaseIndex::IndexParams类型的常量指针，存储索引参数
-        const BaseIndex::IndexParams *params;
+    // 指向BaseIndex::IndexParams类型的常量指针，存储索引参数
+    const BaseIndex::IndexParams *params;
 
-        // 存储指向段图邻居列表的指针，表示图结构中的边信息
-        vector<DirectedPointNeighbors<dist_t>> *compact_graph;
+    // 存储指向段图邻居列表的指针，表示图结构中的边信息
+    vector<DirectedPointNeighbors<dist_t>> *compact_graph;
 
-        /**
-         * 在构建HNSW图时优化搜索过程，保留更多邻居节点信息。
-         * 这个是基本就是原本的search 就是在整个图里当前层搜最近的
-         * 或许可以结合（RNN-descent）以提升效率??? chaoji left 的。
-         *
-         * @param ep_id 起始点ID
-         * @param data_point 数据点指针
-         * @param layer 当前层级
-         * @return 返回一个优先队列，其中包含距离和节点ID对，按距离排序。
-         */
-        virtual std::priority_queue<std::pair<dist_t, tableint>,
-                                    std::vector<std::pair<dist_t, tableint>>,
-                                    CompareByFirst>
-        searchBaseLayerLevel0(tableint ep_id, const void *data_point, int layer)
-        {
-            // 获取空闲访问列表
-            VisitedList *vl = visited_list_pool_->getFreeVisitedList();
-            vl_type *visited_array = vl->mass;
-            vl_type visited_array_tag = vl->curV;
-
-            // 初始化候选集和待处理集合
-            std::priority_queue<std::pair<dist_t, tableint>,
+    /**
+     * 在构建HNSW图时优化搜索过程，保留更多邻居节点信息。
+     * 这个是基本就是原本的search 就是在整个图里当前层搜最近的
+     * 或许可以结合（RNN-descent）以提升效率??? chaoji left 的。
+     *
+     * @param ep_id 起始点ID
+     * @param data_point 数据点指针
+     * @param layer 当前层级
+     * @return 返回一个优先队列，其中包含距离和节点ID对，按距离排序。
+     */
+    virtual std::priority_queue<std::pair<dist_t, tableint>,
                                 std::vector<std::pair<dist_t, tableint>>,
                                 CompareByFirst>
-                top_candidates;
-            std::priority_queue<std::pair<dist_t, tableint>,
-                                std::vector<std::pair<dist_t, tableint>>,
-                                CompareByFirst>
-                candidateSet;
+    searchBaseLayerLevel0(tableint ep_id, const void *data_point, int layer) {
+        // 获取空闲访问列表
+        VisitedList *vl = visited_list_pool_->getFreeVisitedList();
+        vl_type *visited_array = vl->mass;
+        vl_type visited_array_tag = vl->curV;
 
-            // 存储删除的邻接节点列表
-            std::vector<pair<dist_t, tableint>> deleted_list;
+        // 初始化候选集和待处理集合
+        std::priority_queue<std::pair<dist_t, tableint>,
+                            std::vector<std::pair<dist_t, tableint>>,
+                            CompareByFirst>
+            top_candidates;
+        std::priority_queue<std::pair<dist_t, tableint>,
+                            std::vector<std::pair<dist_t, tableint>>,
+                            CompareByFirst>
+            candidateSet;
 
-            // 设置构造时的EF值
-            size_t ef_construction = ef_max_;
+        // 存储删除的邻接节点列表
+        std::vector<pair<dist_t, tableint>> deleted_list;
 
-            // 计算起始点的距离下界
-            dist_t lowerBound;
-            if (!isMarkedDeleted(ep_id))
-            {
-                dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id),
-                                           dist_func_param_);
-                top_candidates.emplace(dist, ep_id);
-                lowerBound = dist;
-                candidateSet.emplace(-dist, ep_id);
+        // 设置构造时的EF值
+        size_t ef_construction = ef_max_;
+
+        // 计算起始点的距离下界
+        dist_t lowerBound;
+        if (!isMarkedDeleted(ep_id)) {
+            dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id),
+                                       dist_func_param_);
+            top_candidates.emplace(dist, ep_id);
+            lowerBound = dist;
+            candidateSet.emplace(-dist, ep_id);
+        } else {
+            lowerBound = std::numeric_limits<dist_t>::max();
+            candidateSet.emplace(-lowerBound, ep_id);
+        }
+        visited_array[ep_id] = visited_array_tag;
+
+        // 主循环：遍历候选集直到为空
+        while (!candidateSet.empty()) {
+            std::pair<dist_t, tableint> curr_el_pair = candidateSet.top();
+            if ((-curr_el_pair.first) > lowerBound) {
+                break;
             }
-            else
-            {
-                lowerBound = std::numeric_limits<dist_t>::max();
-                candidateSet.emplace(-lowerBound, ep_id);
+            candidateSet.pop();
+
+            // 处理当前节点
+            tableint curNodeNum = curr_el_pair.second;
+            std::unique_lock<std::mutex> lock(link_list_locks_[curNodeNum]);
+
+            // 根据层级获取链接列表数据
+            int *data;
+            if (layer == 0) {
+                data = (int *)get_linklist0(curNodeNum);
+            } else {
+                data = (int *)get_linklist(curNodeNum, layer);
             }
-            visited_array[ep_id] = visited_array_tag;
+            size_t size = getListCount((linklistsizeint *)data);
+            tableint *datal = (tableint *)(data + 1);
 
-            // 主循环：遍历候选集直到为空
-            while (!candidateSet.empty())
-            {
-                std::pair<dist_t, tableint> curr_el_pair = candidateSet.top();
-                if ((-curr_el_pair.first) > lowerBound)
-                {
-                    break;
-                }
-                candidateSet.pop();
+#ifdef USE_SSE
+            // 预取指令提高性能
+            _mm_prefetch((char *)(visited_array + *(data + 1)), _MM_HINT_T0);
+            _mm_prefetch((char *)(visited_array + *(data + 1) + 64), _MM_HINT_T0);
+            _mm_prefetch(getDataByInternalId(*datal), _MM_HINT_T0);
+            _mm_prefetch(getDataByInternalId(*(datal + 1)), _MM_HINT_T0);
+#endif
 
-                // 处理当前节点
-                tableint curNodeNum = curr_el_pair.second;
-                std::unique_lock<std::mutex> lock(link_list_locks_[curNodeNum]);
-
-                // 根据层级获取链接列表数据
-                int *data;
-                if (layer == 0)
-                {
-                    data = (int *)get_linklist0(curNodeNum);
-                }
-                else
-                {
-                    data = (int *)get_linklist(curNodeNum, layer);
-                }
-                size_t size = getListCount((linklistsizeint *)data);
-                tableint *datal = (tableint *)(data + 1);
-
+            // 遍历链接列表中的每个元素
+            for (size_t j = 0; j < size; j++) {
+                tableint candidate_id = *(datal + j);
 #ifdef USE_SSE
                 // 预取指令提高性能
-                _mm_prefetch((char *)(visited_array + *(data + 1)), _MM_HINT_T0);
-                _mm_prefetch((char *)(visited_array + *(data + 1) + 64), _MM_HINT_T0);
-                _mm_prefetch(getDataByInternalId(*datal), _MM_HINT_T0);
-                _mm_prefetch(getDataByInternalId(*(datal + 1)), _MM_HINT_T0);
+                _mm_prefetch((char *)(visited_array + *(datal + j + 1)), _MM_HINT_T0);
+                _mm_prefetch(getDataByInternalId(*(datal + j + 1)), _MM_HINT_T0);
 #endif
+                if (visited_array[candidate_id] == visited_array_tag)
+                    continue;
+                visited_array[candidate_id] = visited_array_tag;
 
-                // 遍历链接列表中的每个元素
-                for (size_t j = 0; j < size; j++)
-                {
-                    tableint candidate_id = *(datal + j);
+                // 计算候选节点到目标点的距离
+                char *currObj1 = (getDataByInternalId(candidate_id));
+                dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_);
+
+                // 更新候选集和已访问节点
+                if (top_candidates.size() < ef_construction || lowerBound > dist1) {
+                    candidateSet.emplace(-dist1, candidate_id);
 #ifdef USE_SSE
                     // 预取指令提高性能
-                    _mm_prefetch((char *)(visited_array + *(datal + j + 1)), _MM_HINT_T0);
-                    _mm_prefetch(getDataByInternalId(*(datal + j + 1)), _MM_HINT_T0);
-#endif
-                    if (visited_array[candidate_id] == visited_array_tag)
-                        continue;
-                    visited_array[candidate_id] = visited_array_tag;
-
-                    // 计算候选节点到目标点的距离
-                    char *currObj1 = (getDataByInternalId(candidate_id));
-                    dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_);
-
-                    // 更新候选集和已访问节点
-                    if (top_candidates.size() < ef_construction || lowerBound > dist1)
-                    {
-                        candidateSet.emplace(-dist1, candidate_id);
-#ifdef USE_SSE
-                        // 预取指令提高性能
-                        _mm_prefetch(getDataByInternalId(candidateSet.top().second),
-                                     _MM_HINT_T0);
+                    _mm_prefetch(getDataByInternalId(candidateSet.top().second),
+                                 _MM_HINT_T0);
 #endif
 
-                        if (!isMarkedDeleted(candidate_id))
-                            top_candidates.emplace(dist1, candidate_id);
+                    if (!isMarkedDeleted(candidate_id))
+                        top_candidates.emplace(dist1, candidate_id);
 
-                        // 记录并移除超出EF限制的节点
-                        if (top_candidates.size() > ef_construction)
-                        {
-                            deleted_list.emplace_back(top_candidates.top());
-                            top_candidates.pop();
+                    // 记录并移除超出EF限制的节点
+                    if (top_candidates.size() > ef_construction) {
+                        deleted_list.emplace_back(top_candidates.top());
+                        top_candidates.pop();
+                    }
+
+                    if (!top_candidates.empty())
+                        lowerBound = top_candidates.top().first;
+                }
+            }
+        }
+
+        // 释放访问列表资源
+        visited_list_pool_->releaseVisitedList(vl);
+
+        // 将之前记录的删除节点重新加入候选集
+        for (auto deleted_candidate : deleted_list) {
+            top_candidates.emplace(deleted_candidate);
+        }
+
+        return top_candidates;
+    }
+
+    std::vector<tableint> selectedNeighbors;
+    std::vector<tableint> return_list;
+    unsigned iter_counter = 0;
+    bool complete = false;
+    tableint next_closest_entry_point;
+    void init_selectedNeighbors() {
+        selectedNeighbors.clear();
+        return_list.clear();
+        iter_counter = 0;
+        next_closest_entry_point = 0;
+        complete = false;
+    }
+
+    void get_selectedNeighbors(tableint passed_c, dist_t dist_to_query, const unsigned &Mcurmax) {
+        if (complete)
+            return;
+
+        if (return_list.size() >= Mcurmax || iter_counter >= ef_basic_construction_) {
+            // The first batch, also use for original HNSW constructing
+            next_closest_entry_point =
+                return_list.front(); // TODO: check whether the nearest neighbor
+            for (auto point : return_list) {
+                selectedNeighbors.push_back((tableint)point);
+            }
+
+            return_list.clear(); // 这里会清空return list
+            iter_counter = 0;
+            complete = true;
+            return;
+        }
+
+        iter_counter++;
+        bool good = true;
+
+        // 查看会不会被在return list的给prune掉
+        for (auto point : return_list) {
+            dist_t curdist = fstdistfunc_(getDataByInternalId(point),
+                                          getDataByInternalId(passed_c),
+                                          dist_func_param_);
+
+            if (curdist < dist_to_query) {
+                good = false;
+                break;
+            }
+        }
+
+        if (good) {
+            return_list.emplace_back(passed_c);
+        }
+    }
+
+    // the internal ids of points sorted by distance from queue_closest
+    std::vector<pair<unsigned, dist_t>> sorted_cands;
+    // the tmp map for saving the result of dominationion pair
+    // to avoid the duplicate calculation
+    std::unordered_map<unsigned, bool> calculated_pair;
+    // TODO: we need to get the boundary of each nbr
+    std::vector<bool> if_nbr;
+    std::vector<unsigned> nbr_L;
+    std::vector<unsigned> nbr_R;
+
+    void dfs(vector<unsigned> &prefix_idx, unsigned PIVOT_ID, unsigned L, unsigned R, unsigned lr, unsigned rl) {
+        if (prefix_idx.size() == Mcurmax) {
+            return;
+        }
+
+        unsigned st_idx = prefix_idx.empty() ? 0 : prefix_idx.back() + 1;
+        for (auto i = st_idx; i < sorted_cands.size(); ++i) {
+            unsigned cur_external_id = getExternalLabel(sorted_cands[i].first);
+            auto cur_dist = sorted_cands[i].second;
+
+            // TODO: how to quickly get the corresponding ID that locates in the range [L,R]
+            if (cur_external_id <= R && cur_external_id >= L) {
+                bool dominated_flag = false;
+                // Iterate each nb in prefix_nbr and check its domination relationship with current closest nb
+                for (auto const &pre_nb_idx : prefix_idx) {
+                    unsigned encoded_pair = (pre_nb_idx << 16) + i;
+
+                    // check whether it has been calculated
+                    if (calculated_pair.find(encoded_pair) != calculated_pair.end()) {
+                        const auto &domination_result = calculated_pair[encoded_pair];
+                        if (domination_result == true) {
+                            dominated_flag = true;
+                            break;
                         }
-
-                        if (!top_candidates.empty())
-                            lowerBound = top_candidates.top().first;
+                    } else {
+                        // if not calculated, we need to calculate the result
+                        dist_t tmp_dist = fstdistfunc_(getDataByInternalId(sorted_cands[i].first), getDataByInternalId(sorted_cands[pre_nb_idx].first), dist_func_param_);
+                        auto domination_result = tmp_dist < cur_dist;
+                        calculated_pair[encoded_pair] = domination_result;
+                        if (domination_result) {
+                            dominated_flag = true;
+                            break;
+                        }
                     }
                 }
-            }
 
-            // 释放访问列表资源
-            visited_list_pool_->releaseVisitedList(vl);
+                if (dominated_flag)
+                    continue;
 
-            // 将之前记录的删除节点重新加入候选集
-            for (auto deleted_candidate : deleted_list)
-            {
-                top_candidates.emplace(deleted_candidate);
-            }
+                unsigned next_lr = (cur_external_id < PIVOT_ID) ? std::min(cur_external_id, lr) : lr;
+                unsigned next_rl = (cur_external_id > PIVOT_ID) ? std::max(cur_external_id, rl) : rl;
 
-            return top_candidates;
-        }
+                prefix_idx.push_back(i);
 
-        std::vector<tableint> selectedNeighbors;
-        std::vector<tableint> return_list;
-        unsigned iter_counter = 0;
-        bool complete = false;
-        tableint next_closest_entry_point;
-        void init_selectedNeighbors()
-        {
-            selectedNeighbors.clear();
-            return_list.clear();
-            iter_counter = 0;
-            next_closest_entry_point = 0;
-            complete = false;
-        }
-
-        void get_selectedNeighbors(tableint passed_c, dist_t dist_to_query, const unsigned &Mcurmax)
-        {
-            if (complete)
-                return;
-
-            if (return_list.size() >= Mcurmax || iter_counter >= ef_basic_construction_)
-            {
-                // The first batch, also use for original HNSW constructing
-                next_closest_entry_point =
-                    return_list.front(); // TODO: check whether the nearest neighbor
-                for (auto point : return_list)
-                {
-                    selectedNeighbors.push_back((tableint)point);
+                // TODO: check whether this is good
+                if (if_nbr[i] == false) {
+                    if_nbr[i] = true;
+                    nbr_L[i] = L;
+                    nbr_R[i] = R;
+                } else {
+                    nbr_L[i] = std::max(nbr_L[i], L);
+                    nbr_R[i] = std::min(nbr_R[i], R);
                 }
 
-                return_list.clear(); // 这里会清空return list
-                iter_counter = 0;
-                complete = true;
-                return;
-            }
+                dfs(prefix_idx, PIVOT_ID, L, R, next_lr, next_rl);
 
-            iter_counter++;
-            bool good = true;
+                prefix_idx.pop_back();
 
-            // 查看会不会被在return list的给prune掉
-            for (auto point : return_list)
-            {
-                dist_t curdist = fstdistfunc_(getDataByInternalId(point),
-                                              getDataByInternalId(passed_c),
-                                              dist_func_param_);
-
-                if (curdist < dist_to_query)
-                {
-                    good = false;
+                if (cur_external_id < lr) {
+                    L = cur_external_id + 1;
+                } else if (cur_external_id > rl) {
+                    R = cur_external_id - 1;
+                } else {
                     break;
                 }
             }
+        }
+    }
 
-            if (good)
-            {
-                return_list.emplace_back(passed_c);
-            }
+    void generate_compressed_neighbors(
+        std::priority_queue<std::pair<dist_t, tableint>> &queue_closest,
+        unsigned center_external_id,
+        const unsigned &index_k) {
+        if (queue_closest.size() == 0) {
+            return;
+        }
+        // unsigned tmp_left_bound = min_external_id_ == 0 ? 0 : min_external_id_ - 1;                                                              // consider we have 0 as min external id
+        // unsigned tmp_right_bound = max_external_id_ == std::numeric_limits<int>::max() ? std::numeric_limits<int>::max() : max_external_id_ + 1; // consider we have too maximum value as max external id
+
+        // TODO: Make sure left bound as 0 is perfect? no any bugs? if -1 that will be fined but if 0 I am not sure
+        unsigned tmp_left_bound = 0;
+        unsigned tmp_right_bound = max_elements_;
+
+        sorted_cands.clear();
+        while (!queue_closest.empty()) {
+            std::pair<dist_t, tableint> current_pair = queue_closest.top(); // 当前离我最近的点
+            dist_t dist_to_query = -current_pair.first;
+            sorted_cands.emplace_back(current_pair.second, dist_to_query); // 把queue_closest里的按照顺序塞进sorted_cands里面
+            queue_closest.pop();
+            /*这里调用回掉函数*/
+            get_selectedNeighbors(current_pair.second, dist_to_query, index_k);
         }
 
-        // the internal ids of points sorted by distance from queue_closest
-        std::vector<unsigned, dist_t> sorted_cands;
-        // the tmp map for saving the result of dominationion pair
-        std::unordered_map<unsigned, bool> calculated_pair;
-        // TODO: we need to get the boundary of each nbr
-        std::vector<bool> if_nbr;
-        void dfs(vector<unsigned> &prefix_idx, unsigned PIVOT_ID, unsigned L, unsigned R, unsigned lr, unsigned rl)
-        {
-            if (prefix_idx.size() == Mcurmax)
-            {
-                return;
-            }
+        // some initiliazation for some variables serving for dfs function
+        vector<unsigned> prefix_idx;
+        prefix_idx.reserve(Mcurmax);
 
-            unsigned st_idx = prefix_idx.empty() ? 0 : prefix_idx.back() + 1;
-            for (auto i = st_idx; i < sorted_cands.size(); ++i)
-            {
-                unsigned cur_external_id = getExternalLabel(sorted_cands[i].first);
-                auto cur_dist = sorted_cands[i].second;
+        // TODO: we can shrink this memory that they do not need so much space we can integrate them into one data structure
+        if_nbr.resize(sorted_cands.size());
+        nbr_L.resize(sorted_cands.size());
+        nbr_R.resize(sorted_cands.size());
+        std::fill_n(if_nbr.begin(), if_nbr.size(), false);
+        calculated_pair.clear();
 
-                if (cur_external_id <= R && cur_external_id >= L)
-                {
-                    bool dominated_flag = false;
-                    // Iterate each nb in prefix_nbr and check its domination relationship with current closest nb
-                    for (auto const &pre_nb_idx : prefix_idx)
-                    {
-                        unsigned encoded_pair = pre_nb_idx << 16 + i;
+        dfs(prefix_idx, center_external_id, tmp_left_bound, tmp_right_bound, center_external_id, center_external_id);
 
-                        // check whether it has been calculated
-                        if (calculated_pair.find(encoded_pair) != calculated_pair.end())
-                        {
-                            const auto &domination_result = calculated_pair[encoded_pair];
-                            if (domination_result == true)
-                            {
-                                dominated_flag = true;
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            // if not calculated, we need to calculate the result
-                            dist_t tmp_dist = fstdistfunc_(i, pre_nb_idx, dist_func_param_);
-                            auto domination_result = tmp_dist < cur_dist;
-                            calculated_pair[encoded_pair] = domination_result;
-                            if (domination_result)
-                            {
-                                dominated_flag = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (dominated_flag)
-                        continue;
-
-                    unsigned next_lr = (cur_external_id < PIVOT_ID) ? min(cur_external_id, lr) : lr;
-                    unsigned next_rl = (cur_external_id > PIVOT_ID) ? max(cur_external_id, rl) : rl;
-
-                    prefix_idx.push_back(i);
-
-                    if_nbr[i] = true;
-                    dfs(prefix_idx, PIVOT_ID, L, R, next_lr, next_rl);
-
-                    prefix_idx.pop_back();
-
-                    if (cur_external_id < lr)
-                    {
-                        L = cur_external_id + 1;
-                    }
-                    else if (cur_external_id > rl)
-                    {
-                        R = cur_external_id - 1;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-            }
-        }
-
-        void generate_compressed_neighbors(
-            std::priority_queue<std::pair<dist_t, tableint>> &queue_closest,
-            unsigned center_external_id, const unsigned &index_k)
-        {
-            if (queue_closest.size() == 0)
-            {
-                return;
-            }
-            // unsigned tmp_left_bound = min_external_id_ == 0 ? 0 : min_external_id_ - 1;                                                              // consider we have 0 as min external id
-            // unsigned tmp_right_bound = max_external_id_ == std::numeric_limits<int>::max() ? std::numeric_limits<int>::max() : max_external_id_ + 1; // consider we have too maximum value as max external id
-
-            // TODO: Make sure left bound as 0 is perfect? no any bugs? if -1 that will be fined but if 0 I am not sure
-            unsigned tmp_left_bound = 0;
-            unsigned tmp_right_bound = max_elements_;
-
-            sorted_cands.clear();
-            while (!queue_closest.empty())
-            {
-                std::pair<dist_t, tableint> curent_pair = queue_closest.top(); // 当前离我最近的点
-                dist_t dist_to_query = -curent_pair.first;
-                sorted_cands.emplace_back(current_pair.second, dist_to_query); // 把queue_closest里的按照顺序塞进sorted_cands里面
-                queue_closest.pop();
-                /*这里调用回掉函数*/
-                get_selectedNeighbors(curent_pair.second, dist_to_query, index_k);
-            }
-
-            vector<unsigned> prefix_idx;
-            prefix_idx.reserve(Mcurmax);
-
-            if_nbr.resize(sorted_cands.size());
-            std::fill_n(if_nbr.begin(), if_nbr.size(), false);
-            calculated_pair.clear();
-            
-            dfs(prefix_idx, center_external_id, tmp_left_bound, tmp_right_bound, center_external_id, center_external_id);
-
-            // generate the compressed point
-            for (unsigned i = 0; i < if_nbr.size(); i++)
-            {
-                if (if_nbr[i])
-                {
-                    // TODO: each point is actually corresponding to a boundary we need to get the accurate positions
-                    compact_graph->at(center_external_id).nns.emplace_back(sorted_cands[i].first, tmp_left_bound, tmp_right_bound, sorted_cands[i].second);
-                }
+        // generate the compressed point
+        for (unsigned i = 0; i < if_nbr.size(); i++) {
+            if (if_nbr[i]) {
+                // TODO: each point is actually corresponding to a boundary we need to get the accurate positions
+                unsigned tmp_external_id = getExternalLabel(sorted_cands[i].first);
+                // compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, tmp_left_bound, tmp_right_bound, sorted_cands[i].second);
+                compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, nbr_L[i], nbr_R[i], sorted_cands[i].second);
             }
         }
     }
 
     void
-    gen_rev_neighbors(unsigned center_external_id)
-    {
+    gen_rev_neighbors(unsigned center_external_id) {
         auto &nns = compact_graph->at(center_external_id).nns;
-        for (auto &point : nns)
-        {
+        for (auto &point : nns) {
             auto rev_point_id = point.external_id;
-            auto &rev_nns = compact_graph->at(rev_point_id).nns;
+            auto &rev_nns = compact_graph->at(rev_point_id).rev_nns;
             rev_nns.emplace_back(center_external_id, point.left_bound, point.right_bound, point.dist);
         }
         return;
     }
 
-    void gen_domination_relationship(unsigned center_external_id)
-    {
+    void gen_domination_relationship(unsigned center_external_id) {
         auto &nns = compact_graph->at(center_external_id).nns;
         std::sort(nns.begin(), nns.end());
-        for (unsigned i = 1; i < nns.size(); i++)
-        {
+        for (unsigned i = 1; i < nns.size(); i++) {
             size_t tmp_flag = 0;
             auto cur_dist = nns[i].dist;
             unsigned j_limit = std::min(i, static_cast<unsigned>(64));
-            for (unsigned j = 0; j < j_limit; j++)
-            {
+            for (unsigned j = 0; j < j_limit; j++) {
                 // calculate distance
                 auto tmp_dist = fstdistfunc_(getDataByLabel(nns[i].external_id),
                                              getDataByLabel(nns[j].external_id),
                                              dist_func_param_);
-                if (tmp_dist < cur_dist)
-                {
+                if (tmp_dist < cur_dist) {
                     tmp_flag |= (1 << j);
                 }
             }
@@ -501,7 +468,7 @@ namespace Compact
         int level,                                           /**< layer level */
         bool isUpdate)                                       /**< 是否是更新已有的点 还是插入新的点 */
     {
-        size_t Mcurmax = maxM0_; // 最大邻接数量
+        Mcurmax = maxM0_; // 最大邻接数量
 
         // 获取当前节点的外部标签
         unsigned external_id = getExternalLabel(cur_c);
@@ -515,8 +482,7 @@ namespace Compact
         {
             // 处理优先级队列：从最近到最远排序候选者
             std::priority_queue<std::pair<dist_t, tableint>> queue_closest;
-            while (!top_candidates.empty())
-            {
+            while (!top_candidates.empty()) {
                 queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second);
                 top_candidates.pop();
             }
@@ -531,8 +497,7 @@ namespace Compact
             {
                 // The first batch, also use for original HNSW constructing
                 next_closest_entry_point = return_list.front();
-                for (auto point : return_list)
-                {
+                for (auto point : return_list) {
                     selectedNeighbors.push_back(point);
                 }
 
@@ -545,15 +510,13 @@ namespace Compact
             linklistsizeint *ll_cur;
             ll_cur = get_linklist0(cur_c);
 
-            if (*ll_cur && !isUpdate)
-            {
+            if (*ll_cur && !isUpdate) {
                 throw std::runtime_error(
                     "The newly inserted element should have blank link list");
             }
             setListCount(ll_cur, selectedNeighbors.size());
             tableint *data = (tableint *)(ll_cur + 1);
-            for (size_t idx = 0; idx < selectedNeighbors.size(); idx++)
-            {
+            for (size_t idx = 0; idx < selectedNeighbors.size(); idx++) {
                 if (data[idx] && !isUpdate)
                     throw std::runtime_error("Possible memory corruption");
                 if (level > element_levels_[selectedNeighbors[idx]])
@@ -564,8 +527,7 @@ namespace Compact
             }
         }
 
-        for (size_t idx = 0; idx < selectedNeighbors.size(); idx++)
-        {
+        for (size_t idx = 0; idx < selectedNeighbors.size(); idx++) {
             std::unique_lock<std::mutex> lock(
                 link_list_locks_[selectedNeighbors[idx]]);
 
@@ -585,12 +547,9 @@ namespace Compact
             tableint *data = (tableint *)(ll_other + 1);
 
             bool is_cur_c_present = false;
-            if (isUpdate)
-            {
-                for (size_t j = 0; j < sz_link_list_other; j++)
-                {
-                    if (data[j] == cur_c)
-                    {
+            if (isUpdate) {
+                for (size_t j = 0; j < sz_link_list_other; j++) {
+                    if (data[j] == cur_c) {
                         is_cur_c_present = true;
                         break;
                     }
@@ -601,15 +560,11 @@ namespace Compact
             // If cur_c is already present in the neighboring connections of
             // `selectedNeighbors[idx]` then no need to modify any connections or
             // run the heuristics.
-            if (!is_cur_c_present)
-            {
-                if (sz_link_list_other < Mcurmax)
-                {
+            if (!is_cur_c_present) {
+                if (sz_link_list_other < Mcurmax) {
                     data[sz_link_list_other] = cur_c;
                     setListCount(ll_other, sz_link_list_other + 1);
-                }
-                else
-                {
+                } else {
                     // finding the "weakest" element to replace it with the new one
                     dist_t d_max = fstdistfunc_(
                         getDataByInternalId(cur_c),
@@ -621,8 +576,7 @@ namespace Compact
                         candidates;
                     candidates.emplace(d_max, cur_c);
 
-                    for (size_t j = 0; j < sz_link_list_other; j++)
-                    {
+                    for (size_t j = 0; j < sz_link_list_other; j++) {
                         candidates.emplace(
                             fstdistfunc_(getDataByInternalId(data[j]),
                                          getDataByInternalId(selectedNeighbors[idx]),
@@ -633,8 +587,7 @@ namespace Compact
                     getNeighborsByHeuristic2(candidates, Mcurmax);
 
                     int indx = 0;
-                    while (candidates.size() > 0)
-                    {
+                    while (candidates.size() > 0) {
                         data[indx] = candidates.top().second;
                         candidates.pop();
                         indx++;
@@ -648,15 +601,13 @@ namespace Compact
     }
 };
 
-class IndexCompactGraph : public BaseIndex
-{
+class IndexCompactGraph : public BaseIndex {
 public:
     vector<DirectedPointNeighbors<float>> directed_indexed_arr;
 
     IndexCompactGraph(base_hnsw::SpaceInterface<float> *s,
-                      const DataWrapper *data)
-        : BaseIndex(data)
-    {
+                      const DataWrapper *data) :
+        BaseIndex(data) {
         fstdistfunc_ = s->get_dist_func();
         dist_func_param_ = s->get_dist_func_param();
         index_info = new IndexInfo();
@@ -669,12 +620,10 @@ public:
     IndexInfo *index_info;
     const BaseIndex::IndexParams *index_params_;
 
-    void printOnebatch()
-    {
+    void printOnebatch() {
         cout << "Print one batch" << endl;
         for (auto cp :
-             directed_indexed_arr[data_wrapper->data_size / 2].nns)
-        {
+             directed_indexed_arr[data_wrapper->data_size / 2].nns) {
             cout << "[" << cp.external_id << "," << cp.left_bound << ","
                  << cp.right_bound << "], ";
         }
@@ -687,15 +636,12 @@ public:
      * 此方法遍历有向图索引数组以计算平均前向邻居数、最大前向批量邻居数，
      * 平均反向邻居数、最大反向邻居数以及相关批处理计数。
      */
-    void countNeighbrs()
-    {
+    void countNeighbrs() {
         size_t max_nns_len = 0;
         // 如果有向图索引不为空，则开始处理
-        if (!directed_indexed_arr.empty())
-        {
+        if (!directed_indexed_arr.empty()) {
             // 遍历所有节点的前向邻居列表
-            for (unsigned j = 0; j < directed_indexed_arr.size(); j++)
-            {
+            for (unsigned j = 0; j < directed_indexed_arr.size(); j++) {
                 index_info->nodes_amount += directed_indexed_arr[j].countNeighbors();
                 max_nns_len = std::max(max_nns_len, directed_indexed_arr[j].nns.size());
             }
@@ -705,8 +651,7 @@ public:
         index_info->avg_forward_nns = index_info->nodes_amount / static_cast<float>(data_wrapper->data_size);
 
         // 打印日志（如果启用）
-        if (isLog)
-        {
+        if (isLog) {
             cout << "Max. nns length of one point" << max_nns_len << endl;
             cout << "Sum of forward nn #: " << index_info->nodes_amount << endl;
             cout << "Avg. forward nn #: " << index_info->nodes_amount / static_cast<float>(data_wrapper->data_size) << endl;
@@ -714,8 +659,7 @@ public:
         }
     }
 
-    void buildIndex(const IndexParams *index_params) override
-    {
+    void buildIndex(const IndexParams *index_params) override {
         cout << "Building Index using " << index_info->index_version_type << endl;
         timeval tt1, tt2;
         visited_list_pool_ =
@@ -748,8 +692,7 @@ public:
         // Step 3: Traverse the shuffled sequence
 
         cout << "First point" << permutation[0] << endl;
-        for (size_t i : permutation)
-        {
+        for (size_t i : permutation) {
             hnsw.addPoint(data_wrapper->nodes.at(i).data(), i);
         }
         timeval tt3;
@@ -758,8 +701,7 @@ public:
 #ifdef OnlinePrune
         cout << "Points Added, now generateing domination relationship" << endl;
         gettimeofday(&tt1, NULL);
-        for (size_t i : permutation)
-        {
+        for (size_t i : permutation) {
             hnsw.gen_domination_relationship(i);
         }
 #endif
@@ -791,10 +733,10 @@ public:
      * @return vector<int> 返回最邻近点ID列表。
      */
     vector<int> rangeFilteringSearchInRange(
-        const SearchParams *search_params, SearchInfo *search_info,
+        const SearchParams *search_params,
+        SearchInfo *search_info,
         const vector<float> &query,
-        const std::pair<int, int> query_bound) override
-    {
+        const std::pair<int, int> query_bound) override {
         // 时间测量变量初始化
         timeval tt1, tt2, tt3, tt4;
 
@@ -817,8 +759,7 @@ public:
         {
             int lbound = query_bound.first;
             int interval = (query_bound.second - lbound) / 3;
-            for (size_t i = 0; i < 3; i++)
-            {
+            for (size_t i = 0; i < 3; i++) {
                 int point = lbound + interval * i;
                 float dist = EuclideanDistance(data_wrapper->nodes[point], query); // 计算距离
                 candidate_set.push(make_pair(-dist, point));                       // 将负距离和点ID推入候选集
@@ -833,8 +774,7 @@ public:
         // TODO: How to find proper enters. // looks like useless
 
         size_t hop_counter = 0;
-        while (!candidate_set.empty())
-        {
+        while (!candidate_set.empty()) {
             std::pair<float, int> current_node_pair = candidate_set.top(); // 获取当前节点
             int current_node_id = current_node_pair.second;
 
@@ -854,83 +794,39 @@ public:
 
             // // only search when candidate point is inside the range
             // this can be commented because no way to do this
-            if (current_node_id < query_bound.first || current_node_id > query_bound.second)
-            {
+            if (current_node_id < query_bound.first || current_node_id > query_bound.second) {
                 cout << "no satisfied range point" << endl;
                 continue;
             }
 
             // search cw on the fly
-            const auto Mcurmax = 2 * index_params_->K;
-            vector<unsigned> nn_ids_in_range;
-            nn_ids_in_range.reserve(Mcurmax);
             gettimeofday(&tt1, NULL);
             {
-                for (unsigned i = 0; i < directed_indexed_arr[current_node_id].nns.size(); i++)
-                {
-                    auto &cp = directed_indexed_arr[current_node_id].nns[i];
-                    if (cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second))
-                    {
-#ifdef OnlinePrune
-                        nn_ids_in_range.emplace_back(i);
-#elif
-                        nn_ids_in_range.emplace_back(cp.external_id);
-#endif
-                    }
-                }
-#ifdef OnlinePrune
-                // TODO: prune all of them or just prune to Mcurmax neighbros left
-                if (nn_ids_in_range.size() > Mcurmax)
-                {
-                    size_t visited_flag = 0;
-                    size_t cnt = 0;
-
-                    // Left these neighbors to make sure at least Mcurmax neighbors
-                    for (unsigned i = 0; i < nn_ids_in_range.size(); i++)
-                    {
-                        auto nn_id = nn_ids_in_range[i];
-                        auto &cp = directed_indexed_arr[current_node_id].nns[nn_id];
-                        auto left_cnt = nn_ids_in_range.size() - i;
-                        if (cnt + left_cnt <= Mcurmax || cp.if_not_dominated(visited_flag))
-                        {
-                            nn_ids_in_range[cnt++] = cp.external_id;
-                            if (nn_id < 64)
-                            {
-                                visited_flag |= 1 << nn_id;
-                            }
-                        }
-                    }
-                    nn_ids_in_range.resize(cnt); // now pruned external ids are stored in nn_ids_in_range
-                }
-                else
-                {
-                    for (unsigned i = 0; i < nn_ids_in_range.size(); i++)
-                    {
-                        auto nn_id = nn_ids_in_range[i];
-                        auto &cp = directed_indexed_arr[current_node_id].nns[nn_id];
-                        nn_ids_in_range[i] = cp.external_id;
-                    }
-                }
-#endif
+                // for (unsigned i = 0; i < directed_indexed_arr[current_node_id].nns.size(); i++) {
+                //     auto &cp = directed_indexed_arr[current_node_id].nns[i];
+                //     if (cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
+                //         nn_ids_in_range.emplace_back(cp.external_id);
+                //     }
+                // }
             }
             gettimeofday(&tt2, NULL);                              // 结束时间记录
             AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
 
             // 处理邻居集合
             gettimeofday(&tt1, NULL); // 开始时间记录
+            auto const &pos_edges = directed_indexed_arr[current_node_id].nns;
+            CompressedPoint<float> tmp_point((unsigned)query_bound.first, 0, 0, 0);
+            const auto positive_nn_id_st = std::lower_bound(pos_edges.begin(), pos_edges.end(), tmp_point) - pos_edges.begin();
+            for (auto i = positive_nn_id_st; i < pos_edges.size(); i++) {
+                unsigned candidate_id = pos_edges[i].external_id;
 
-            // TODO whether we need to limit the neighbors
-            // unsigned cnt_positive_through_neighbors = 0;
+                if (candidate_id > (unsigned) query_bound.second) // 后面的点都是越界节点
+                    break;
 
-            for (auto candidate_id : nn_ids_in_range)
-            {
-                // if (candidate_id < query_bound.first || candidate_id > query_bound.second) // 忽略越界节点
-                //     continue;
-
-                // if (cnt_positive_through_neighbors < Mcurmax)
-                //     cnt_positive_through_neighbors++;
-                // else
-                //     break;
+                auto &cp = pos_edges[i];
+                if (!cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
+                    continue;
+                }
 
                 if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
                 {
@@ -942,16 +838,13 @@ public:
                                               dist_func_param_);
 
                     num_search_comparison++; // 更新比较次数
-                    if (top_candidates.size() < search_params->search_ef || lower_bound > dist)
-                    {
+                    if (top_candidates.size() < search_params->search_ef || lower_bound > dist) {
                         candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
                         top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
-                        if (top_candidates.size() > search_params->search_ef)
-                        {
+                        if (top_candidates.size() > search_params->search_ef) {
                             top_candidates.pop(); // 维护候选集大小
                         }
-                        if (!top_candidates.empty())
-                        {
+                        if (!top_candidates.empty()) {
                             lower_bound = top_candidates.top().first; // 更新最低界限
                         }
                     }
@@ -960,17 +853,48 @@ public:
 
             gettimeofday(&tt2, NULL);                             // 结束时间记录
             AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
-        }
 
+            // 反向边都是不按照顺序的 所以 得遍历一遍
+            auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
+            for (auto i = 0; i < neg_edges.size(); i++) {
+                auto candidate_id = pos_edges[i].external_id;
+
+                auto &cp = pos_edges[i];
+                if (!cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
+                    continue;
+                }
+
+                if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
+                {
+                    visited_array[candidate_id] = visited_array_tag; // 标记为已访问
+
+                    // 计算距离
+                    float dist = fstdistfunc_(query.data(),
+                                              data_wrapper->nodes[candidate_id].data(),
+                                              dist_func_param_);
+
+                    num_search_comparison++; // 更新比较次数
+                    if (top_candidates.size() < search_params->search_ef || lower_bound > dist) {
+                        candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
+                        top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
+                        if (top_candidates.size() > search_params->search_ef) {
+                            top_candidates.pop(); // 维护候选集大小
+                        }
+                        if (!top_candidates.empty()) {
+                            lower_bound = top_candidates.top().first; // 更新最低界限
+                        }
+                    }
+                }
+            }
+        }
+        
         // 构建结果列表
         vector<int> res;
-        while (top_candidates.size() > search_params->query_K)
-        {
+        while (top_candidates.size() > search_params->query_K) {
             top_candidates.pop(); // 减少候选集至所需K个
         }
 
-        while (!top_candidates.empty())
-        {
+        while (!top_candidates.empty()) {
             res.emplace_back(top_candidates.top().second); // 提取节点ID构建结果
             top_candidates.pop();
         }
@@ -990,17 +914,16 @@ public:
     }
 
     vector<int> rangeFilteringSearchOutBound(
-        const SearchParams *search_params, SearchInfo *search_info,
+        const SearchParams *search_params,
+        SearchInfo *search_info,
         const vector<float> &query,
-        const std::pair<int, int> query_bound) override
-    {
+        const std::pair<int, int> query_bound) override {
         return vector<int>();
     }
-    ~IndexCompactGraph()
-    {
+    ~IndexCompactGraph() {
         delete index_info;
         directed_indexed_arr.clear();
         delete visited_list_pool_;
     }
 };
-} // namespace SeRF
+} // namespace Compact

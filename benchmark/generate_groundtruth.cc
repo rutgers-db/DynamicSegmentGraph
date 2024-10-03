@@ -58,16 +58,15 @@ int main(int argc, char **argv)
     }
 
     string size_symbol = "";
-    if (data_size == 100000)
+    if (data_size >= 1000 && data_size < 1000000)
     {
-        size_symbol = "100k";
+        size_symbol = std::to_string(data_size / 1000) + "k";
     }
-    else if (data_size == 1000000)
+    else if (data_size >= 1000000)
     {
-        size_symbol = "1m";
-    }else if (data_size == 10000000){
-        size_symbol = "10m";
+        size_symbol = std::to_string(data_size / 1000000) + "m";
     }
+
 
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path);

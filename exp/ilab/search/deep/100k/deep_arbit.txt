@@ -1,0 +1,60 @@
+zp128@ilab3:/research/projects/zp128/RangeIndexWithRandomInsertion/build$ ../script/run_benchmark.sh 
+Load vecs from: ../data/deep10M.fvecs
+# of vecs: 100000
+Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 64, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-SeRF_2D-deep-100000.csv
+Method: SeRF_2D
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexSegmentGraph2D
+Max. forward batch nn #: 0
+Avg. forward nn #: 16.6357
+Avg. forward batch #: 2.58703
+Max. reverse nn #: 133
+Avg. reverse nn #: 16.6357
+Avg. reverse batch #: 1
+Avg. delta nn #: 33.2714
+# Build Index Time: 58.6465800s
+Total # of Neighbors: 3327140
+
+Search ef: 16
+========================
+range: 100       recall: 0.1631  QPS: 85139      Comps: 11
+range: 500       recall: 0.4985  QPS: 29894      Comps: 55
+range: 1000      recall: 0.6803  QPS: 27036      Comps: 87
+range: 5000      recall: 0.8179  QPS: 16873      Comps: 171
+range: 10000     recall: 0.8063  QPS: 14300      Comps: 213
+range: 50000     recall: 0.7988  QPS: 9900       Comps: 319
+range: 100000    recall: 0.8312  QPS: 8808       Comps: 401
+========================
+# total query time: 0.8827540s
+
+Search ef: 64
+========================
+range: 100       recall: 0.1948  QPS: 78388      Comps: 18
+range: 500       recall: 0.7022  QPS: 13451      Comps: 137
+range: 1000      recall: 0.8842  QPS: 10360      Comps: 208
+range: 5000      recall: 0.9636  QPS: 6572       Comps: 404
+range: 10000     recall: 0.9579  QPS: 5573       Comps: 512
+range: 50000     recall: 0.9540  QPS: 4149       Comps: 776
+range: 100000    recall: 0.9634  QPS: 3299       Comps: 983
+========================
+# total query time: 2.1369500s
+
+Search ef: 256
+========================
+range: 100       recall: 0.1954  QPS: 70606      Comps: 19
+range: 500       recall: 0.8014  QPS: 4810       Comps: 331
+range: 1000      recall: 0.9467  QPS: 3553       Comps: 534
+range: 5000      recall: 0.9948  QPS: 2201       Comps: 1087
+range: 10000     recall: 0.9944  QPS: 1852       Comps: 1381
+range: 50000     recall: 0.9940  QPS: 1351       Comps: 2174
+range: 100000    recall: 0.9968  QPS: 1082       Comps: 2745
+========================
+# total query time: 6.3457730s

@@ -1,3 +1,5 @@
+以下都是KNN级别的实验结果
+
 没有prune  没有扩大range的
 Load vecs from: ../data/deep10M.fvecs
 # of vecs: 1000000

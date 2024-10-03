@@ -72,7 +72,7 @@ int main(int argc, char **argv)
     string dataset = "deep";
     int data_size = 100000;
     string dataset_path = "";
-    string method = "";
+    string method = ""; 
     string query_path = "";
     string groundtruth_path = "";
     vector<int> index_k_list = {8};

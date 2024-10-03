@@ -8,7 +8,7 @@ import time
 # 全局常量定义
 K = 8
 PIVOT_ID = 2048  # 基准点ID
-DOMINATION_FILE_PATH = '/Users/zhencan/WorkPlace/Serf_V2/simulation/sample_data/sampled_neighbors_domination.txt'
+DOMINATION_FILE_PATH = './sample_data/sampled_neighbors_domination.txt'
 IF_SAVE = True
 IF_LOAD_DOMINATE = True
 

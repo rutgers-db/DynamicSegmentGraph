@@ -31,20 +31,22 @@ template <typename dist_t>
 struct CompressedPoint {
     // 使用初始化列表构造函数，简化赋值操作并提高效率
     // TODO: here it should be a tuple not a pair, there should be ll, lr, rl, rr
-    CompressedPoint(unsigned _external_id, unsigned l, unsigned r, dist_t _dist) :
-        external_id(_external_id), left_bound(l), right_bound(r), dist(_dist) {
+    CompressedPoint(unsigned _external_id, unsigned _ll, unsigned _lr, unsigned _rl, unsigned _rr, dist_t _dist) :
+        external_id(_external_id), ll(_ll), lr(_lr), rl(_rl), rr(_rr), dist(_dist) {
     }
 
     // 默认构造函数
     CompressedPoint() {
     }
 
-    unsigned external_id, left_bound, right_bound;
+    unsigned external_id;
+    unsigned ll, lr, rl, rr;
+
     dist_t dist;
     size_t flag = 0;
 
     bool if_in_compressed_range(const unsigned center_external_id, const unsigned query_L, const unsigned query_R) const {
-        return (query_L <= left_bound && query_R >= right_bound);
+        return ((ll <= query_L && query_L <= lr) && (rl <= query_R && query_R <= rr));
     }
 
     bool if_not_dominated(const size_t &cur_dom_relation) {
@@ -65,7 +67,7 @@ struct DirectedPointNeighbors {
     vector<CompressedPoint<dist_t>> rev_nns;
 
     size_t countNeighbors() {
-        return nns.size();
+        return nns.size() + rev_nns.size();
     }
 };
 
@@ -300,8 +302,10 @@ public:
     std::unordered_map<unsigned, bool> calculated_pair;
     // TODO: we need to get the boundary of each nbr
     std::vector<bool> if_nbr;
-    std::vector<unsigned> nbr_L;
-    std::vector<unsigned> nbr_R;
+    std::vector<unsigned> nbr_ll;
+    std::vector<unsigned> nbr_lr;
+    std::vector<unsigned> nbr_rl;
+    std::vector<unsigned> nbr_rr;
 
     void dfs(vector<unsigned> &prefix_idx, unsigned PIVOT_ID, unsigned L, unsigned R, unsigned lr, unsigned rl) {
         if (prefix_idx.size() == Mcurmax) {
@@ -350,11 +354,15 @@ public:
                 // TODO: check whether this is good
                 if (if_nbr[i] == false) {
                     if_nbr[i] = true;
-                    nbr_L[i] = L;
-                    nbr_R[i] = R;
+                    nbr_ll[i] = L;
+                    nbr_lr[i] = next_lr;
+                    nbr_rl[i] = next_rl;
+                    nbr_rr[i] = R;
                 } else {
-                    nbr_L[i] = std::max(nbr_L[i], L);
-                    nbr_R[i] = std::min(nbr_R[i], R);
+                    nbr_ll[i] = std::min(nbr_ll[i], L);
+                    nbr_lr[i] = std::max(nbr_lr[i], next_lr);
+                    nbr_rl[i] = std::min(nbr_rl[i], next_rl);
+                    nbr_rr[i] = std::max(nbr_rr[i], R);
                 }
 
                 dfs(prefix_idx, PIVOT_ID, L, R, next_lr, next_rl);
@@ -402,8 +410,10 @@ public:
 
         // TODO: we can shrink this memory that they do not need so much space we can integrate them into one data structure
         if_nbr.resize(sorted_cands.size());
-        nbr_L.resize(sorted_cands.size());
-        nbr_R.resize(sorted_cands.size());
+        nbr_ll.resize(sorted_cands.size());
+        nbr_lr.resize(sorted_cands.size());
+        nbr_rl.resize(sorted_cands.size());
+        nbr_rr.resize(sorted_cands.size());
         std::fill_n(if_nbr.begin(), if_nbr.size(), false);
         calculated_pair.clear();
 
@@ -415,18 +425,18 @@ public:
                 // TODO: each point is actually corresponding to a boundary we need to get the accurate positions
                 unsigned tmp_external_id = getExternalLabel(sorted_cands[i].first);
                 // compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, tmp_left_bound, tmp_right_bound, sorted_cands[i].second);
-                compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, nbr_L[i], nbr_R[i], sorted_cands[i].second);
+                compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, nbr_ll[i], nbr_lr[i], nbr_rl[i], nbr_rr[i], sorted_cands[i].second);
             }
         }
+        sort(compact_graph->at(center_external_id).nns.begin(), compact_graph->at(center_external_id).nns.end());
     }
 
-    void
-    gen_rev_neighbors(unsigned center_external_id) {
+    void gen_rev_neighbors(unsigned center_external_id) {
         auto &nns = compact_graph->at(center_external_id).nns;
         for (auto &point : nns) {
             auto rev_point_id = point.external_id;
             auto &rev_nns = compact_graph->at(rev_point_id).rev_nns;
-            rev_nns.emplace_back(center_external_id, point.left_bound, point.right_bound, point.dist);
+            rev_nns.emplace_back(center_external_id, point.ll, point.lr, point.rl, point.rr, point.dist);
         }
         return;
     }
@@ -624,8 +634,8 @@ public:
         cout << "Print one batch" << endl;
         for (auto cp :
              directed_indexed_arr[data_wrapper->data_size / 2].nns) {
-            cout << "[" << cp.external_id << "," << cp.left_bound << ","
-                 << cp.right_bound << "], ";
+            cout << "[" << cp.external_id << "," << cp.ll << ","
+                 << cp.rr << "], ";
         }
         cout << endl;
     }
@@ -801,26 +811,18 @@ public:
 
             // search cw on the fly
             gettimeofday(&tt1, NULL);
-            {
-                // for (unsigned i = 0; i < directed_indexed_arr[current_node_id].nns.size(); i++) {
-                //     auto &cp = directed_indexed_arr[current_node_id].nns[i];
-                //     if (cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
-                //         nn_ids_in_range.emplace_back(cp.external_id);
-                //     }
-                // }
-            }
             gettimeofday(&tt2, NULL);                              // 结束时间记录
             AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
 
             // 处理邻居集合
             gettimeofday(&tt1, NULL); // 开始时间记录
             auto const &pos_edges = directed_indexed_arr[current_node_id].nns;
-            CompressedPoint<float> tmp_point((unsigned)query_bound.first, 0, 0, 0);
+            CompressedPoint<float> tmp_point((unsigned)query_bound.first, 0, 0, 0, 0, 0);
             const auto positive_nn_id_st = std::lower_bound(pos_edges.begin(), pos_edges.end(), tmp_point) - pos_edges.begin();
             for (auto i = positive_nn_id_st; i < pos_edges.size(); i++) {
                 unsigned candidate_id = pos_edges[i].external_id;
 
-                if (candidate_id > (unsigned) query_bound.second) // 后面的点都是越界节点
+                if (candidate_id > (unsigned)query_bound.second) // 后面的点都是越界节点
                     break;
 
                 auto &cp = pos_edges[i];
@@ -857,9 +859,11 @@ public:
             // 反向边都是不按照顺序的 所以 得遍历一遍
             auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
             for (auto i = 0; i < neg_edges.size(); i++) {
-                auto candidate_id = pos_edges[i].external_id;
+                auto candidate_id = neg_edges[i].external_id;
+                if (candidate_id > (unsigned)query_bound.second || candidate_id < (unsigned)query_bound.first) // 后面的点都是越界节点
+                    continue;
 
-                auto &cp = pos_edges[i];
+                auto &cp = neg_edges[i];
                 if (!cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
                     continue;
                 }
@@ -887,7 +891,7 @@ public:
                 }
             }
         }
-        
+
         // 构建结果列表
         vector<int> res;
         while (top_candidates.size() > search_params->query_K) {

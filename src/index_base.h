@@ -188,6 +188,11 @@ public:
         // size_t visited_num;
         size_t path_counter;
 
+        size_t pos_point_traverse_counter = 0;
+        size_t pos_point_used_counter = 0;
+        size_t neg_point_traverse_counter = 0;
+        size_t neg_point_used_counter = 0;
+        
         /// 探查路径字符串
         string investigate_path;
 
@@ -202,8 +207,6 @@ public:
             save_path = "../exp/search/" + version + "-" + method + "-" +
                         data_wrapper->dataset + "-" +
                         std::to_string(data_wrapper->data_size) + ".csv";
-
-            std::cout << "Save result to :" << save_path << std::endl;
         };
 
         void RecordOneQuery(BaseIndex::SearchParams *search)

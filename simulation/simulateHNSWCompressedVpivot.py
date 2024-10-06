@@ -5,7 +5,7 @@
 from bisect import bisect_left
 from collections import defaultdict
 import json
-from IO import process_lines
+from IO import process_lines, save_relaxed_points
 from util import hash_top_k_min_positions, analyze_top_k_distribution
 import time
 
@@ -44,6 +44,13 @@ cal_domination_count = 0 # 计算 domination 的次数
 calculate_pair = defaultdict(lambda: 0)
 prefix_set = set()
 unique_points_weight = defaultdict(lambda: 0)  # store how many path pass this point
+
+# Store the points with relaxed range tuples
+def default_4_tuple():
+    return (0, 0, 0, 0)
+
+relaxed_points = defaultdict(default_4_tuple)
+
 def dfs(prefix_nbr_idx, M, L, R, lr, rl):
     global cal_domination_count, top_k_min_hash_map, current_V
     if len(prefix_nbr_idx) == M:
@@ -79,6 +86,18 @@ def dfs(prefix_nbr_idx, M, L, R, lr, rl):
             # 更新右侧范围边界
             next_rl = max(nns[i][0], rl) if nns[i][0] > PIVOT_ID else rl
             
+            # Store current point:
+            cur_nn = nns[i][0]
+            if cur_nn in relaxed_points:
+                tmp_ll, tmp_lr, tmp_rl, tmp_rr = relaxed_points[cur_nn]
+                tmp_ll = min(tmp_ll, L)
+                tmp_lr = max(tmp_lr, next_lr)
+                tmp_rl = min(tmp_rl, next_rl)
+                tmp_rr = max(tmp_rr, R)
+                relaxed_points[cur_nn] = (tmp_ll, tmp_lr, tmp_rl, tmp_rr)
+            else:
+                relaxed_points[cur_nn] = (L, next_lr, next_rl, R)
+
             dfs(prefix_nbr_idx + [i], M, L, R, next_lr, next_rl)
             prefix_set.add(hash_top_k_min_positions(prefix_nbr_idx + [i]))
                         
@@ -106,6 +125,8 @@ print(f"calculate_pair 的长度: {len(calculate_pair)}")
 print(f"prefix_set 的长度: {len(prefix_set)}")
 # print(top_k_min_hash_map)
 if IF_SAVE:
-        file_path = 'topk_results/top_k_DFS.json'
-        with open(file_path, 'w') as f:
-            json.dump(top_k_min_hash_map, f)
+    # Output the each point sorted by 
+    save_relaxed_points('topk_results/DFS_relaxed_points.pkl',relaxed_points)
+    file_path = 'topk_results/top_k_DFS.json'
+    with open(file_path, 'w') as f:
+        json.dump(top_k_min_hash_map, f)

@@ -18,6 +18,7 @@
 #include <vector>
 #include <random>
 #include <unordered_map>
+#include <fstream>
 
 #include "base_hnsw/hnswalg.h"
 #include "base_hnsw/hnswlib.h"
@@ -43,15 +44,9 @@ struct CompressedPoint {
     unsigned ll, lr, rl, rr;
 
     dist_t dist;
-    size_t flag = 0;
 
     bool if_in_compressed_range(const unsigned center_external_id, const unsigned query_L, const unsigned query_R) const {
         return ((ll <= query_L && query_L <= lr) && (rl <= query_R && query_R <= rr));
-    }
-
-    bool if_not_dominated(const size_t &cur_dom_relation) {
-        // 换成bool return
-        return (flag & cur_dom_relation) == 0;
     }
 
     // 重载小于运算符 (<)，用于按照（距离） or （索引）从小到大排序
@@ -390,7 +385,7 @@ public:
         // unsigned tmp_left_bound = min_external_id_ == 0 ? 0 : min_external_id_ - 1;                                                              // consider we have 0 as min external id
         // unsigned tmp_right_bound = max_external_id_ == std::numeric_limits<int>::max() ? std::numeric_limits<int>::max() : max_external_id_ + 1; // consider we have too maximum value as max external id
 
-        // TODO: Make sure left bound as 0 is perfect? no any bugs? if -1 that will be fined but if 0 I am not sure
+        // // TODO: Make sure left bound as 0 is perfect? no any bugs? if -1 that will be fined but if 0 I am not sure
         unsigned tmp_left_bound = 0;
         unsigned tmp_right_bound = max_elements_;
 
@@ -417,6 +412,8 @@ public:
         std::fill_n(if_nbr.begin(), if_nbr.size(), false);
         calculated_pair.clear();
 
+        // always choosing the range [0, max_elements] as dfs input
+        // If choose current [min_element_external_id, max_element_exteranl_id] that will make the recall a little bit lower
         dfs(prefix_idx, center_external_id, tmp_left_bound, tmp_right_bound, center_external_id, center_external_id);
 
         // generate the compressed point
@@ -424,7 +421,6 @@ public:
             if (if_nbr[i]) {
                 // TODO: each point is actually corresponding to a boundary we need to get the accurate positions
                 unsigned tmp_external_id = getExternalLabel(sorted_cands[i].first);
-                // compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, tmp_left_bound, tmp_right_bound, sorted_cands[i].second);
                 compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, nbr_ll[i], nbr_lr[i], nbr_rl[i], nbr_rr[i], sorted_cands[i].second);
             }
         }
@@ -439,26 +435,6 @@ public:
             rev_nns.emplace_back(center_external_id, point.ll, point.lr, point.rl, point.rr, point.dist);
         }
         return;
-    }
-
-    void gen_domination_relationship(unsigned center_external_id) {
-        auto &nns = compact_graph->at(center_external_id).nns;
-        std::sort(nns.begin(), nns.end());
-        for (unsigned i = 1; i < nns.size(); i++) {
-            size_t tmp_flag = 0;
-            auto cur_dist = nns[i].dist;
-            unsigned j_limit = std::min(i, static_cast<unsigned>(64));
-            for (unsigned j = 0; j < j_limit; j++) {
-                // calculate distance
-                auto tmp_dist = fstdistfunc_(getDataByLabel(nns[i].external_id),
-                                             getDataByLabel(nns[j].external_id),
-                                             dist_func_param_);
-                if (tmp_dist < cur_dist) {
-                    tmp_flag |= (1 << j);
-                }
-            }
-            nns[i].flag = tmp_flag;
-        }
     }
 
     /**
@@ -705,22 +681,12 @@ public:
         for (size_t i : permutation) {
             hnsw.addPoint(data_wrapper->nodes.at(i).data(), i);
         }
-        timeval tt3;
-        gettimeofday(&tt3, NULL);
-        // generate online domination relationship
-#ifdef OnlinePrune
-        cout << "Points Added, now generateing domination relationship" << endl;
-        gettimeofday(&tt1, NULL);
-        for (size_t i : permutation) {
-            hnsw.gen_domination_relationship(i);
-        }
-#endif
+
         gettimeofday(&tt2, NULL);
         index_info->index_time = CountTime(tt1, tt2);
 
         cout << "All the forward batch nn #: " << hnsw.forward_batch_nn_amount << endl;
         cout << "Theoratical backward batch nn #: " << hnsw.backward_batch_theoratical_nn_amount << endl;
-        cout << "Domination relationship generation cost time: " << CountTime(tt3, tt2) << endl;
         // count neighbors number
         countNeighbrs();
 
@@ -760,6 +726,10 @@ public:
 
         search_info->total_comparison = 0;
         search_info->internal_search_time = 0;
+        search_info->pos_point_traverse_counter = 0;
+        search_info->pos_point_used_counter = 0;
+        search_info->neg_point_traverse_counter = 0;
+        search_info->neg_point_used_counter = 0;
         search_info->cal_dist_time = 0;
         search_info->fetch_nns_time = 0;
         search_info->path_counter = 0;
@@ -784,6 +754,11 @@ public:
         // TODO: How to find proper enters. // looks like useless
 
         size_t hop_counter = 0;
+        float pos_point_traverse_counter = 0;
+        float pos_point_used_counter = 0;
+        float neg_point_traverse_counter = 0;
+        float neg_point_used_counter = 0;
+
         while (!candidate_set.empty()) {
             std::pair<float, int> current_node_pair = candidate_set.top(); // 获取当前节点
             int current_node_id = current_node_pair.second;
@@ -825,13 +800,14 @@ public:
                 if (candidate_id > (unsigned)query_bound.second) // 后面的点都是越界节点
                     break;
 
-                auto &cp = pos_edges[i];
-                if (!cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
-                    continue;
-                }
-
                 if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
-                {
+                {   
+                    pos_point_traverse_counter++;
+                    auto &cp = pos_edges[i];
+                    if (!cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
+                        continue;
+                    }
+                    pos_point_used_counter++;
                     visited_array[candidate_id] = visited_array_tag; // 标记为已访问
 
                     // 计算距离
@@ -860,16 +836,15 @@ public:
             auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
             for (auto i = 0; i < neg_edges.size(); i++) {
                 auto candidate_id = neg_edges[i].external_id;
-                if (candidate_id > (unsigned)query_bound.second || candidate_id < (unsigned)query_bound.first) // 后面的点都是越界节点
-                    continue;
-
-                auto &cp = neg_edges[i];
-                if (!cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
-                    continue;
-                }
-
                 if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
                 {
+                    neg_point_traverse_counter ++;
+                    auto &cp = neg_edges[i];
+                    if (!cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
+                        continue;
+                    }
+
+                    neg_point_used_counter ++;
                     visited_array[candidate_id] = visited_array_tag; // 标记为已访问
 
                     // 计算距离
@@ -904,6 +879,10 @@ public:
         }
         search_info->total_comparison += num_search_comparison; // 更新总比较次数
         search_info->path_counter += hop_counter;
+        search_info->pos_point_traverse_counter = pos_point_traverse_counter;
+        search_info->pos_point_used_counter = pos_point_used_counter;
+        search_info->neg_point_traverse_counter = neg_point_traverse_counter;
+        search_info->neg_point_used_counter = neg_point_used_counter;
 #ifdef LOG_DEBUG_MODE
         print_set(res);
         cout << l_bound << "," << r_bound << endl;

@@ -192,7 +192,8 @@ public:
         size_t pos_point_used_counter = 0;
         size_t neg_point_traverse_counter = 0;
         size_t neg_point_used_counter = 0;
-        
+        float total_traversed_nn_amount = 0;
+
         /// 探查路径字符串
         string investigate_path;
 

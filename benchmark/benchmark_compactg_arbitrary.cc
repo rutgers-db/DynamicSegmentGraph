@@ -39,7 +39,7 @@ using std::tuple;
 void log_result_recorder(
     const std::map<int, tuple<double, double, double, double>> &result_recorder,
     const std::map<int, std::tuple<float, float>> &comparison_recorder,
-    const std::map<int, std::tuple<float, float, float, float>> &traversed_recorder,  const int amount)
+    const std::map<int, std::tuple<float, float, float, float, float>> &traversed_recorder,  const int amount)
 {
     // 遍历结果记录器
     for (const auto& item : result_recorder)
@@ -47,7 +47,7 @@ void log_result_recorder(
         // 解构元组以访问各个成员
         const auto& [recall, calDistTime, internal_search_time, fetch_nn_time] = item.second;
         const auto& [comps, hops] = comparison_recorder.at(item.first);
-        const auto& [pos_traverse, pos_used, neg_traverse, neg_used] = traversed_recorder.at(item.first);
+        const auto& [pos_traverse, pos_used, neg_traverse, neg_used, total_nnInHops] = traversed_recorder.at(item.first);
         const auto cur_range_amount = amount / result_recorder.size();
         // 打印范围、召回率、QPS和比较次数
         std::cout << std::setiosflags(std::ios::fixed) << std::setprecision(4)
@@ -61,6 +61,7 @@ void log_result_recorder(
                   << "\t Positive Used POints: " << pos_used / cur_range_amount << std::setprecision(4)
                   << "Negative Traversed Points: " << neg_traverse / cur_range_amount << std::setprecision(4)
                   << "\t Negative Used POints: " << neg_used / cur_range_amount << std::setprecision(4)
+                  << "\t Total NNS among traversed points: " << total_nnInHops / cur_range_amount << std::setprecision(4)
                   << "\t Avg. Fetched NN Per Point: " << comps / hops
                   << "\t Internal Search Time: " << internal_search_time
                   << "\t Fetch NN Time: " << fetch_nn_time
@@ -175,7 +176,7 @@ int main(int argc, char **argv)
                             s_params.search_ef = one_searchef;
                             std::map<int, std::tuple<double, double, double, double>> result_recorder; // first->precision, second-> caldist time, third->query_time
                             std::map<int, std::tuple<float, float>> comparison_recorder;
-                            std::map<int, std::tuple<float, float, float, float>> traversed_recorder;
+                            std::map<int, std::tuple<float, float, float, float, float>> traversed_recorder;
                             gettimeofday(&tt3, NULL);
                             /**
                              * 对于每个查询ID，执行范围过滤搜索并更新结果记录器。
@@ -205,6 +206,7 @@ int main(int argc, char **argv)
                                 std::get<1>(traversed_recorder[s_params.query_range]) += search_info.pos_point_used_counter;
                                 std::get<2>(traversed_recorder[s_params.query_range]) += search_info.neg_point_traverse_counter;
                                 std::get<3>(traversed_recorder[s_params.query_range]) += search_info.neg_point_used_counter;
+                                std::get<4>(traversed_recorder[s_params.query_range]) += search_info.total_traversed_nn_amount;
                             }
 
                             cout << endl

@@ -823,6 +823,7 @@ namespace SeRF
             const int data_size = data_wrapper->data_size;
             const int two_batch_threshold =
                 data_size * search_params->control_batch_threshold;
+            search_info->path_counter = 0;
             search_info->total_comparison = 0;
             search_info->internal_search_time = 0;
             search_info->cal_dist_time = 0;
@@ -1006,6 +1007,7 @@ namespace SeRF
             std::priority_queue<pair<float, int>> top_candidates;
             std::priority_queue<pair<float, int>> candidate_set;
 
+            search_info->path_counter = 0;
             search_info->total_comparison = 0;
             search_info->internal_search_time = 0;
             search_info->cal_dist_time = 0;
@@ -1123,6 +1125,7 @@ namespace SeRF
                 res.emplace_back(top_candidates.top().second);
                 top_candidates.pop();
             }
+            search_info->path_counter += hop_counter;
             search_info->total_comparison += num_search_comparison;
 
 #ifdef LOG_DEBUG_MODE

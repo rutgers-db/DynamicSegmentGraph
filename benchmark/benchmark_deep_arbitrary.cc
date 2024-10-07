@@ -14,7 +14,7 @@
 #include <random>
 #include <sstream>
 #include <vector>
-
+#include <tuple>
 // #include "baselines/knn_first_hnsw.h"
 #include "data_processing.h"
 #include "data_wrapper.h"
@@ -37,23 +37,27 @@ using std::to_string;
 using std::vector;
 
 void log_result_recorder(
-    const std::map<int, std::pair<float, float>> &result_recorder,
-    const std::map<int, float> &comparison_recorder, const int amount)
-{
-    for (auto it : result_recorder)
-    {
+    const std::map<int, std::tuple<double, double, double, double>> &result_recorder,
+    const std::map<int, std::tuple<float, float>> &comparison_recorder,
+    const int amount) {
+    for (auto item : result_recorder) {
+        const auto &[recall, calDistTime, internal_search_time, fetch_nn_time] = item.second;
+        const auto &[comps, hops] = comparison_recorder.at(item.first);
+        const auto cur_range_amount = amount / result_recorder.size();
         cout << std::setiosflags(ios::fixed) << std::setprecision(4)
-             << "range: " << it.first
-             << "\t recall: " << it.second.first / (amount / result_recorder.size())
+             << "range: " << item.first
+             << "\t recall: " << recall / cur_range_amount
              << "\t QPS: " << std::setprecision(0)
-             << (amount / result_recorder.size()) / it.second.second << "\t Comps: "
-             << comparison_recorder.at(it.first) / (amount / result_recorder.size())
-             << endl;
+             << cur_range_amount / internal_search_time << "\t"
+             << "Comps: " << comps / cur_range_amount << std::setprecision(4)
+             << "\t Hops: " << hops / cur_range_amount << std::setprecision(4)
+             << "\t Internal Search Time: " << internal_search_time
+             << "\t Fetch NN Time: " << fetch_nn_time
+             << "\t CalDist Time: " << calDistTime << std::endl; // 新增一行显示CalDist时间
     }
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 #ifdef USE_SSE
     cout << "Use SSE" << endl;
 #endif
@@ -76,8 +80,7 @@ int main(int argc, char **argv)
     // string ef_max_str = "";
     string version = "Benchmark";
 
-    for (int i = 0; i < argc; i++)
-    {
+    for (int i = 0; i < argc; i++) {
         string arg = argv[i];
         if (arg == "-dataset") dataset = string(argv[i + 1]);
         if (arg == "-N")
@@ -122,12 +125,9 @@ int main(int argc, char **argv)
 
     timeval t1, t2;
 
-    for (unsigned index_k : index_k_list)
-    {
-        for (unsigned ef_max : ef_max_list)
-        {
-            for (unsigned ef_construction : ef_construction_list)
-            {
+    for (unsigned index_k : index_k_list) {
+        for (unsigned ef_max : ef_max_list) {
+            for (unsigned ef_construction : ef_construction_list) {
                 BaseIndex::IndexParams i_params(index_k, ef_construction,
                                                 ef_construction, ef_max);
                 {
@@ -139,8 +139,7 @@ int main(int argc, char **argv)
                                                       "benchmark");
 
                     cout << "Method: " << search_info.method << endl;
-                    cout << "parameters: ef_construction ( " +
-                                to_string(i_params.ef_construction) + " )  index-k( "
+                    cout << "parameters: ef_construction ( " + to_string(i_params.ef_construction) + " )  index-k( "
                          << i_params.K << ")  ef_max (" << i_params.ef_max << ") "
                          << endl;
                     gettimeofday(&t1, NULL);
@@ -154,19 +153,15 @@ int main(int argc, char **argv)
                         timeval tt3, tt4;
                         BaseIndex::SearchParams s_params;
                         s_params.query_K = data_wrapper.query_k;
-                        for (auto one_searchef : searchef_para_range_list)
-                        {
+                        for (auto one_searchef : searchef_para_range_list) {
                             s_params.search_ef = one_searchef;
-                            std::map<int, std::pair<float, float>>
-                                result_recorder; // first->precision, second->query_time
-                            std::map<int, float> comparison_recorder;
+                            std::map<int, std::tuple<double, double, double, double>> result_recorder; // first->precision, second-> caldist time, third->query_time
+                            std::map<int, std::tuple<float, float>> comparison_recorder;
                             gettimeofday(&tt3, NULL);
-                            for (int idx = 0; idx < data_wrapper.query_ids.size(); idx++)
-                            {
+                            for (int idx = 0; idx < data_wrapper.query_ids.size(); idx++) {
                                 int one_id = data_wrapper.query_ids.at(idx);
                                 s_params.query_range =
-                                    data_wrapper.query_ranges.at(idx).second -
-                                    data_wrapper.query_ranges.at(idx).first + 1;
+                                    data_wrapper.query_ranges.at(idx).second - data_wrapper.query_ranges.at(idx).first + 1;
                                 auto res = index.rangeFilteringSearchOutBound(
                                     &s_params, &search_info, data_wrapper.querys.at(one_id),
                                     data_wrapper.query_ranges.at(idx));
@@ -175,12 +170,12 @@ int main(int argc, char **argv)
                                 //     data_wrapper.query_ranges.at(idx));
                                 search_info.precision =
                                     countPrecision(data_wrapper.groundtruth.at(idx), res);
-                                result_recorder[s_params.query_range].first +=
-                                    search_info.precision;
-                                result_recorder[s_params.query_range].second +=
-                                    search_info.internal_search_time;
-                                comparison_recorder[s_params.query_range] +=
-                                    search_info.total_comparison;
+                                std::get<0>(result_recorder[s_params.query_range]) += search_info.precision;
+                                std::get<1>(result_recorder[s_params.query_range]) += search_info.cal_dist_time;
+                                std::get<2>(result_recorder[s_params.query_range]) += search_info.internal_search_time;
+                                std::get<3>(result_recorder[s_params.query_range]) += search_info.fetch_nns_time;
+                                std::get<0>(comparison_recorder[s_params.query_range]) += search_info.total_comparison;
+                                std::get<1>(comparison_recorder[s_params.query_range]) += search_info.path_counter;
                             }
 
                             cout << endl

@@ -32,8 +32,8 @@ template <typename dist_t>
 struct CompressedPoint {
     // 使用初始化列表构造函数，简化赋值操作并提高效率
     // TODO: here it should be a tuple not a pair, there should be ll, lr, rl, rr
-    CompressedPoint(unsigned _external_id, unsigned _ll, unsigned _lr, unsigned _rl, unsigned _rr, dist_t _dist) :
-        external_id(_external_id), ll(_ll), lr(_lr), rl(_rl), rr(_rr), dist(_dist) {
+    CompressedPoint(unsigned _external_id, unsigned _ll, unsigned _lr, unsigned _rl, unsigned _rr) :
+        external_id(_external_id), ll(_ll), lr(_lr), rl(_rl), rr(_rr) {
     }
 
     // 默认构造函数
@@ -43,9 +43,7 @@ struct CompressedPoint {
     unsigned external_id;
     unsigned ll, lr, rl, rr;
 
-    dist_t dist;
-
-    bool if_in_compressed_range(const unsigned center_external_id, const unsigned query_L, const unsigned query_R) const {
+    inline bool const if_in_compressed_range(const unsigned &query_L, const unsigned &query_R) const {
         return ((ll <= query_L && query_L <= lr) && (rl <= query_R && query_R <= rr));
     }
 
@@ -421,7 +419,7 @@ public:
             if (if_nbr[i]) {
                 // TODO: each point is actually corresponding to a boundary we need to get the accurate positions
                 unsigned tmp_external_id = getExternalLabel(sorted_cands[i].first);
-                compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, nbr_ll[i], nbr_lr[i], nbr_rl[i], nbr_rr[i], sorted_cands[i].second);
+                compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, nbr_ll[i], nbr_lr[i], nbr_rl[i], nbr_rr[i]);
             }
         }
         sort(compact_graph->at(center_external_id).nns.begin(), compact_graph->at(center_external_id).nns.end());
@@ -432,7 +430,7 @@ public:
         for (auto &point : nns) {
             auto rev_point_id = point.external_id;
             auto &rev_nns = compact_graph->at(rev_point_id).rev_nns;
-            rev_nns.emplace_back(center_external_id, point.ll, point.lr, point.rl, point.rr, point.dist);
+            rev_nns.emplace_back(center_external_id, point.ll, point.lr, point.rl, point.rr);
         }
         return;
     }
@@ -696,6 +694,7 @@ public:
         // }
     };
 
+    vector<unsigned> fetched_nns;
     /**
      * @brief 范围过滤搜索，在范围内节点上计算距离。
      *
@@ -713,6 +712,10 @@ public:
         SearchInfo *search_info,
         const vector<float> &query,
         const std::pair<int, int> query_bound) override {
+        
+        fetched_nns.reserve(30);
+        fetched_nns.clear();
+
         // 时间测量变量初始化
         timeval tt1, tt2, tt3, tt4;
 
@@ -754,6 +757,7 @@ public:
         // TODO: How to find proper enters. // looks like useless
 
         size_t hop_counter = 0;
+        float total_traversed_nn_amount = 0;
         float pos_point_traverse_counter = 0;
         float pos_point_used_counter = 0;
         float neg_point_traverse_counter = 0;
@@ -783,34 +787,64 @@ public:
                 cout << "no satisfied range point" << endl;
                 continue;
             }
-
-            // search cw on the fly
             gettimeofday(&tt1, NULL);
+
+            auto const &pos_edges = directed_indexed_arr[current_node_id].nns;
+            auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
+            // fetch nns first 
+            fetched_nns.clear();
+            for (auto i = 0; i < pos_edges.size(); i++) {
+#ifdef USE_SSE
+                if (i + 1 < pos_edges.size()) {
+                    _mm_prefetch(reinterpret_cast<const char *>(&pos_edges[i + 1]), _MM_HINT_T0);
+                }
+                if (i + 2 < pos_edges.size()) {
+                    _mm_prefetch(reinterpret_cast<const char *>(&pos_edges[i + 2]), _MM_HINT_T0);
+                }
+#endif
+                const unsigned& candidate_id = pos_edges[i].external_id;
+                if(candidate_id < query_bound.first)
+                    continue;
+                if (candidate_id > query_bound.second ) // 后面的点都是越界节点
+                    break;
+                const auto &cp = pos_edges[i];
+                if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
+                    continue;
+                }
+                fetched_nns.emplace_back(candidate_id);
+            }
+
+            for (auto i = 0; i < neg_edges.size(); i++) {
+                const unsigned& candidate_id = neg_edges[i].external_id;
+#ifdef USE_SSE
+                if (i + 1 < neg_edges.size()) {
+                    _mm_prefetch(reinterpret_cast<const char *>(&neg_edges[i + 1]), _MM_HINT_T0);
+                }
+                if (i + 2 < neg_edges.size()) {
+                    _mm_prefetch(reinterpret_cast<const char *>(&neg_edges[i + 2]), _MM_HINT_T0);
+                }
+#endif
+                if(candidate_id < query_bound.first)
+                    continue;
+                if (candidate_id > query_bound.second ) // 后面的点都是越界节点
+                    continue;
+                auto &cp = neg_edges[i];
+                if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
+                    continue;
+                }
+                fetched_nns.emplace_back(candidate_id);
+            }
             gettimeofday(&tt2, NULL);                              // 结束时间记录
             AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
 
-            // 处理邻居集合
-            gettimeofday(&tt1, NULL); // 开始时间记录
-            auto const &pos_edges = directed_indexed_arr[current_node_id].nns;
-            CompressedPoint<float> tmp_point((unsigned)query_bound.first, 0, 0, 0, 0, 0);
-            const auto positive_nn_id_st = std::lower_bound(pos_edges.begin(), pos_edges.end(), tmp_point) - pos_edges.begin();
-            for (auto i = positive_nn_id_st; i < pos_edges.size(); i++) {
-                unsigned candidate_id = pos_edges[i].external_id;
-
-                if (candidate_id > (unsigned)query_bound.second) // 后面的点都是越界节点
-                    break;
-
+            // now iterate fetched nn and calculate distance
+            for(auto & candidate_id: fetched_nns){
                 if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
                 {   
-                    pos_point_traverse_counter++;
-                    auto &cp = pos_edges[i];
-                    if (!cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
-                        continue;
-                    }
-                    pos_point_used_counter++;
                     visited_array[candidate_id] = visited_array_tag; // 标记为已访问
 
                     // 计算距离
+                    gettimeofday(&tt1, NULL); // 开始时间记录
                     float dist = fstdistfunc_(query.data(),
                                               data_wrapper->nodes[candidate_id].data(),
                                               dist_func_param_);
@@ -826,45 +860,95 @@ public:
                             lower_bound = top_candidates.top().first; // 更新最低界限
                         }
                     }
+                    gettimeofday(&tt2, NULL);                             // 结束时间记录
+                    AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
                 }
             }
+            
 
-            gettimeofday(&tt2, NULL);                             // 结束时间记录
-            AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
+            // CompressedPoint<float> tmp_point((unsigned)query_bound.first, 0, 0, 0, 0, 0);
+            // const auto positive_nn_id_st = std::lower_bound(pos_edges.begin(), pos_edges.end(), tmp_point) - pos_edges.begin();
+            // for (auto i = 0; i < pos_edges.size(); i++) {
+            //     const unsigned& candidate_id = pos_edges[i].external_id;
+            //     if(candidate_id < query_bound.first)
+            //         continue;
+            //     if (candidate_id > query_bound.second ) // 后面的点都是越界节点
+            //         break;
 
-            // 反向边都是不按照顺序的 所以 得遍历一遍
-            auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
-            for (auto i = 0; i < neg_edges.size(); i++) {
-                auto candidate_id = neg_edges[i].external_id;
-                if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
-                {
-                    neg_point_traverse_counter ++;
-                    auto &cp = neg_edges[i];
-                    if (!cp.if_in_compressed_range(current_node_id, query_bound.first, query_bound.second)) {
-                        continue;
-                    }
+            //     if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
+            //     {   
+            //         pos_point_traverse_counter++;
+            //         auto &cp = pos_edges[i];
+            //         if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
+            //             continue;
+            //         }
+            //         pos_point_used_counter++;
+            //         visited_array[candidate_id] = visited_array_tag; // 标记为已访问
 
-                    neg_point_used_counter ++;
-                    visited_array[candidate_id] = visited_array_tag; // 标记为已访问
+            //         // 计算距离
+            //         gettimeofday(&tt1, NULL); // 开始时间记录
+            //         float dist = fstdistfunc_(query.data(),
+            //                                   data_wrapper->nodes[candidate_id].data(),
+            //                                   dist_func_param_);
 
-                    // 计算距离
-                    float dist = fstdistfunc_(query.data(),
-                                              data_wrapper->nodes[candidate_id].data(),
-                                              dist_func_param_);
+            //         num_search_comparison++; // 更新比较次数
+            //         if (top_candidates.size() < search_params->search_ef || lower_bound > dist) {
+            //             candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
+            //             top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
+            //             if (top_candidates.size() > search_params->search_ef) {
+            //                 top_candidates.pop(); // 维护候选集大小
+            //             }
+            //             if (!top_candidates.empty()) {
+            //                 lower_bound = top_candidates.top().first; // 更新最低界限
+            //             }
+            //         }
+            //         gettimeofday(&tt2, NULL);                             // 结束时间记录
+            //         AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
 
-                    num_search_comparison++; // 更新比较次数
-                    if (top_candidates.size() < search_params->search_ef || lower_bound > dist) {
-                        candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
-                        top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
-                        if (top_candidates.size() > search_params->search_ef) {
-                            top_candidates.pop(); // 维护候选集大小
-                        }
-                        if (!top_candidates.empty()) {
-                            lower_bound = top_candidates.top().first; // 更新最低界限
-                        }
-                    }
-                }
-            }
+            //     }
+            // }
+
+            
+            // // 反向边都是不按照顺序的 所以 得遍历一遍
+            // auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
+            // for (auto i = 0; i < neg_edges.size(); i++) {
+            //     auto candidate_id = neg_edges[i].external_id;
+            //     if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
+            //     {
+            //         neg_point_traverse_counter++;
+            //         auto &cp = neg_edges[i];
+            //         if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
+            //             continue;
+            //         }
+
+            //         neg_point_used_counter ++;
+            //         visited_array[candidate_id] = visited_array_tag; // 标记为已访问
+
+            //         // 计算距离
+            //         gettimeofday(&tt1, NULL); // 开始时间记录
+            //         float dist = fstdistfunc_(query.data(),
+            //                                   data_wrapper->nodes[candidate_id].data(),
+            //                                   dist_func_param_);
+
+            //         num_search_comparison++; // 更新比较次数
+            //         if (top_candidates.size() < search_params->search_ef || lower_bound > dist) {
+            //             candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
+            //             top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
+            //             if (top_candidates.size() > search_params->search_ef) {
+            //                 top_candidates.pop(); // 维护候选集大小
+            //             }
+            //             if (!top_candidates.empty()) {
+            //                 lower_bound = top_candidates.top().first; // 更新最低界限
+            //             }
+            //         }
+            //         gettimeofday(&tt2, NULL);                             // 结束时间记录
+            //         AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
+            //     }
+            // }
+            // gettimeofday(&tt2, NULL);                              // 结束时间记录
+            // CountTime(tt3, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
+            // search_info->fetch_nns_time = search_info->fetch_nns_time - search_info->cal_dist_time;
+            total_traversed_nn_amount += float(pos_edges.size()) + float(neg_edges.size());
         }
 
         // 构建结果列表
@@ -883,6 +967,8 @@ public:
         search_info->pos_point_used_counter = pos_point_used_counter;
         search_info->neg_point_traverse_counter = neg_point_traverse_counter;
         search_info->neg_point_used_counter = neg_point_used_counter;
+        search_info->total_traversed_nn_amount = total_traversed_nn_amount;
+
 #ifdef LOG_DEBUG_MODE
         print_set(res);
         cout << l_bound << "," << r_bound << endl;

@@ -588,6 +588,11 @@ public:
 class IndexCompactGraph : public BaseIndex {
 public:
     vector<DirectedPointNeighbors<float>> directed_indexed_arr;
+    base_hnsw::DISTFUNC<float> fstdistfunc_;
+    void *dist_func_param_;
+    VisitedListPool *visited_list_pool_;
+    IndexInfo *index_info=nullptr;
+    const BaseIndex::IndexParams *index_params_;
 
     IndexCompactGraph(base_hnsw::SpaceInterface<float> *s,
                       const DataWrapper *data) :
@@ -597,12 +602,7 @@ public:
         index_info = new IndexInfo();
         index_info->index_version_type = "IndexCompactGraph";
     }
-    base_hnsw::DISTFUNC<float> fstdistfunc_;
-    void *dist_func_param_;
-
-    VisitedListPool *visited_list_pool_;
-    IndexInfo *index_info;
-    const BaseIndex::IndexParams *index_params_;
+    
 
     void printOnebatch() {
         cout << "Print one batch" << endl;
@@ -713,7 +713,7 @@ public:
         const vector<float> &query,
         const std::pair<int, int> query_bound) override {
         
-        fetched_nns.reserve(30);
+        fetched_nns.reserve(100);
         fetched_nns.clear();
 
         // 时间测量变量初始化
@@ -751,10 +751,7 @@ public:
         }
         gettimeofday(&tt3, NULL);
 
-        // only one center
-        // float dist_enter = EuclideanDistance(data_nodes[l_bound], query);
-        // candidate_set.push(make_pair(-dist_enter, l_bound));
-        // TODO: How to find proper enters. // looks like useless
+        // TODO: How to find proper enters. // looks like useless Maybe it is not working well if we wanna find proper enters?
 
         size_t hop_counter = 0;
         float total_traversed_nn_amount = 0;
@@ -794,14 +791,6 @@ public:
             // fetch nns first 
             fetched_nns.clear();
             for (auto i = 0; i < pos_edges.size(); i++) {
-#ifdef USE_SSE
-                if (i + 1 < pos_edges.size()) {
-                    _mm_prefetch(reinterpret_cast<const char *>(&pos_edges[i + 1]), _MM_HINT_T0);
-                }
-                if (i + 2 < pos_edges.size()) {
-                    _mm_prefetch(reinterpret_cast<const char *>(&pos_edges[i + 2]), _MM_HINT_T0);
-                }
-#endif
                 const unsigned& candidate_id = pos_edges[i].external_id;
                 if(candidate_id < query_bound.first)
                     continue;
@@ -816,14 +805,6 @@ public:
 
             for (auto i = 0; i < neg_edges.size(); i++) {
                 const unsigned& candidate_id = neg_edges[i].external_id;
-#ifdef USE_SSE
-                if (i + 1 < neg_edges.size()) {
-                    _mm_prefetch(reinterpret_cast<const char *>(&neg_edges[i + 1]), _MM_HINT_T0);
-                }
-                if (i + 2 < neg_edges.size()) {
-                    _mm_prefetch(reinterpret_cast<const char *>(&neg_edges[i + 2]), _MM_HINT_T0);
-                }
-#endif
                 if(candidate_id < query_bound.first)
                     continue;
                 if (candidate_id > query_bound.second ) // 后面的点都是越界节点
@@ -864,90 +845,6 @@ public:
                     AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
                 }
             }
-            
-
-            // CompressedPoint<float> tmp_point((unsigned)query_bound.first, 0, 0, 0, 0, 0);
-            // const auto positive_nn_id_st = std::lower_bound(pos_edges.begin(), pos_edges.end(), tmp_point) - pos_edges.begin();
-            // for (auto i = 0; i < pos_edges.size(); i++) {
-            //     const unsigned& candidate_id = pos_edges[i].external_id;
-            //     if(candidate_id < query_bound.first)
-            //         continue;
-            //     if (candidate_id > query_bound.second ) // 后面的点都是越界节点
-            //         break;
-
-            //     if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
-            //     {   
-            //         pos_point_traverse_counter++;
-            //         auto &cp = pos_edges[i];
-            //         if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
-            //             continue;
-            //         }
-            //         pos_point_used_counter++;
-            //         visited_array[candidate_id] = visited_array_tag; // 标记为已访问
-
-            //         // 计算距离
-            //         gettimeofday(&tt1, NULL); // 开始时间记录
-            //         float dist = fstdistfunc_(query.data(),
-            //                                   data_wrapper->nodes[candidate_id].data(),
-            //                                   dist_func_param_);
-
-            //         num_search_comparison++; // 更新比较次数
-            //         if (top_candidates.size() < search_params->search_ef || lower_bound > dist) {
-            //             candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
-            //             top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
-            //             if (top_candidates.size() > search_params->search_ef) {
-            //                 top_candidates.pop(); // 维护候选集大小
-            //             }
-            //             if (!top_candidates.empty()) {
-            //                 lower_bound = top_candidates.top().first; // 更新最低界限
-            //             }
-            //         }
-            //         gettimeofday(&tt2, NULL);                             // 结束时间记录
-            //         AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
-
-            //     }
-            // }
-
-            
-            // // 反向边都是不按照顺序的 所以 得遍历一遍
-            // auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
-            // for (auto i = 0; i < neg_edges.size(); i++) {
-            //     auto candidate_id = neg_edges[i].external_id;
-            //     if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
-            //     {
-            //         neg_point_traverse_counter++;
-            //         auto &cp = neg_edges[i];
-            //         if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
-            //             continue;
-            //         }
-
-            //         neg_point_used_counter ++;
-            //         visited_array[candidate_id] = visited_array_tag; // 标记为已访问
-
-            //         // 计算距离
-            //         gettimeofday(&tt1, NULL); // 开始时间记录
-            //         float dist = fstdistfunc_(query.data(),
-            //                                   data_wrapper->nodes[candidate_id].data(),
-            //                                   dist_func_param_);
-
-            //         num_search_comparison++; // 更新比较次数
-            //         if (top_candidates.size() < search_params->search_ef || lower_bound > dist) {
-            //             candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
-            //             top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
-            //             if (top_candidates.size() > search_params->search_ef) {
-            //                 top_candidates.pop(); // 维护候选集大小
-            //             }
-            //             if (!top_candidates.empty()) {
-            //                 lower_bound = top_candidates.top().first; // 更新最低界限
-            //             }
-            //         }
-            //         gettimeofday(&tt2, NULL);                             // 结束时间记录
-            //         AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
-            //     }
-            // }
-            // gettimeofday(&tt2, NULL);                              // 结束时间记录
-            // CountTime(tt3, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
-            // search_info->fetch_nns_time = search_info->fetch_nns_time - search_info->cal_dist_time;
             total_traversed_nn_amount += float(pos_edges.size()) + float(neg_edges.size());
         }
 
@@ -969,12 +866,6 @@ public:
         search_info->neg_point_used_counter = neg_point_used_counter;
         search_info->total_traversed_nn_amount = total_traversed_nn_amount;
 
-#ifdef LOG_DEBUG_MODE
-        print_set(res);
-        cout << l_bound << "," << r_bound << endl;
-        assert(false);
-#endif
-
         // 释放资源和更新时间统计
         visited_list_pool_->releaseVisitedList(vl);
         gettimeofday(&tt4, NULL);
@@ -989,6 +880,56 @@ public:
         const std::pair<int, int> query_bound) override {
         return vector<int>();
     }
+
+    // Save function to store the IndexCompactGraph to a file
+    void save(const std::string &file_path) override {
+        std::ofstream out(file_path, std::ios::binary);
+        if (!out) {
+            throw std::runtime_error("Failed to open file for saving index.");
+        }
+
+        // Save directed_indexed_arr
+        size_t arr_size = directed_indexed_arr.size();
+        out.write((char *)&arr_size, sizeof(arr_size));
+        for (auto &neighbors : directed_indexed_arr) {
+            size_t nns_size = neighbors.nns.size();
+            out.write((char *)&nns_size, sizeof(nns_size));
+            out.write((char *)neighbors.nns.data(), nns_size * sizeof(CompressedPoint<float>));
+
+            size_t rev_nns_size = neighbors.rev_nns.size();
+            out.write((char *)&rev_nns_size, sizeof(rev_nns_size));
+            out.write((char *)neighbors.rev_nns.data(), rev_nns_size * sizeof(CompressedPoint<float>));
+        }
+
+        out.close();
+    }
+
+    // Load function to load the IndexCompactGraph from a file
+    void load(const std::string &file_path) override{ 
+        std::ifstream in(file_path, std::ios::binary);
+        if (!in) {
+            throw std::runtime_error("Failed to open file for loading index.");
+        }
+        visited_list_pool_ = new base_hnsw::VisitedListPool(1, data_wrapper->data_size);
+        // Load directed_indexed_arr
+        size_t arr_size;
+        in.read((char *)&arr_size, sizeof(arr_size));
+        directed_indexed_arr.resize(arr_size);
+        for (auto &neighbors : directed_indexed_arr) {
+            size_t nns_size;
+            in.read((char *)&nns_size, sizeof(nns_size));
+            neighbors.nns.resize(nns_size);
+            in.read((char *)neighbors.nns.data(), nns_size * sizeof(CompressedPoint<float>));
+
+            size_t rev_nns_size;
+            in.read((char *)&rev_nns_size, sizeof(rev_nns_size));
+            neighbors.rev_nns.resize(rev_nns_size);
+            in.read((char *)neighbors.rev_nns.data(), rev_nns_size * sizeof(CompressedPoint<float>));
+        }
+
+        in.close();
+    }
+
     ~IndexCompactGraph() {
         delete index_info;
         directed_indexed_arr.clear();

@@ -54,7 +54,7 @@ void DataWrapper::readData(string &dataset_path, string &query_path) {
 
 void SaveToCSVRow(const string &path, const int idx, const int l_bound, const int r_bound, const int pos_range, const int real_search_key_range, const int K_neighbor, const double &search_time, const vector<int> &gt, const vector<float> &pts) {
     std::ofstream file;
-    file.open(path, std::ios_base::app);
+    file.open(path, std::ios_base::out);
     if (file) {
         file << idx << "," << l_bound << "," << r_bound << "," << pos_range << ","
              << real_search_key_range << "," << K_neighbor << "," << search_time

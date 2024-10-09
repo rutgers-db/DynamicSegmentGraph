@@ -46,7 +46,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
    message(STATUS "Debug Mode")
 else()
    # 如果不是 Debug 模式，默认设置优化标志
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -msse4.2 -DUSE_SSE")
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 endif()
 
@@ -54,6 +54,7 @@ endif()
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(NOSIMD "build hnsw on SIMD" ON)
+
 if(NOSIMD)
     add_definitions(-DNO_MANUAL_VECTORIZATION)
     add_definitions(-DKGRAPH_NO_VECTORIZE)

@@ -7,3 +7,4 @@ groundtruth
 __pycache__
 *.zip
 .DS_Store
+*.bin

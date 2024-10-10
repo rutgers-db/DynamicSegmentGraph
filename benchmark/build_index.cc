@@ -48,11 +48,12 @@ int main(int argc, char **argv) {
     string dataset_path = "";
     string method = "";
     string query_path = "";
-    vector<int> index_k_list = {8};
-    vector<int> ef_construction_list = {100};
+    unsigned index_k = 8;
+    unsigned ef_max = 500;
+    unsigned ef_construction = 100;
     int query_num = 1000;
     int query_k = 10;
-    vector<int> ef_max_list = {500};
+    
 
     string indexk_str = "";
     string ef_con_str = "";
@@ -70,6 +71,13 @@ int main(int argc, char **argv) {
             index_dir_path = string(argv[i + 1]);
         if (arg == "-method")
             method = string(argv[i + 1]);
+        if (arg == "-k")
+            index_k = atoi(argv[i + 1]);
+        if (arg == "-ef_max")
+            ef_max = atoi(argv[i + 1]);
+        if (arg == "-ef_construction")
+            ef_construction = atoi(argv[i + 1]);
+
     }
 
     assert(index_k_list.size() != 0);
@@ -78,44 +86,37 @@ int main(int argc, char **argv) {
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path); // query_path is useless when just building index
 
-    cout << "index K:" << endl;
-    print_set(index_k_list);
-    cout << "ef construction:" << endl;
-    print_set(ef_construction_list);
+    cout << "index K:" << index_k<< " ef construction: "<<ef_construction<<" ef_max: "<< ef_max<< endl;
 
     data_wrapper.version = version;
     base_hnsw::L2Space ss(data_wrapper.data_dim);
     timeval t1, t2;
     BaseIndex* index;
-    for (unsigned index_k : index_k_list) {
-        for (unsigned ef_max : ef_max_list) {
-            for (unsigned ef_construction : ef_construction_list) {
-                BaseIndex::IndexParams i_params(index_k, ef_construction,
-                                                ef_construction, ef_max);
-                i_params.recursion_type = BaseIndex::IndexParams::MAX_POS;
-                {
-                    
-                    if(method == "Seg2D"){
-                        index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
-                    }else{
-                        index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
-                    }
 
-                    cout << "method: " << method<<" parameters: ef_construction ( " + to_string(i_params.ef_construction) + " )  index-k( "
-                         << i_params.K << ")  ef_max (" << i_params.ef_max << ") "
-                         << endl;
-                    gettimeofday(&t1, NULL);
-                    index->buildIndex(&i_params);
-                    gettimeofday(&t2, NULL);
-                    logTime(t1, t2, "Build Index Time");
-                    
-
-                    string save_path = index_dir_path + "/" + method+ "_" + std::to_string(index_k) + "_" + std::to_string(ef_max) + "_" + std::to_string(ef_construction) + ".bin";
-                    index->save(save_path);
-                }
-            }
+    BaseIndex::IndexParams i_params(index_k, ef_construction,
+                                    ef_construction, ef_max);
+    i_params.recursion_type = BaseIndex::IndexParams::MAX_POS;
+    {
+        
+        if(method == "Seg2D"){
+            index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
+        }else{
+            index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
         }
+
+        cout << "method: " << method<<" parameters: ef_construction ( " + to_string(i_params.ef_construction) + " )  index-k( "
+                << i_params.K << ")  ef_max (" << i_params.ef_max << ") "
+                << endl;
+        gettimeofday(&t1, NULL);
+        index->buildIndex(&i_params);
+        gettimeofday(&t2, NULL);
+        logTime(t1, t2, "Build Index Time");
+        
+
+        string save_path = index_dir_path + "/" + method+ "_" + std::to_string(index_k) + "_" + std::to_string(ef_max) + "_" + std::to_string(ef_construction) + ".bin";
+        index->save(save_path);
     }
+
 
     return 0;
 }

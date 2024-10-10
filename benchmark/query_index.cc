@@ -72,7 +72,10 @@ int main(int argc, char **argv) {
     string groundtruth_path = "";
     int query_num = 1000;
     int query_k = 10;
-
+    unsigned index_k = 8;
+    unsigned ef_max = 500;
+    unsigned ef_construction = 100;
+    
     string index_path;
     string version = "Benchmark";
 
@@ -91,6 +94,12 @@ int main(int argc, char **argv) {
             method = string(argv[i + 1]);
         if (arg == "-index_path")
             index_path = string(argv[i + 1]);
+        if (arg == "-k")
+            index_k = atoi(argv[i + 1]);
+        if (arg == "-ef_max")
+            ef_max = atoi(argv[i + 1]);
+        if (arg == "-ef_construction")
+            ef_construction = atoi(argv[i + 1]);
     }
 
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
@@ -98,8 +107,8 @@ int main(int argc, char **argv) {
     data_wrapper.LoadGroundtruth(groundtruth_path);
     assert(data_wrapper.query_ids.size() == data_wrapper.query_ranges.size());
 
-    int st = 64;     // starting value
-    int ed = 256;    // ending value (inclusive)
+    int st = 16;     // starting value
+    int ed = 400;    // ending value (inclusive)
     int stride = 16; // stride value
     std::vector<int> searchef_para_range_list;
     for (int i = st; i <= ed; i += stride) {
@@ -114,10 +123,6 @@ int main(int argc, char **argv) {
     base_hnsw::L2Space ss(data_wrapper.data_dim);
 
     timeval t1, t2;
-
-    unsigned index_k = 8;
-    unsigned ef_max = 500;
-    unsigned ef_construction = 100;
 
     BaseIndex::IndexParams i_params(index_k, ef_construction,
                                     ef_construction, ef_max);

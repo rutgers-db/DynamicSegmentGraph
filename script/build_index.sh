@@ -3,9 +3,12 @@
 # Define root directory, N, dataset, and method as variables
 ROOT_DIR="/research/projects/zp128/RangeIndexWithRandomInsertion/index"
 N=1000000
-DATASET="yt8m-audio" # wiki-image deep 
-DATASETNAME="yt8m-audio"  # wiki deep
-DATASET_PATH="../data/yt8m_audio_embedding.fvecs" # ../data/deep10M.fvecs ../data/wiki_image_embedding.fvecs
+index_k=8
+ef_max=500
+ef_construction=100
+DATASET="yt8m-video" # wiki-image deep  yt8m-audio
+DATASETNAME="yt8m-video"  # wiki deep yt8m-audio
+DATASET_PATH="../data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs" # ../data/deep10M.fvecs ../data/wiki_image_embedding.fvecs yt8m_sorted_by_timestamp_video_embedding_1M yt8m_audio_embedding
 METHODS=("Seg2D" "compact")
 
 # Iterate over methods and build index
@@ -22,7 +25,7 @@ for METHOD in "${METHODS[@]}"; do
         mkdir -p "$INDEX_PATH"
     fi
 
-    ./benchmark/build_index -N $N -dataset $DATASET -method $METHOD -dataset_path $DATASET_PATH -index_path "$INDEX_PATH"
+    ./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max -dataset $DATASET -method $METHOD -dataset_path $DATASET_PATH -index_path "$INDEX_PATH"
 done
 
 exit 0

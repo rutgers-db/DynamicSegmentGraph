@@ -39,8 +39,10 @@ def read_data_from_file(filename):
         return file.read()
 
 # Example usage
-filename1 = '../wiki/100K/seg.txt'
-filename2 = '../wiki/100K/compact.txt'
+# filename1 = '../yt8m-audio/1m_16_750_100/seg.txt'
+# filename2 = '../yt8m-audio/1m_16_750_100/compact.txt'
+filename1 = '../wiki/1m/seg.txt'
+filename2 = '../wiki/1m/compact.txt'
 
 data1 = read_data_from_file(filename1)
 data2 = read_data_from_file(filename2)

@@ -3,3 +3,6 @@ build
 test.dSYM
 data
 groundtruth
+*.bin
+*.pyc
+test

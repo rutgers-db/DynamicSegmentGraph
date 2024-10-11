@@ -571,8 +571,8 @@ namespace OnlineDominate
             
             gettimeofday(&tt1, NULL);
             // auto top_candidates = hnsw->searchKnn(query.data(), search_params->search_ef);
-            // auto top_candidates = hnsw->searchKnn(query.data(), search_params->search_ef);
-            auto top_candidates = hnsw->searchKnnWithOnlineDomination(query.data(), search_params->search_ef, search_info);
+            auto top_candidates = hnsw->searchKnn(query.data(), search_params->search_ef);
+            // auto top_candidates = hnsw->searchKnnWithOnlineDomination(query.data(), search_params->search_ef, search_info);
             gettimeofday(&tt2, NULL);                                    // 结束时间记录
             AccumulateTime(tt1, tt2, search_info->internal_search_time); // 累加邻居检索时间
 

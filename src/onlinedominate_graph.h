@@ -75,6 +75,17 @@ namespace OnlineDominate
             ef_max_ = index_params.ef_max;
         }
 
+        OnlineDominationGraph(const BaseIndex::IndexParams &index_params,
+                              SpaceInterface<float> *s, const std::string & location)
+            : HierarchicalNSW(s, location)
+        {
+            // 将传入的索引参数指针赋值给成员变量
+            params = &index_params;
+
+            // 设置最大扩展因子为索引参数中的ef_max值
+            ef_max_ = index_params.ef_max;
+        }
+        
         // 指向BaseIndex::IndexParams类型的常量指针，存储索引参数
         const BaseIndex::IndexParams *params;
 
@@ -570,12 +581,14 @@ namespace OnlineDominate
 
             
             gettimeofday(&tt1, NULL);
+            hnsw->internalLevel_cmp = 0;
+            hnsw->baseLevel_cmp = 0;
             // auto top_candidates = hnsw->searchKnn(query.data(), search_params->search_ef);
             auto top_candidates = hnsw->searchKnn(query.data(), search_params->search_ef);
             // auto top_candidates = hnsw->searchKnnWithOnlineDomination(query.data(), search_params->search_ef, search_info);
             gettimeofday(&tt2, NULL);                                    // 结束时间记录
             AccumulateTime(tt1, tt2, search_info->internal_search_time); // 累加邻居检索时间
-
+            search_info->total_comparison = hnsw->internalLevel_cmp + hnsw->baseLevel_cmp;
             while (top_candidates.size() > search_params->query_K)
             {
                 top_candidates.pop(); // 减少候选集至所需K个
@@ -781,6 +794,15 @@ namespace OnlineDominate
             delete index_info;
             indexed_arr.clear();
             delete visited_list_pool_;
+        }
+
+        void saveIndex(const string& path){
+            hnsw->saveIndex(path);
+        }
+
+        void loadIndex(const BaseIndex::IndexParams *index_params,
+                              SpaceInterface<float> *s, const std::string & location){
+            hnsw = new OnlineDominationGraph<float>(*index_params, s, location);
         }
     };
 } // namespace SeRF

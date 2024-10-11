@@ -24,7 +24,6 @@
 #include "onlinedominate_graph.h"
 #include "utils.h"
 
-
 #ifdef __linux__
 #include "sys/sysinfo.h"
 #include "sys/types.h"
@@ -38,13 +37,12 @@ using std::vector;
 using std::tuple;
 void log_result_recorder(
     const std::map<int, tuple<double, double, double>> &result_recorder,
-    const std::map<int, float> &comparison_recorder, const int amount)
-{
+    const std::map<int, float> &comparison_recorder,
+    const int amount) {
     // 遍历结果记录器
-    for (const auto& item : result_recorder)
-    {
+    for (const auto &item : result_recorder) {
         // 解构元组以访问各个成员
-        const auto& [recall, calDistTime, internal_search_time] = item.second;
+        const auto &[recall, calDistTime, internal_search_time] = item.second;
 
         // 打印范围、召回率、QPS和比较次数
         std::cout << std::setiosflags(std::ios::fixed) << std::setprecision(4)
@@ -53,13 +51,12 @@ void log_result_recorder(
                   << "\t QPS: " << std::setprecision(0)
                   << (amount / result_recorder.size()) / internal_search_time << "\t"
                   << "Comps: " << comparison_recorder.at(item.first) / (amount / result_recorder.size()) << std::setprecision(6)
-                  << "\t Internal Search Time: " << internal_search_time / (amount / result_recorder.size()) 
+                  << "\t Internal Search Time: " << internal_search_time / (amount / result_recorder.size())
                   << "\t CalDist Time: " << calDistTime << std::endl; // 新增一行显示CalDist时间
     }
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
 #ifdef USE_SSE
     cout << "Use SSE" << endl;
 #endif
@@ -82,8 +79,7 @@ int main(int argc, char **argv)
     // string ef_max_str = "";
     string version = "Benchmark";
 
-    for (int i = 0; i < argc; i++)
-    {
+    for (int i = 0; i < argc; i++) {
         string arg = argv[i];
         if (arg == "-dataset")
             dataset = string(argv[i + 1]);
@@ -113,7 +109,7 @@ int main(int argc, char **argv)
     data_wrapper.LoadGroundtruth(groundtruth_path);
     assert(data_wrapper.query_ids.size() == data_wrapper.query_ranges.size());
 
-    vector<int> searchef_para_range_list = {16, 64, 256};
+    vector<int> searchef_para_range_list = {16, 32, 64, 96, 128, 160, 256};
 
     cout << "index K:" << endl;
     print_set(index_k_list);
@@ -128,12 +124,9 @@ int main(int argc, char **argv)
 
     timeval t1, t2;
 
-    for (unsigned index_k : index_k_list)
-    {
-        for (unsigned ef_max : ef_max_list)
-        {
-            for (unsigned ef_construction : ef_construction_list)
-            {
+    for (unsigned index_k : index_k_list) {
+        for (unsigned ef_max : ef_max_list) {
+            for (unsigned ef_construction : ef_construction_list) {
                 BaseIndex::IndexParams i_params(index_k, ef_construction,
                                                 ef_construction, ef_max);
                 {
@@ -144,12 +137,13 @@ int main(int argc, char **argv)
                                                       "benchmark");
 
                     cout << "Method: " << search_info.method << endl;
-                    cout << "parameters: ef_construction ( " +
-                                to_string(i_params.ef_construction) + " )  index-k( "
+                    cout << "parameters: ef_construction ( " + to_string(i_params.ef_construction) + " )  index-k( "
                          << i_params.K << ")  ef_max (" << i_params.ef_max << ") "
                          << endl;
                     gettimeofday(&t1, NULL);
                     index.buildIndex(&i_params);
+                    index.saveIndex(dataset + "_graph.bin");
+                    // index.loadIndex(&i_params, &ss, "graph.bin");
                     gettimeofday(&t2, NULL);
                     logTime(t1, t2, "Build Index Time");
                     cout << "Total # of Neighbors: " << index.index_info->nodes_amount
@@ -159,8 +153,7 @@ int main(int argc, char **argv)
                         timeval tt3, tt4;
                         BaseIndex::SearchParams s_params;
                         s_params.query_K = data_wrapper.query_k;
-                        for (auto one_searchef : searchef_para_range_list)
-                        {
+                        for (auto one_searchef : searchef_para_range_list) {
                             s_params.search_ef = one_searchef;
                             std::map<int, std::tuple<double, double, double>> result_recorder; // first->precision, second-> caldist time, third->query_time
                             std::map<int, float> comparison_recorder;
@@ -168,12 +161,10 @@ int main(int argc, char **argv)
                             /**
                              * 对于每个查询ID，执行范围过滤搜索并更新结果记录器。
                              */
-                            for (unsigned idx = 0; idx < data_wrapper.query_ids.size(); idx++)
-                            {
+                            for (unsigned idx = 0; idx < data_wrapper.query_ids.size(); idx++) {
                                 int one_id = data_wrapper.query_ids.at(idx);
                                 s_params.query_range =
-                                    data_wrapper.query_ranges.at(idx).second -
-                                    data_wrapper.query_ranges.at(idx).first + 1;
+                                    data_wrapper.query_ranges.at(idx).second - data_wrapper.query_ranges.at(idx).first + 1;
                                 auto res = index.searchInFullRange(
                                     &s_params, &search_info, data_wrapper.querys.at(one_id));
 

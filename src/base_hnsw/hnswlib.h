@@ -175,7 +175,7 @@ namespace base_hnsw
          * @param k 近邻数量
          * @return std::priority_queue<std::pair<dist_t, labeltype>> 结果队列
          */
-        virtual std::priority_queue<std::pair<dist_t, labeltype>> searchKnn(const void *, size_t) const = 0;
+        virtual std::priority_queue<std::pair<dist_t, labeltype>> searchKnn(const void *, size_t) = 0;
 
         /**
          * @brief K近邻搜索，返回按距离递增排序的结果
@@ -184,7 +184,7 @@ namespace base_hnsw
          * @param k 近邻数量
          * @return std::vector<std::pair<dist_t, labeltype>> 结果向量
          */
-        virtual std::vector<std::pair<dist_t, labeltype>> searchKnnCloserFirst(const void *query_data, size_t k) const;
+        virtual std::vector<std::pair<dist_t, labeltype>> searchKnnCloserFirst(const void *query_data, size_t k);
 
         /**
          * @brief 将索引保存至指定位置
@@ -205,7 +205,7 @@ namespace base_hnsw
      * @return std::vector<std::pair<dist_t, labeltype>> 结果向量
      */
     template <typename dist_t>
-    std::vector<std::pair<dist_t, labeltype>> AlgorithmInterface<dist_t>::searchKnnCloserFirst(const void *query_data, size_t k) const
+    std::vector<std::pair<dist_t, labeltype>> AlgorithmInterface<dist_t>::searchKnnCloserFirst(const void *query_data, size_t k)
     {
         std::vector<std::pair<dist_t, labeltype>> result;
 

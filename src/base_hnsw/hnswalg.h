@@ -206,6 +206,9 @@ namespace base_hnsw
         // 默认随机数引擎，用于更新概率生成
         std::default_random_engine update_probability_generator_;
 
+        size_t baseLevel_cmp = 0;
+        size_t internalLevel_cmp = 0;
+
         /**
          * 根据内部ID获取外部标签值。
          *
@@ -395,6 +398,7 @@ namespace base_hnsw
                     // 计算查询点到候选点的距离
                     char *currObj1 = (getDataByInternalId(candidate_id));
                     dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_);
+                    baseLevel_cmp++;
 
                     // 更新候选集和顶点集合
                     if (top_candidates.size() < ef_construction || lowerBound > dist1)
@@ -506,7 +510,7 @@ namespace base_hnsw
                         continue;
                     visited_array[candidate_id] = visited_array_tag;
                     char *currObj1 = (getDataByInternalId(candidate_id));
-
+                    baseLevel_cmp++;
                     dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_);
                     if (top_candidates.size() < ef_construction || lowerBound > dist1)
                     {
@@ -556,7 +560,7 @@ namespace base_hnsw
         template <bool has_deletions, bool collect_metrics = false>
         std::priority_queue<std::pair<dist_t, tableint>,
                             std::vector<std::pair<dist_t, tableint>>, CompareByFirst>
-        searchBaseLayerST(tableint ep_id, const void *data_point, size_t ef) const
+        searchBaseLayerST(tableint ep_id, const void *data_point, size_t ef)
         {
 
             // 获取空闲访问列表
@@ -640,7 +644,7 @@ namespace base_hnsw
 
                         char *currObj1 = (getDataByInternalId(candidate_id));
                         dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
-
+                        baseLevel_cmp++;
                         // 更新候选集和顶部候选者
                         if (top_candidates.size() < ef || lowerBound > dist)
                         {
@@ -2193,7 +2197,7 @@ namespace base_hnsw
          * @return 优先队列，包含距离和标签类型的配对
          */
         std::priority_queue<std::pair<dist_t, labeltype>> searchKnn(
-            const void *query_data, size_t k) const
+            const void *query_data, size_t k)
         {
             // 初始化结果优先队列
             std::priority_queue<std::pair<dist_t, labeltype>> result;
@@ -2240,7 +2244,7 @@ namespace base_hnsw
                         // 计算查询数据到候选节点的距离
                         dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand),
                                                 dist_func_param_);
-
+                        internalLevel_cmp++;
                         // 如果新距离小于当前最小距离，则更新之
                         if (d < curdist)
                         {

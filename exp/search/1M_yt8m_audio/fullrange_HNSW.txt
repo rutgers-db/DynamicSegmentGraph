@@ -1,0 +1,41 @@
+zp128@ilab3:/research/projects/zp128/RangeIndexWithRandomInsertion/build$ ../script/test_onlinedominate.sh 
+Reading Data: ../data/yt8m_audio_embedding.fvecs
+Finish Reading Data
+Reading Data: ../data/yt8m_audio_querys_10k.fvecs
+Finish Reading Data
+Load vecs from: ../data/yt8m_audio_embedding.fvecs
+# of vecs: 1000000
+Loading Groundtruth from../groundtruth/yt8m_benchmark-groundtruth-deep-1m-num1000-k10.fullrange.cvs...    Done!
+index K:
+vertex in set: {64}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 64, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-yt8m-audio-1000000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 64)  ef_max (500) 
+Building Index using IndexOnlineDominationGraph
+First point576384
+
+# Build Index Time: 2834.4667670s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 1000000   recall: 0.9387  QPS: 5683      Comps: 0         Internal Search Time: 0.000176  CalDist Time: 0.000000
+========================
+# total query time: 0.1766710s
+
+Search ef: 64
+========================
+range: 1000000   recall: 0.9667  QPS: 2154      Comps: 0         Internal Search Time: 0.000464  CalDist Time: 0.000000
+========================
+# total query time: 0.4656500s
+
+Search ef: 256
+========================
+range: 1000000   recall: 0.9686  QPS: 743       Comps: 0         Internal Search Time: 0.001345  CalDist Time: 0.000000
+========================
+# total query time: 1.3563790s

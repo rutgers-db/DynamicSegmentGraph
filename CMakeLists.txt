@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.12)
 project(RangeFiltering-ANNS)
 
 # 设置编译器
-set(CMAKE_C_COMPILER /opt/homebrew/opt/gcc/bin/gcc-14)
-set(CMAKE_CXX_COMPILER /opt/homebrew/opt/gcc/bin/g++-14)
 
 find_package(OpenMP REQUIRED)
 if(OpenMP_FOUND)

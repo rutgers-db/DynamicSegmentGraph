@@ -5,10 +5,10 @@
 ROOT_DIR="/research/projects/zp128/RangeIndexWithRandomInsertion/index"
 N=1000000
 DATASET="yt8m-video"  # wiki-image
-# index_k=16
-# ef_max=750
-index_k=8
-ef_max=500
+index_k=16
+ef_max=750
+# index_k=8
+# ef_max=500
 ef_construction=100
 DATASET_PATH="../data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs" #yt8m_audio_embedding.fvecs
 QUERY_PATH="../data/yt8m_video_querys_10k.fvecs"  # wiki_image_querys

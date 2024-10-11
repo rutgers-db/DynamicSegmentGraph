@@ -687,11 +687,6 @@ public:
         cout << "Theoratical backward batch nn #: " << hnsw.backward_batch_theoratical_nn_amount << endl;
         // count neighbors number
         countNeighbrs();
-
-        // if (index_params->print_one_batch)
-        // {
-        //     printOnebatch();
-        // }
     };
 
     vector<unsigned> fetched_nns;
@@ -928,6 +923,9 @@ public:
         }
 
         in.close();
+
+        // print out the basic neighbor amount of the loaded index
+        countNeighbrs();
     }
 
     ~IndexCompactGraph() {

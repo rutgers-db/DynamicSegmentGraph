@@ -3,8 +3,8 @@
 # Define root directory, N, dataset, and method as variables
 ROOT_DIR="/research/projects/zp128/RangeIndexWithRandomInsertion/index"
 N=1000000
-index_k=8
-ef_max=500
+index_k=16
+ef_max=750
 ef_construction=100
 DATASET="yt8m-video" # wiki-image deep  yt8m-audio
 DATASETNAME="yt8m-video"  # wiki deep yt8m-audio

@@ -1,0 +1,252 @@
+./benchmark/test_onlinedomination -N 1000000 -dataset yt8m-video -dataset_path ../data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs -query_path ../data/yt8m_video_querys_10k.fvecs -groundtruth_path ../groundtruth/yt8m_video_benchmark-groundtruth-deep-1m-num1000-k10.fullrange.cvs
+Reading Data: ../data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs
+Finish Reading Data
+Reading Data: ../data/yt8m_video_querys_10k.fvecs
+Finish Reading Data
+Load vecs from: ../data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs
+# of vecs: 1000000
+Loading Groundtruth from../groundtruth/yt8m_video_benchmark-groundtruth-deep-1m-num1000-k10.fullrange.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 32, 64, 96, 128, 160, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-yt8m-video-1000000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexOnlineDominationGraph
+First point576384
+# Build Index Time: 4098.9663280s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 1000000	 recall: 0.2408	 QPS: 3794	Comps: 193	 Internal Search Time: 0.000264	 CalDist Time: 0.000000
+========================
+# total query time: 0.2643000s
+
+Search ef: 32
+========================
+range: 1000000	 recall: 0.3424	 QPS: 2793	Comps: 296	 Internal Search Time: 0.000358	 CalDist Time: 0.000000
+========================
+# total query time: 0.3589860s
+
+Search ef: 64
+========================
+range: 1000000	 recall: 0.4393	 QPS: 1714	Comps: 470	 Internal Search Time: 0.000583	 CalDist Time: 0.000000
+========================
+# total query time: 0.5848880s
+
+Search ef: 96
+========================
+range: 1000000	 recall: 0.4894	 QPS: 1220	Comps: 625	 Internal Search Time: 0.000819	 CalDist Time: 0.000000
+========================
+# total query time: 0.8214610s
+
+Search ef: 128
+========================
+range: 1000000	 recall: 0.5186	 QPS: 1020	Comps: 773	 Internal Search Time: 0.000980	 CalDist Time: 0.000000
+========================
+# total query time: 0.9832600s
+
+Search ef: 160
+========================
+range: 1000000	 recall: 0.5392	 QPS: 857	Comps: 913	 Internal Search Time: 0.001167	 CalDist Time: 0.000000
+========================
+# total query time: 1.1711990s
+
+Search ef: 256
+========================
+range: 1000000	 recall: 0.5776	 QPS: 574	Comps: 1325	 Internal Search Time: 0.001743	 CalDist Time: 0.000000
+========================
+# total query time: 1.7537880s
+./benchmark/test_onlinedomination -N 1000000 -dataset wiki-image -dataset_path ../data/wiki_image_embedding.fvecs -query_path ../data/wiki_image_querys.fvecs -groundtruth_path ../groundtruth/wiki_image_benchmark-groundtruth-deep-1m-num1000-k10.fullrange.cvs
+Reading Data: ../data/wiki_image_embedding.fvecs
+Finish Reading Data
+Reading Data: ../data/wiki_image_querys.fvecs
+Finish Reading Data
+Load vecs from: ../data/wiki_image_embedding.fvecs
+# of vecs: 1000000
+Loading Groundtruth from../groundtruth/wiki_image_benchmark-groundtruth-deep-1m-num1000-k10.fullrange.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 32, 64, 96, 128, 160, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-wiki-image-1000000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexOnlineDominationGraph
+First point576384
+# Build Index Time: 7327.1606620s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 1000000	 recall: 0.3927	 QPS: 1774	Comps: 218	 Internal Search Time: 0.000564	 CalDist Time: 0.000000
+========================
+# total query time: 0.5646340s
+
+Search ef: 32
+========================
+range: 1000000	 recall: 0.5333	 QPS: 1319	Comps: 327	 Internal Search Time: 0.000758	 CalDist Time: 0.000000
+========================
+# total query time: 0.7591240s
+
+Search ef: 64
+========================
+range: 1000000	 recall: 0.6539	 QPS: 835	Comps: 505	 Internal Search Time: 0.001197	 CalDist Time: 0.000000
+========================
+# total query time: 1.1988070s
+
+Search ef: 96
+========================
+range: 1000000	 recall: 0.7165	 QPS: 635	Comps: 669	 Internal Search Time: 0.001576	 CalDist Time: 0.000000
+========================
+# total query time: 1.5777020s
+
+Search ef: 128
+========================
+range: 1000000	 recall: 0.7561	 QPS: 519	Comps: 824	 Internal Search Time: 0.001925	 CalDist Time: 0.000000
+========================
+# total query time: 1.9283020s
+
+Search ef: 160
+========================
+range: 1000000	 recall: 0.7804	 QPS: 439	Comps: 972	 Internal Search Time: 0.002277	 CalDist Time: 0.000000
+========================
+# total query time: 2.2806040s
+
+Search ef: 256
+========================
+range: 1000000	 recall: 0.8262	 QPS: 300	Comps: 1394	 Internal Search Time: 0.003331	 CalDist Time: 0.000000
+========================
+# total query time: 3.3428360s
+./benchmark/test_onlinedomination -N 1000000 -dataset deep -dataset_path ../data/deep10M.fvecs -query_path ../data/deep1B_queries.fvecs -groundtruth_path ../groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.fullrange.cvs
+Load vecs from: ../data/deep10M.fvecs
+# of vecs: 1000000
+Loading Groundtruth from../groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.fullrange.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 32, 64, 96, 128, 160, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-deep-1000000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexOnlineDominationGraph
+First point576384
+# Build Index Time: 773.4090750s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 1000000	 recall: 0.5159	 QPS: 10734	Comps: 239	 Internal Search Time: 0.000093	 CalDist Time: 0.000000
+========================
+# total query time: 0.0944390s
+
+Search ef: 32
+========================
+range: 1000000	 recall: 0.6395	 QPS: 10720	Comps: 334	 Internal Search Time: 0.000093	 CalDist Time: 0.000000
+========================
+# total query time: 0.0941590s
+
+Search ef: 64
+========================
+range: 1000000	 recall: 0.7504	 QPS: 6825	Comps: 506	 Internal Search Time: 0.000147	 CalDist Time: 0.000000
+========================
+# total query time: 0.1479990s
+
+Search ef: 96
+========================
+range: 1000000	 recall: 0.8037	 QPS: 5106	Comps: 665	 Internal Search Time: 0.000196	 CalDist Time: 0.000000
+========================
+# total query time: 0.1981140s
+
+Search ef: 128
+========================
+range: 1000000	 recall: 0.8329	 QPS: 4074	Comps: 816	 Internal Search Time: 0.000245	 CalDist Time: 0.000000
+========================
+# total query time: 0.2485810s
+
+Search ef: 160
+========================
+range: 1000000	 recall: 0.8545	 QPS: 3454	Comps: 962	 Internal Search Time: 0.000290	 CalDist Time: 0.000000
+========================
+# total query time: 0.2938670s
+
+Search ef: 256
+========================
+range: 1000000	 recall: 0.8902	 QPS: 2365	Comps: 1378	 Internal Search Time: 0.000423	 CalDist Time: 0.000000
+========================
+# total query time: 0.4336510s
+./benchmark/test_onlinedomination -N 1000000 -dataset yt8m-audio -dataset_path ../data/yt8m_audio_embedding.fvecs -query_path ../data/yt8m_audio_querys_10k.fvecs -groundtruth_path ../groundtruth/yt8m_benchmark-groundtruth-deep-1m-num1000-k10.fullrange.cvs
+Reading Data: ../data/yt8m_audio_embedding.fvecs
+Finish Reading Data
+Reading Data: ../data/yt8m_audio_querys_10k.fvecs
+Finish Reading Data
+Load vecs from: ../data/yt8m_audio_embedding.fvecs
+# of vecs: 1000000
+Loading Groundtruth from../groundtruth/yt8m_benchmark-groundtruth-deep-1m-num1000-k10.fullrange.cvs...    Done!
+index K:
+vertex in set: {8}
+ef construction:
+vertex in set: {100}
+search ef:
+vertex in set: {16, 32, 64, 96, 128, 160, 256}
+
+Save result to :../exp/search/benchmark-Benchmark-Compact-yt8m-audio-1000000.csv
+Method: Compact
+parameters: ef_construction ( 100 )  index-k( 8)  ef_max (500) 
+Building Index using IndexOnlineDominationGraph
+First point576384
+# Build Index Time: 863.3101700s
+Total # of Neighbors: 0
+
+Search ef: 16
+========================
+range: 1000000	 recall: 0.6915	 QPS: 9316	Comps: 257	 Internal Search Time: 0.000107	 CalDist Time: 0.000000
+========================
+# total query time: 0.1083490s
+
+Search ef: 32
+========================
+range: 1000000	 recall: 0.8261	 QPS: 9240	Comps: 346	 Internal Search Time: 0.000108	 CalDist Time: 0.000000
+========================
+# total query time: 0.1091160s
+
+Search ef: 64
+========================
+range: 1000000	 recall: 0.9014	 QPS: 6054	Comps: 499	 Internal Search Time: 0.000165	 CalDist Time: 0.000000
+========================
+# total query time: 0.1666000s
+
+Search ef: 96
+========================
+range: 1000000	 recall: 0.9280	 QPS: 4615	Comps: 638	 Internal Search Time: 0.000217	 CalDist Time: 0.000000
+========================
+# total query time: 0.2187740s
+
+Search ef: 128
+========================
+range: 1000000	 recall: 0.9414	 QPS: 3752	Comps: 770	 Internal Search Time: 0.000267	 CalDist Time: 0.000000
+========================
+# total query time: 0.2695470s
+
+Search ef: 160
+========================
+range: 1000000	 recall: 0.9507	 QPS: 3168	Comps: 899	 Internal Search Time: 0.000316	 CalDist Time: 0.000000
+========================
+# total query time: 0.3195960s
+
+Search ef: 256
+========================
+range: 1000000	 recall: 0.9634	 QPS: 2191	Comps: 1266	 Internal Search Time: 0.000456	 CalDist Time: 0.000000
+========================
+# total query time: 0.4659510s

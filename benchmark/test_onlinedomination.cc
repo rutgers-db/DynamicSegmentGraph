@@ -142,7 +142,7 @@ int main(int argc, char **argv) {
                          << endl;
                     gettimeofday(&t1, NULL);
                     index.buildIndex(&i_params);
-                    index.saveIndex(dataset + "_graph.bin");
+                    // index.saveIndex(dataset + "_graph.bin");
                     // index.loadIndex(&i_params, &ss, "graph.bin");
                     gettimeofday(&t2, NULL);
                     logTime(t1, t2, "Build Index Time");

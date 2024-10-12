@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
     string method = "";
     string query_path = "";
     string groundtruth_path = "";
-    vector<int> index_k_list = {64};
+    vector<int> index_k_list = {8};
     vector<int> ef_construction_list = {100};
     int query_num = 1000;
     int query_k = 10;

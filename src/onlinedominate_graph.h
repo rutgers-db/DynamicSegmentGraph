@@ -549,10 +549,10 @@ namespace OnlineDominate
             }
 
             // Step 4: Get Compressed Edges
-            for (size_t i : permutation)
-            {
-                hnsw->getDominationRelationship(i);
-            }
+            // for (size_t i : permutation)
+            // {
+            //     hnsw->getDominationRelationship(i);
+            // }
 
             gettimeofday(&tt2, NULL);
             index_info->index_time = CountTime(tt1, tt2);
@@ -583,9 +583,8 @@ namespace OnlineDominate
             gettimeofday(&tt1, NULL);
             hnsw->internalLevel_cmp = 0;
             hnsw->baseLevel_cmp = 0;
-            // auto top_candidates = hnsw->searchKnn(query.data(), search_params->search_ef);
-            // auto top_candidates = hnsw->searchKnn(query.data(), search_params->search_ef);
-            auto top_candidates = hnsw->searchBaseLayerST<false, true>(hnsw->enterpoint_node_, query.data(), search_params->search_ef);
+            auto top_candidates = hnsw->searchKnn(query.data(), search_params->search_ef);
+            // auto top_candidates = hnsw->searchBaseLayerST<false, true>(500, query.data(), search_params->search_ef);
             // auto top_candidates = hnsw->searchKnnWithOnlineDomination(query.data(), search_params->search_ef, search_info);
             gettimeofday(&tt2, NULL);                                    // 结束时间记录
             AccumulateTime(tt1, tt2, search_info->internal_search_time); // 累加邻居检索时间

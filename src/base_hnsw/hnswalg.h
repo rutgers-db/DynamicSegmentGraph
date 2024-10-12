@@ -1544,7 +1544,8 @@ namespace base_hnsw
 
         void addPoint(const void *data_point, labeltype label)
         {
-            addPoint(data_point, label, -1);
+            // addPoint(data_point, label, -1);
+            addPoint(data_point, label, 0);
         }
 
         /**
@@ -2062,7 +2063,7 @@ namespace base_hnsw
                 link_list_update_locks_[(cur_c & (max_update_element_locks - 1))]);
             std::unique_lock<std::mutex> lock_el(link_list_locks_[cur_c]);
             int curlevel = getRandomLevel(mult_);
-            if (level > 0)
+            if (level >= 0)
                 curlevel = level;
 
             element_levels_[cur_c] = curlevel;

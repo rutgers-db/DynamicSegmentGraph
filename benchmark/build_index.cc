@@ -23,6 +23,8 @@
 #include "logger.h"
 #include "reader.h"
 #include "compact_graph.h"
+#include "compact_graph_0_0.h"
+#include "compact_graph_1_0.h"
 #include "segment_graph_2d.h"
 #include "utils.h"
 
@@ -46,7 +48,7 @@ int main(int argc, char **argv) {
     string dataset = "deep";
     int data_size = 100000;
     string dataset_path = "";
-    string method = "";
+    string method = "compact";
     string query_path = "";
     unsigned index_k = 8;
     unsigned ef_max = 500;

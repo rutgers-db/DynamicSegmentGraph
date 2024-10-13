@@ -19,6 +19,8 @@
 #include <random>
 #include <unordered_map>
 #include <fstream>
+#include <tuple>
+#include <functional>  // For std::hash
 
 #include "base_hnsw/hnswalg.h"
 #include "base_hnsw/hnswlib.h"
@@ -27,7 +29,32 @@
 #include "utils.h"
 using namespace base_hnsw;
 
-namespace Compact {
+// Helper function to combine two hash values
+inline void hash_combine(std::size_t &seed, std::size_t hash) {
+    seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+// Custom hash specialization for std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned>
+namespace std {
+    template <>
+    struct hash<std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned>> {
+        std::size_t operator()(const std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned> &t) const {
+            std::size_t seed = 0;
+
+            // Hash each element of the tuple
+            hash_combine(seed, std::hash<unsigned>{}(std::get<0>(t)));
+            hash_combine(seed, std::hash<unsigned>{}(std::get<1>(t)));
+            hash_combine(seed, std::hash<unsigned>{}(std::get<2>(t)));
+            hash_combine(seed, std::hash<unsigned>{}(std::get<3>(t)));
+            hash_combine(seed, std::hash<unsigned>{}(std::get<4>(t)));
+
+            return seed;
+        }
+    };
+}
+
+// Not Use Pruned KNN and not merge points
+namespace Compact_0_0 {
 template <typename dist_t>
 struct CompressedPoint {
     // 使用初始化列表构造函数，简化赋值操作并提高效率
@@ -83,17 +110,17 @@ public:
                 size_t M = 16,
                 size_t ef_construction = 200,
                 size_t random_seed = 100) :
-        HierarchicalNSW(s, max_elements, M, index_params.ef_construction, random_seed) {
+        HierarchicalNSW(s, max_elements, M, random_seed) {
         // 将传入的索引参数指针赋值给成员变量
         params = &index_params;
-
+        ef_to_align = ef_construction;
         // 设置最大扩展因子为索引参数中的ef_max值
         ef_max_ = index_params.ef_max;
     }
 
     unsigned max_external_id_ = 0;
     unsigned min_external_id_ = std::numeric_limits<unsigned>::max();
-
+    size_t ef_to_align;
     // log
     size_t forward_batch_nn_amount = 0;
     size_t backward_batch_theoratical_nn_amount = 0;
@@ -293,73 +320,73 @@ public:
     // the tmp map for saving the result of dominationion pair
     // to avoid the duplicate calculation
     std::unordered_map<unsigned, bool> calculated_pair;
+    std::unordered_set<std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned>> passed_cps;
     // TODO: we need to get the boundary of each nbr
-    std::vector<bool> if_nbr;
-    std::vector<unsigned> nbr_ll;
-    std::vector<unsigned> nbr_lr;
-    std::vector<unsigned> nbr_rl;
-    std::vector<unsigned> nbr_rr;
+
+    void pruneAndPushIntoNN(const vector<unsigned> &prefix_idx, unsigned L, unsigned lr, unsigned rl, unsigned R) {
+        vector<unsigned> tmp_NN_idx;
+        for (auto const &nb_idx : prefix_idx) {
+            bool dominated_flag = false;
+            for (auto &nn_idx : tmp_NN_idx) {
+                unsigned encoded_pair = (nb_idx << 16) + nn_idx;
+                // check whether it has been calculated
+                if (calculated_pair.find(encoded_pair) != calculated_pair.end()) {
+                    const auto &domination_result = calculated_pair[encoded_pair];
+                    if (domination_result == true) {
+                        dominated_flag = true;
+                        break;
+                    }
+                } else {
+                    // if not calculated, we need to calculate the result
+                    dist_t tmp_dist = fstdistfunc_(getDataByInternalId(sorted_cands[nn_idx].first), getDataByInternalId(sorted_cands[nb_idx].first), dist_func_param_);
+                    auto cur_dist = sorted_cands[nb_idx].second;
+                    auto domination_result = tmp_dist < cur_dist;
+                    calculated_pair[encoded_pair] = domination_result;
+                    if (domination_result) {
+                        dominated_flag = true;
+                        break;
+                    }
+                }
+            }
+            if (!dominated_flag) { // if it is not dominated
+                tmp_NN_idx.emplace_back(nb_idx);
+                if (tmp_NN_idx.size() >= Mcurmax)
+                    break;
+            }
+        }
+
+        // push each external id of each NN into compressed points
+        for (auto const &nn_idx : tmp_NN_idx) {
+            auto cur_external_id = getExternalLabel(sorted_cands[nn_idx].first);
+            auto tmp_tuple = std::make_tuple(cur_external_id, L, lr, rl, R);
+            if(passed_cps.find(tmp_tuple) == passed_cps.end())
+                passed_cps.insert(tmp_tuple);
+        }
+    }
 
     void dfs(vector<unsigned> &prefix_idx, unsigned PIVOT_ID, unsigned L, unsigned R, unsigned lr, unsigned rl) {
-        if (prefix_idx.size() == Mcurmax) {
+        if (prefix_idx.size() == ef_to_align) {
+            pruneAndPushIntoNN(prefix_idx, L, lr, rl, R);
             return;
         }
 
+        bool if_leaf = true;
         unsigned st_idx = prefix_idx.empty() ? 0 : prefix_idx.back() + 1;
         for (auto i = st_idx; i < sorted_cands.size(); ++i) {
             unsigned cur_external_id = getExternalLabel(sorted_cands[i].first);
-            auto cur_dist = sorted_cands[i].second;
 
             // TODO: how to quickly get the corresponding ID that locates in the range [L,R]
             if (cur_external_id <= R && cur_external_id >= L) {
-                bool dominated_flag = false;
-                // Iterate each nb in prefix_nbr and check its domination relationship with current closest nb
-                for (auto const &pre_nb_idx : prefix_idx) {
-                    unsigned encoded_pair = (pre_nb_idx << 16) + i;
-
-                    // check whether it has been calculated
-                    if (calculated_pair.find(encoded_pair) != calculated_pair.end()) {
-                        const auto &domination_result = calculated_pair[encoded_pair];
-                        if (domination_result == true) {
-                            dominated_flag = true;
-                            break;
-                        }
-                    } else {
-                        // if not calculated, we need to calculate the result
-                        dist_t tmp_dist = fstdistfunc_(getDataByInternalId(sorted_cands[i].first), getDataByInternalId(sorted_cands[pre_nb_idx].first), dist_func_param_);
-                        auto domination_result = tmp_dist < cur_dist;
-                        calculated_pair[encoded_pair] = domination_result;
-                        if (domination_result) {
-                            dominated_flag = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (dominated_flag)
-                    continue;
 
                 unsigned next_lr = (cur_external_id < PIVOT_ID) ? std::min(cur_external_id, lr) : lr;
                 unsigned next_rl = (cur_external_id > PIVOT_ID) ? std::max(cur_external_id, rl) : rl;
 
                 prefix_idx.push_back(i);
 
-                // TODO: check whether this is good
-                if (if_nbr[i] == false) {
-                    if_nbr[i] = true;
-                    nbr_ll[i] = L;
-                    nbr_lr[i] = next_lr;
-                    nbr_rl[i] = next_rl;
-                    nbr_rr[i] = R;
-                } else {
-                    nbr_ll[i] = std::min(nbr_ll[i], L);
-                    nbr_lr[i] = std::max(nbr_lr[i], next_lr);
-                    nbr_rl[i] = std::min(nbr_rl[i], next_rl);
-                    nbr_rr[i] = std::max(nbr_rr[i], R);
-                }
+                // compact_graph->at(PIVOT_ID).nns.emplace_back(cur_external_id, L, next_lr, next_rl, R);
 
                 dfs(prefix_idx, PIVOT_ID, L, R, next_lr, next_rl);
-
+                if_leaf = false;
                 prefix_idx.pop_back();
 
                 if (cur_external_id < lr) {
@@ -370,6 +397,10 @@ public:
                     break;
                 }
             }
+        }
+
+        if (if_leaf) {
+            pruneAndPushIntoNN(prefix_idx, L, lr, rl, R);
         }
     }
 
@@ -388,6 +419,7 @@ public:
         unsigned tmp_right_bound = max_elements_;
 
         sorted_cands.clear();
+        passed_cps.clear();
         while (!queue_closest.empty()) {
             std::pair<dist_t, tableint> current_pair = queue_closest.top(); // 当前离我最近的点
             dist_t dist_to_query = -current_pair.first;
@@ -397,36 +429,21 @@ public:
             get_selectedNeighbors(current_pair.second, dist_to_query, index_k);
         }
 
-        
-
-        // TODO: we can shrink this memory that they do not need so much space we can integrate them into one data structure
-        if_nbr.resize(sorted_cands.size());
-        nbr_ll.resize(sorted_cands.size());
-        nbr_lr.resize(sorted_cands.size());
-        nbr_rl.resize(sorted_cands.size());
-        nbr_rr.resize(sorted_cands.size());
-        std::fill_n(if_nbr.begin(), if_nbr.size(), false);
-
         // clear the caculation cache
         calculated_pair.clear();
 
         // some initiliazation for some variables serving for dfs function
         vector<unsigned> prefix_idx;
         prefix_idx.reserve(Mcurmax);
-        
+
         // always choosing the range [0, max_elements] as dfs input
         // If choose current [min_element_external_id, max_element_exteranl_id] that will make the recall a little bit lower
         dfs(prefix_idx, center_external_id, tmp_left_bound, tmp_right_bound, center_external_id, center_external_id);
 
-        // generate the compressed point
-        for (unsigned i = 0; i < if_nbr.size(); i++) {
-            if (if_nbr[i]) {
-                // TODO: each point is actually corresponding to a boundary we need to get the accurate positions
-                unsigned tmp_external_id = getExternalLabel(sorted_cands[i].first);
-                compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, nbr_ll[i], nbr_lr[i], nbr_rl[i], nbr_rr[i]);
-            }
+        // generate compressed points
+        for (auto const &tup : passed_cps) {
+            compact_graph->at(center_external_id).nns.emplace_back(std::get<0>(tup), std::get<1>(tup), std::get<2>(tup), std::get<3>(tup), std::get<4>(tup));
         }
-        sort(compact_graph->at(center_external_id).nns.begin(), compact_graph->at(center_external_id).nns.end());
     }
 
     void gen_rev_neighbors(unsigned center_external_id) {
@@ -595,7 +612,7 @@ public:
     base_hnsw::DISTFUNC<float> fstdistfunc_;
     void *dist_func_param_;
     VisitedListPool *visited_list_pool_;
-    IndexInfo *index_info=nullptr;
+    IndexInfo *index_info = nullptr;
     const BaseIndex::IndexParams *index_params_;
 
     IndexCompactGraph(base_hnsw::SpaceInterface<float> *s,
@@ -606,7 +623,6 @@ public:
         index_info = new IndexInfo();
         index_info->index_version_type = "IndexCompactGraph";
     }
-    
 
     void printOnebatch() {
         cout << "Print one batch" << endl;
@@ -711,7 +727,6 @@ public:
         SearchInfo *search_info,
         const vector<float> &query,
         const std::pair<int, int> query_bound) override {
-        
         fetched_nns.reserve(100);
         fetched_nns.clear();
 
@@ -787,14 +802,14 @@ public:
 
             auto const &pos_edges = directed_indexed_arr[current_node_id].nns;
             auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
-            // fetch nns first 
+            // fetch nns first
             fetched_nns.clear();
             for (auto i = 0; i < pos_edges.size(); i++) {
-                const unsigned& candidate_id = pos_edges[i].external_id;
-                if(candidate_id < query_bound.first)
+                const unsigned &candidate_id = pos_edges[i].external_id;
+                if (candidate_id < query_bound.first)
                     continue;
-                if (candidate_id > query_bound.second ) // 后面的点都是越界节点
-                    break;
+                if (candidate_id > query_bound.second)
+                    continue;
                 const auto &cp = pos_edges[i];
                 if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
                     continue;
@@ -803,10 +818,10 @@ public:
             }
 
             for (auto i = 0; i < neg_edges.size(); i++) {
-                const unsigned& candidate_id = neg_edges[i].external_id;
-                if(candidate_id < query_bound.first)
+                const unsigned &candidate_id = neg_edges[i].external_id;
+                if (candidate_id < query_bound.first)
                     continue;
-                if (candidate_id > query_bound.second ) // 后面的点都是越界节点
+                if (candidate_id > query_bound.second)
                     continue;
                 auto &cp = neg_edges[i];
                 if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
@@ -818,9 +833,9 @@ public:
             AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
 
             // now iterate fetched nn and calculate distance
-            for(auto & candidate_id: fetched_nns){
+            for (auto &candidate_id : fetched_nns) {
                 if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
-                {   
+                {
                     visited_array[candidate_id] = visited_array_tag; // 标记为已访问
 
                     // 计算距离
@@ -904,7 +919,7 @@ public:
     }
 
     // Load function to load the IndexCompactGraph from a file
-    void load(const std::string &file_path) override{ 
+    void load(const std::string &file_path) override {
         std::ifstream in(file_path, std::ios::binary);
         if (!in) {
             throw std::runtime_error("Failed to open file for loading index.");
@@ -938,4 +953,4 @@ public:
         delete visited_list_pool_;
     }
 };
-} // namespace Compact
+} // namespace Compact_0_0

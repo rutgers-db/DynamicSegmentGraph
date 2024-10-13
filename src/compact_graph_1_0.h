@@ -27,7 +27,8 @@
 #include "utils.h"
 using namespace base_hnsw;
 
-namespace Compact {
+// Use Pruned KNN but not merge points
+namespace Compact_1_0 {
 template <typename dist_t>
 struct CompressedPoint {
     // 使用初始化列表构造函数，简化赋值操作并提高效率
@@ -344,19 +345,7 @@ public:
 
                 prefix_idx.push_back(i);
 
-                // TODO: check whether this is good
-                if (if_nbr[i] == false) {
-                    if_nbr[i] = true;
-                    nbr_ll[i] = L;
-                    nbr_lr[i] = next_lr;
-                    nbr_rl[i] = next_rl;
-                    nbr_rr[i] = R;
-                } else {
-                    nbr_ll[i] = std::min(nbr_ll[i], L);
-                    nbr_lr[i] = std::max(nbr_lr[i], next_lr);
-                    nbr_rl[i] = std::min(nbr_rl[i], next_rl);
-                    nbr_rr[i] = std::max(nbr_rr[i], R);
-                }
+                compact_graph->at(PIVOT_ID).nns.emplace_back(cur_external_id, L, next_lr, next_rl, R);
 
                 dfs(prefix_idx, PIVOT_ID, L, R, next_lr, next_rl);
 
@@ -400,12 +389,12 @@ public:
         
 
         // TODO: we can shrink this memory that they do not need so much space we can integrate them into one data structure
-        if_nbr.resize(sorted_cands.size());
-        nbr_ll.resize(sorted_cands.size());
-        nbr_lr.resize(sorted_cands.size());
-        nbr_rl.resize(sorted_cands.size());
-        nbr_rr.resize(sorted_cands.size());
-        std::fill_n(if_nbr.begin(), if_nbr.size(), false);
+        // if_nbr.resize(sorted_cands.size());
+        // nbr_ll.resize(sorted_cands.size());
+        // nbr_lr.resize(sorted_cands.size());
+        // nbr_rl.resize(sorted_cands.size());
+        // nbr_rr.resize(sorted_cands.size());
+        // std::fill_n(if_nbr.begin(), if_nbr.size(), false);
 
         // clear the caculation cache
         calculated_pair.clear();
@@ -418,15 +407,14 @@ public:
         // If choose current [min_element_external_id, max_element_exteranl_id] that will make the recall a little bit lower
         dfs(prefix_idx, center_external_id, tmp_left_bound, tmp_right_bound, center_external_id, center_external_id);
 
-        // generate the compressed point
-        for (unsigned i = 0; i < if_nbr.size(); i++) {
-            if (if_nbr[i]) {
-                // TODO: each point is actually corresponding to a boundary we need to get the accurate positions
-                unsigned tmp_external_id = getExternalLabel(sorted_cands[i].first);
-                compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, nbr_ll[i], nbr_lr[i], nbr_rl[i], nbr_rr[i]);
-            }
-        }
-        sort(compact_graph->at(center_external_id).nns.begin(), compact_graph->at(center_external_id).nns.end());
+        // // generate the compressed point
+        // for (unsigned i = 0; i < if_nbr.size(); i++) {
+        //     if (if_nbr[i]) {
+        //         // TODO: each point is actually corresponding to a boundary we need to get the accurate positions
+        //         unsigned tmp_external_id = getExternalLabel(sorted_cands[i].first);
+        //         compact_graph->at(center_external_id).nns.emplace_back(tmp_external_id, nbr_ll[i], nbr_lr[i], nbr_rl[i], nbr_rr[i]);
+        //     }
+        // }
     }
 
     void gen_rev_neighbors(unsigned center_external_id) {
@@ -793,8 +781,8 @@ public:
                 const unsigned& candidate_id = pos_edges[i].external_id;
                 if(candidate_id < query_bound.first)
                     continue;
-                if (candidate_id > query_bound.second ) // 后面的点都是越界节点
-                    break;
+                if (candidate_id > query_bound.second ) 
+                    continue;
                 const auto &cp = pos_edges[i];
                 if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
                     continue;
@@ -806,7 +794,7 @@ public:
                 const unsigned& candidate_id = neg_edges[i].external_id;
                 if(candidate_id < query_bound.first)
                     continue;
-                if (candidate_id > query_bound.second ) // 后面的点都是越界节点
+                if (candidate_id > query_bound.second )
                     continue;
                 auto &cp = neg_edges[i];
                 if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {

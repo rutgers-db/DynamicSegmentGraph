@@ -3,18 +3,20 @@
 
 # Define root directory and N
 
-N=1000000
-index_k=32
-ef_max=1000
+N=1000 #000
+index_k=8
+ef_max=500
 ef_construction=100
-METHODS=("Seg2D" "compact")
+METHODS=("compact")
+VERSION=("1_0")
 root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/"  # Define the root path
 
 # List of datasets
-DATASETS=("yt8m-video" "wiki-image" "yt8m-audio")
+DATASETS=("deep" "yt8m-video" "wiki-image" "yt8m-audio")
 
 # List of dataset paths with root_path appended
-DATASET_PATHS=("${root_path}data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs" 
+DATASET_PATHS=("${root_path}data/deep10M.fvecs" 
+                "${root_path}data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs" 
                "${root_path}data/wiki_image_embedding.fvecs" 
                "${root_path}data/yt8m_audio_embedding.fvecs")
 
@@ -28,12 +30,12 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
     if [ $N -ge 1000000 ]; then
         INDEX_SIZE="$(($N / 1000000))m"
     else
-        INDEX_SIZE="$(($N / 1000))k"
+        INDEX_SIZE="$(($N / 1000))k" 
     fi
 
     # Define index path and log file
-    INDEX_PATH="${root_path}index/${dataset}/${INDEX_SIZE}"
-    LOG_PATH="${INDEX_PATH}/${index_k}_${ef_max}_${ef_construction}.log"
+    INDEX_PATH="${root_path}opt_index/${dataset}/${INDEX_SIZE}_${VERSION}"
+    LOG_PATH="${INDEX_PATH}/${index_k}_${ef_max}_${ef_construction}_${VERSION}.log"
 
     # Create the index path directory if it does not exist
     if [ ! -d "$INDEX_PATH" ]; then
@@ -48,6 +50,8 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
         ./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max \
             -dataset $dataset -method $METHOD -dataset_path "$dataset_path" -index_path "$INDEX_PATH" >> "$LOG_PATH"
     done
+
+    break
 done
 
 exit 0

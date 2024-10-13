@@ -1,37 +1,53 @@
+
 #!/bin/bash
 
-# Define root directory, N, dataset, and method as variables
-ROOT_DIR="/research/projects/zp128/RangeIndexWithRandomInsertion/index"
-N=1000000
-index_k=16
-ef_max=750
-ef_construction=100
-DATASET="yt8m-video" # wiki-image deep  yt8m-audio
-DATASETNAME="yt8m-video"  # wiki deep yt8m-audio
-DATASET_PATH="../data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs" # ../data/deep10M.fvecs ../data/wiki_image_embedding.fvecs yt8m_sorted_by_timestamp_video_embedding_1M yt8m_audio_embedding
-METHODS=("Seg2D" "compact")
+# Define root directory and N
 
-# Iterate over methods and build index
-for METHOD in "${METHODS[@]}"; do
+N=1000000
+index_k=32
+ef_max=1000
+ef_construction=100
+METHODS=("Seg2D" "compact")
+root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/"  # Define the root path
+
+# List of datasets
+DATASETS=("yt8m-video" "wiki-image" "yt8m-audio")
+
+# List of dataset paths with root_path appended
+DATASET_PATHS=("${root_path}data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs" 
+               "${root_path}data/wiki_image_embedding.fvecs" 
+               "${root_path}data/yt8m_audio_embedding.fvecs")
+
+
+# Iterate over datasets and their paths using proper indexing
+for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
+    dataset="${DATASETS[$i]}"
+    dataset_path="${DATASET_PATHS[$i]}"
+
+    # Determine index size suffix
     if [ $N -ge 1000000 ]; then
         INDEX_SIZE="$(($N / 1000000))m"
     else
         INDEX_SIZE="$(($N / 1000))k"
     fi
-    INDEX_PATH="$ROOT_DIR/$DATASET/$INDEX_SIZE"
-    
-    # Create index path directory if it does not exist
+
+    # Define index path and log file
+    INDEX_PATH="${root_path}index/${dataset}/${INDEX_SIZE}"
+    LOG_PATH="${INDEX_PATH}/${index_k}_${ef_max}_${ef_construction}.log"
+
+    # Create the index path directory if it does not exist
     if [ ! -d "$INDEX_PATH" ]; then
         mkdir -p "$INDEX_PATH"
     fi
 
-    ./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max -dataset $DATASET -method $METHOD -dataset_path $DATASET_PATH -index_path "$INDEX_PATH"
+    # Iterate over methods and run the benchmark
+    for METHOD in "${METHODS[@]}"; do
+        echo "Running benchmark for dataset: $dataset, method: $METHOD"
+        echo "./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max -dataset $dataset -method $METHOD -dataset_path $dataset_path -index_path $INDEX_PATH"
+        
+        ./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max \
+            -dataset $dataset -method $METHOD -dataset_path "$dataset_path" -index_path "$INDEX_PATH" >> "$LOG_PATH"
+    done
 done
 
 exit 0
-
-
-# ./benchmark/build_index -N 100000 -method Seg2D -dataset_path ../data/deep10M.fvecs -index_path /research/projects/zp128/RangeIndexWithRandomInsertion/index/deep/100k
-# ./benchmark/build_index -N 100000 -method compact -dataset_path ../data/deep10M.fvecs -index_path /research/projects/zp128/RangeIndexWithRandomInsertion/index/deep/100k
-# ./benchmark/build_index -N 100000 -dataset wiki-image -method Seg2D -dataset_path ../data/wiki_image_embedding.fvecs -index_path /research/projects/zp128/RangeIndexWithRandomInsertion/index/wiki/100k
-# ./benchmark/build_index -N 100000 -dataset wiki-image -method compact -dataset_path ../data/wiki_image_embedding.fvecs -index_path /research/projects/zp128/RangeIndexWithRandomInsertion/index/wiki/100k

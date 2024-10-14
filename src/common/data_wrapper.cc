@@ -428,13 +428,14 @@ void DataWrapper::generateRangeFilteringQueriesAndGroundtruthBenchmark(
     timeval t1, t2;
 
     vector<int> query_range_list;
-    query_range_list.emplace_back(this->data_size * 0.001);
-    query_range_list.emplace_back(this->data_size * 0.005);
     query_range_list.emplace_back(this->data_size * 0.01);
-    query_range_list.emplace_back(this->data_size * 0.05);
-    query_range_list.emplace_back(this->data_size * 0.1);
-    query_range_list.emplace_back(this->data_size * 0.5);
-    query_range_list.emplace_back(this->data_size);
+    query_range_list.emplace_back(this->data_size * 0.02);
+    query_range_list.emplace_back(this->data_size * 0.04);
+    query_range_list.emplace_back(this->data_size * 0.08);
+    query_range_list.emplace_back(this->data_size * 0.16);
+    query_range_list.emplace_back(this->data_size * 0.32);
+    query_range_list.emplace_back(this->data_size * 0.64);
+    // query_range_list.emplace_back(this->data_size);
 
     cout << "Generating Range Filtering Groundtruth...";
     cout << endl

@@ -20,38 +20,15 @@
 #include <unordered_map>
 #include <fstream>
 #include <tuple>
-#include <functional>  // For std::hash
+#include <functional> // For std::hash
 
 #include "base_hnsw/hnswalg.h"
 #include "base_hnsw/hnswlib.h"
 #include "data_wrapper.h"
 #include "index_base.h"
 #include "utils.h"
+// #include "compact_graph_0_0.h"
 using namespace base_hnsw;
-
-// Helper function to combine two hash values
-inline void hash_combine(std::size_t &seed, std::size_t hash) {
-    seed ^= hash + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-}
-
-// Custom hash specialization for std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned>
-namespace std {
-    template <>
-    struct hash<std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned>> {
-        std::size_t operator()(const std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned> &t) const {
-            std::size_t seed = 0;
-
-            // Hash each element of the tuple
-            hash_combine(seed, std::hash<unsigned>{}(std::get<0>(t)));
-            hash_combine(seed, std::hash<unsigned>{}(std::get<1>(t)));
-            hash_combine(seed, std::hash<unsigned>{}(std::get<2>(t)));
-            hash_combine(seed, std::hash<unsigned>{}(std::get<3>(t)));
-            hash_combine(seed, std::hash<unsigned>{}(std::get<4>(t)));
-
-            return seed;
-        }
-    };
-}
 
 // Not Use Pruned KNN but merge points
 namespace Compact_0_1 {
@@ -320,7 +297,7 @@ public:
     // the tmp map for saving the result of dominationion pair
     // to avoid the duplicate calculation
     std::unordered_map<unsigned, bool> calculated_pair;
-    
+
     std::vector<bool> if_nbr;
     std::vector<unsigned> nbr_ll;
     std::vector<unsigned> nbr_lr;
@@ -359,12 +336,19 @@ public:
             }
         }
 
-        // push each external id of each NN into compressed points
+        // update the relaxed and compressed points
         for (auto const &nn_idx : tmp_NN_idx) {
-            auto cur_external_id = getExternalLabel(sorted_cands[nn_idx].first);
-            auto tmp_tuple = std::make_tuple(cur_external_id, L, lr, rl, R);
-            if(passed_cps.find(tmp_tuple) == passed_cps.end())
-                passed_cps.insert(tmp_tuple);
+            if (if_nbr[nn_idx] == false) {
+                nbr_ll[nn_idx] = L;
+                nbr_lr[nn_idx] = lr;
+                nbr_rl[nn_idx] = rl;
+                nbr_rr[nn_idx] = R;
+            } else {
+                nbr_ll[nn_idx] = std::min(nbr_ll[nn_idx], L);
+                nbr_lr[nn_idx] = std::max(nbr_lr[nn_idx], lr);
+                nbr_rl[nn_idx] = std::min(nbr_rl[nn_idx], rl);
+                nbr_rr[nn_idx] = std::max(nbr_rr[nn_idx], R);
+            }
         }
     }
 
@@ -381,7 +365,6 @@ public:
 
             // TODO: how to quickly get the corresponding ID that locates in the range [L,R]
             if (cur_external_id <= R && cur_external_id >= L) {
-
                 unsigned next_lr = (cur_external_id < PIVOT_ID) ? std::min(cur_external_id, lr) : lr;
                 unsigned next_rl = (cur_external_id > PIVOT_ID) ? std::max(cur_external_id, rl) : rl;
 
@@ -423,7 +406,6 @@ public:
         unsigned tmp_right_bound = max_elements_;
 
         sorted_cands.clear();
-        passed_cps.clear();
         while (!queue_closest.empty()) {
             std::pair<dist_t, tableint> current_pair = queue_closest.top(); // 当前离我最近的点
             dist_t dist_to_query = -current_pair.first;
@@ -969,4 +951,4 @@ public:
         delete visited_list_pool_;
     }
 };
-} // namespace Compact_0_0
+} // namespace Compact_0_1

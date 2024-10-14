@@ -24,6 +24,7 @@
 #include "reader.h"
 #include "compact_graph.h"
 #include "compact_graph_0_0.h"
+#include "compact_graph_0_1.h"
 #include "compact_graph_1_0.h"
 #include "segment_graph_2d.h"
 #include "utils.h"
@@ -55,13 +56,12 @@ int main(int argc, char **argv) {
     unsigned ef_construction = 100;
     int query_num = 1000;
     int query_k = 10;
-    
 
     string indexk_str = "";
     string ef_con_str = "";
     string version = "Benchmark";
     string index_dir_path;
-
+    string op_version = "1_1";
     for (int i = 0; i < argc; i++) {
         string arg = argv[i];
         if (arg == "-dataset") dataset = string(argv[i + 1]);
@@ -79,7 +79,8 @@ int main(int argc, char **argv) {
             ef_max = atoi(argv[i + 1]);
         if (arg == "-ef_construction")
             ef_construction = atoi(argv[i + 1]);
-
+        if (arg == "-op_version")
+            op_version = string(argv[i + 1]);
     }
 
     assert(index_k_list.size() != 0);
@@ -88,37 +89,41 @@ int main(int argc, char **argv) {
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path); // query_path is useless when just building index
 
-    cout << "index K:" << index_k<< " ef construction: "<<ef_construction<<" ef_max: "<< ef_max<< endl;
+    cout << "index K:" << index_k << " ef construction: " << ef_construction << " ef_max: " << ef_max << endl;
 
     data_wrapper.version = version;
     base_hnsw::L2Space ss(data_wrapper.data_dim);
     timeval t1, t2;
-    BaseIndex* index;
+    BaseIndex *index;
 
     BaseIndex::IndexParams i_params(index_k, ef_construction,
                                     ef_construction, ef_max);
     i_params.recursion_type = BaseIndex::IndexParams::MAX_POS;
     {
-        
-        if(method == "Seg2D"){
+        if (method == "Seg2D") {
             index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
-        }else{
-            index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
+        } else {
+            if (op_version == "0_0")
+                index = new Compact_0_0::IndexCompactGraph(&ss, &data_wrapper);
+            if (op_version == "0_1")
+                index = new Compact_0_1::IndexCompactGraph(&ss, &data_wrapper);
+            if (op_version == "1_0")
+                index = new Compact_1_0::IndexCompactGraph(&ss, &data_wrapper);
+            if (op_version == "1_1")
+                index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
         }
 
-        cout << "method: " << method<<" parameters: ef_construction ( " + to_string(i_params.ef_construction) + " )  index-k( "
-                << i_params.K << ")  ef_max (" << i_params.ef_max << ") "
-                << endl;
+        cout << "method: " << method << " parameters: ef_construction ( " + to_string(i_params.ef_construction) + " )  index-k( "
+             << i_params.K << ")  ef_max (" << i_params.ef_max << ") "
+             << endl;
         gettimeofday(&t1, NULL);
         index->buildIndex(&i_params);
         gettimeofday(&t2, NULL);
         logTime(t1, t2, "Build Index Time");
-        
 
-        string save_path = index_dir_path + "/" + method+ "_" + std::to_string(index_k) + "_" + std::to_string(ef_max) + "_" + std::to_string(ef_construction) + ".bin";
+        string save_path = index_dir_path + "/" + method + "_" + std::to_string(index_k) + "_" + std::to_string(ef_max) + "_" + std::to_string(ef_construction) + ".bin";
         index->save(save_path);
     }
-
 
     return 0;
 }

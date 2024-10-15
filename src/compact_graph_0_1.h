@@ -339,6 +339,7 @@ public:
         // update the relaxed and compressed points
         for (auto const &nn_idx : tmp_NN_idx) {
             if (if_nbr[nn_idx] == false) {
+                if_nbr[nn_idx] = true;
                 nbr_ll[nn_idx] = L;
                 nbr_lr[nn_idx] = lr;
                 nbr_rl[nn_idx] = rl;

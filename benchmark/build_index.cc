@@ -80,9 +80,6 @@ int main(int argc, char **argv) {
 
     }
 
-    assert(index_k_list.size() != 0);
-    assert(ef_construction_list.size() != 0);
-
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path); // query_path is useless when just building index
 

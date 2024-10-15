@@ -591,8 +591,9 @@ public:
     base_hnsw::DISTFUNC<float> fstdistfunc_;
     void *dist_func_param_;
     VisitedListPool *visited_list_pool_;
-    IndexInfo *index_info=nullptr;
+    IndexInfo *index_info = nullptr;
     const BaseIndex::IndexParams *index_params_;
+    CompactHNSW<float> *hnsw;
 
     IndexCompactGraph(base_hnsw::SpaceInterface<float> *s,
                       const DataWrapper *data) :
@@ -602,7 +603,6 @@ public:
         index_info = new IndexInfo();
         index_info->index_version_type = "IndexCompactGraph";
     }
-    
 
     void printOnebatch() {
         cout << "Print one batch" << endl;
@@ -652,13 +652,13 @@ public:
         index_params_ = index_params;
         // build HNSW
         L2Space space(data_wrapper->data_dim);
-        CompactHNSW<float> hnsw(
+        hnsw = new CompactHNSW<float>(
             *index_params, &space, 2 * data_wrapper->data_size, index_params->K,
             index_params->ef_construction, index_params->random_seed);
 
         directed_indexed_arr.clear();
         directed_indexed_arr.resize(data_wrapper->data_size);
-        hnsw.compact_graph = &directed_indexed_arr;
+        hnsw->compact_graph = &directed_indexed_arr;
         gettimeofday(&tt1, NULL);
 
         // random add points
@@ -677,17 +677,45 @@ public:
 
         cout << "First point" << permutation[0] << endl;
         for (size_t i : permutation) {
-            hnsw.addPoint(data_wrapper->nodes.at(i).data(), i);
+            hnsw->addPoint(data_wrapper->nodes.at(i).data(), i);
         }
 
         gettimeofday(&tt2, NULL);
         index_info->index_time = CountTime(tt1, tt2);
 
-        cout << "All the forward batch nn #: " << hnsw.forward_batch_nn_amount << endl;
-        cout << "Theoratical backward batch nn #: " << hnsw.backward_batch_theoratical_nn_amount << endl;
+        cout << "All the forward batch nn #: " << hnsw->forward_batch_nn_amount << endl;
+        cout << "Theoratical backward batch nn #: " << hnsw->backward_batch_theoratical_nn_amount << endl;
         // count neighbors number
         countNeighbrs();
     };
+
+    void initForScabilityExp(const IndexParams *index_params, L2Space* space) {
+        visited_list_pool_ =
+            new base_hnsw::VisitedListPool(1, data_wrapper->data_size);
+        index_params_ = index_params;
+        // build HNSW
+        hnsw = new CompactHNSW<float>(
+            *index_params, space, 2 * data_wrapper->data_size, index_params->K,
+            index_params->ef_construction, index_params->random_seed);
+
+        directed_indexed_arr.clear();
+        directed_indexed_arr.resize(data_wrapper->data_size);
+        hnsw->compact_graph = &directed_indexed_arr;
+    }
+
+    void insert_batch(vector<unsigned> &nodes_ids) {
+        timeval tt1, tt2;
+        gettimeofday(&tt1, NULL);
+        for (auto i : nodes_ids) {
+            hnsw->addPoint(data_wrapper->nodes.at(i).data(), i);
+        }
+
+        gettimeofday(&tt2, NULL);
+        index_info->index_time = CountTime(tt1, tt2);
+        cout << "Insert a  " << nodes_ids.size() << " batch need" << index_info->index_time << endl;
+        // count neighbors number
+        countNeighbrs();
+    }
 
     vector<unsigned> fetched_nns;
     /**
@@ -707,7 +735,6 @@ public:
         SearchInfo *search_info,
         const vector<float> &query,
         const std::pair<int, int> query_bound) override {
-        
         fetched_nns.reserve(100);
         fetched_nns.clear();
 
@@ -783,13 +810,13 @@ public:
 
             auto const &pos_edges = directed_indexed_arr[current_node_id].nns;
             auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
-            // fetch nns first 
+            // fetch nns first
             fetched_nns.clear();
             for (auto i = 0; i < pos_edges.size(); i++) {
-                const unsigned& candidate_id = pos_edges[i].external_id;
-                if(candidate_id < query_bound.first)
+                const unsigned &candidate_id = pos_edges[i].external_id;
+                if (candidate_id < query_bound.first)
                     continue;
-                if (candidate_id > query_bound.second ) // 后面的点都是越界节点
+                if (candidate_id > query_bound.second) // 后面的点都是越界节点
                     break;
                 const auto &cp = pos_edges[i];
                 if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
@@ -799,10 +826,10 @@ public:
             }
 
             for (auto i = 0; i < neg_edges.size(); i++) {
-                const unsigned& candidate_id = neg_edges[i].external_id;
-                if(candidate_id < query_bound.first)
+                const unsigned &candidate_id = neg_edges[i].external_id;
+                if (candidate_id < query_bound.first)
                     continue;
-                if (candidate_id > query_bound.second ) // 后面的点都是越界节点
+                if (candidate_id > query_bound.second) // 后面的点都是越界节点
                     continue;
                 auto &cp = neg_edges[i];
                 if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
@@ -814,9 +841,9 @@ public:
             AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
 
             // now iterate fetched nn and calculate distance
-            for(auto & candidate_id: fetched_nns){
+            for (auto &candidate_id : fetched_nns) {
                 if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
-                {   
+                {
                     visited_array[candidate_id] = visited_array_tag; // 标记为已访问
 
                     // 计算距离
@@ -900,7 +927,7 @@ public:
     }
 
     // Load function to load the IndexCompactGraph from a file
-    void load(const std::string &file_path) override{ 
+    void load(const std::string &file_path) override {
         std::ifstream in(file_path, std::ios::binary);
         if (!in) {
             throw std::runtime_error("Failed to open file for loading index.");
@@ -929,6 +956,7 @@ public:
     }
 
     ~IndexCompactGraph() {
+        delete hnsw;
         delete index_info;
         directed_indexed_arr.clear();
         delete visited_list_pool_;

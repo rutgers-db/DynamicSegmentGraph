@@ -102,10 +102,10 @@ public:
         double index_time;
 
         /// 窗口数量
-        int window_count;
+        size_t window_count;
 
         /// 节点总数
-        int nodes_amount;
+        size_t nodes_amount;
 
         /// 平均正向近邻数量
         float avg_forward_nns;

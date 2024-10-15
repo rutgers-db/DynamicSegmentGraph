@@ -2,7 +2,7 @@
 
 # Define root directory and N
 
-N=10000000
+N=1000000
 index_k=16
 ef_max=500
 ef_construction=100

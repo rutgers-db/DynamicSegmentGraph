@@ -84,7 +84,7 @@ int main(int argc, char **argv)
     //     true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol +
     //               "-num1000-k10.halfbounded.cvs");
     data_wrapper.generateRangeFilteringQueriesAndGroundtruthBenchmark(
-        true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol +
+        true, groundtruth_prefix + size_symbol +
                   "-num1000-k10.arbitrary.cvs");
     return 0;
 }

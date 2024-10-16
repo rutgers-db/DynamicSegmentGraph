@@ -3,15 +3,15 @@
 # Define root directory, dataset, and other variables
 ROOT_DIR="/research/projects/zp128/RangeIndexWithRandomInsertion/"
 N=10000
-DATASET="deep"  # Example: "wiki-image"
+DATASET="yt8m-video"  # Example: "wiki-image"
 index_k=8
 ef_max=500
 ef_construction=100
 
 # Define dataset paths
-DATASET_PATH="../data/deep_sorted_10M.fvecs"  # Example: yt8m_audio_embedding.fvecs
-QUERY_PATH="../data/deep1B_queries.fvecs"  # Example: wiki_image_querys
-GROUNDTRUTH_PATH="../groundtruth/deep_benchmark-groundtruth-deep-10k-num1000-k10.arbitrary.cvs"
+DATASET_PATH="../data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs"  # Example: yt8m_audio_embedding.fvecs
+QUERY_PATH="../data/yt8m_video_querys_10k.fvecs"  # Example: wiki_image_querys
+GROUNDTRUTH_PATH="../groundtruth/yt8m-video_benchmark-groundtruth-deep-10k-num1000-k10.arbitrary.cvs"
 
 # Define methods and versions
 METHODS=("compact")  # Example: "Seg2D"

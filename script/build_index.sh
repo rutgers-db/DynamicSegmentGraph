@@ -7,14 +7,16 @@ index_k=8
 ef_max=500
 ef_construction=100
 METHOD="compact"
-VERSIONS=("0_0" "0_1" )   #"1_0" "1_1"                                         
+VERSIONS=("0_0" "0_1" "1_0" "1_1")                                  #
 root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/" # Define the root path
 
-# List of datasets
-DATASETS=("deep")
+# List of datasets #
+DATASETS=(
+    "wiki-image") #deep "yt8m-video"
 
 # List of dataset paths with root_path appended
-DATASET_PATHS=("${root_path}data/deep_sorted_10M.fvecs")
+DATASET_PATHS=(
+    "${root_path}data/wiki_image_embedding.fvecs") #"${root_path}data/deep_sorted_10M.fvecs" "${root_path}data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs"
 
 # Iterate over datasets and their paths using proper indexing
 for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
@@ -44,8 +46,6 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
         ./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max \
             -dataset $dataset -method $METHOD -dataset_path "$dataset_path" -index_path "$INDEX_PATH" -op_version "$VERSION" >>"$LOG_PATH"
     done
-
-    break
 done
 
 exit 0

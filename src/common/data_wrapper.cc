@@ -441,11 +441,11 @@ void DataWrapper::generateRangeFilteringQueriesAndGroundtruthBenchmark(
     cout << endl
          << "Ranges: " << endl;
     print_set(query_range_list);
-    // generate groundtruth
-
+    vector<double> bf_latency_aveInEachRange(query_range_list.size(), 0);
     std::default_random_engine e;
 
-    for (auto range : query_range_list) {
+    for (int range_id = 0; range_id < query_range_list.size(); range_id++) {
+        auto &range = query_range_list[range_id];
         std::uniform_int_distribution<int> u_lbound(0,
                                                     std::max(this->data_size - range - 1, 0));
         for (int i = 0; i < this->querys.size(); i++) {
@@ -462,6 +462,8 @@ void DataWrapper::generateRangeFilteringQueriesAndGroundtruthBenchmark(
                                     this->query_k);
             gettimeofday(&t2, NULL);
             CountTime(t1, t2, greedy_time);
+            bf_latency_aveInEachRange[range_id] += greedy_time;
+
             groundtruth.emplace_back(gt);
             query_ids.emplace_back(i);
             if (is_save_to_file) {
@@ -469,8 +471,10 @@ void DataWrapper::generateRangeFilteringQueriesAndGroundtruthBenchmark(
                              this->query_k, greedy_time, gt, this->querys.at(i));
             }
         }
+        bf_latency_aveInEachRange[range_id] /= this->querys.size();
     }
-
+    cout << "Here is bruteforce average time cost when generating groundtruth for each range:" << endl;
+    print_set(bf_latency_aveInEachRange);
     if (is_save_to_file) {
         cout << "Save GroundTruth to path: " << save_path << endl;
     }

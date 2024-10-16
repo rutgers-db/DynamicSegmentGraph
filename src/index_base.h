@@ -200,7 +200,7 @@ public:
 
         void Path(const string &ver) {
             version = ver;
-            save_path = "../exp/search/" + version + "-" + method + "-" + data_wrapper->dataset + "-" + std::to_string(data_wrapper->data_size) + ".csv";
+            save_path = "../exp/" + version + "-" + method + "-" + data_wrapper->dataset + "-" + std::to_string(data_wrapper->data_size) + ".csv";
         };
 
         void RecordOneQuery(BaseIndex::SearchParams *search) {

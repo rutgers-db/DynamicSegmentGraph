@@ -72,7 +72,9 @@ std::vector<std::vector<unsigned>> generatePermutations(const std::vector<unsign
         }
 
         // Shuffle to create a random permutation
-        std::shuffle(batch.begin(), batch.end(), rng);
+        // Only for aribitrary order 
+        // Attention here!!! TODO
+        // std::shuffle(batch.begin(), batch.end(), rng);
 
         // Store the permutation and update the starting point for the next batch
         permutations.push_back(batch);
@@ -82,18 +84,33 @@ std::vector<std::vector<unsigned>> generatePermutations(const std::vector<unsign
     return permutations;
 }
 
+// Function to replace a substring in all elements of a vector of strings
+void ReplaceSubstringInPaths(std::vector<std::string> &paths, const std::string &old_str, const std::string &new_str) {
+    for (std::string &path : paths) {
+        size_t pos = path.find(old_str);
+        if (pos != std::string::npos) {
+            path.replace(pos, old_str.length(), new_str);
+        }
+    }
+}
+
 int main(int argc, char **argv) {
 #ifdef USE_SSE
     cout << "Use SSE" << endl;
 #endif
 
     // Parameters
-    string dataset = "deep";
-    vector<unsigned> batches_size = {1000, 10000, 100000, 1000000, 10000000};
-    int data_size = 10000000;
+    string dataset = "wiki-image";
+    // vector<unsigned> batches_size = {1000, 10000, 100000, 1000000, 10000000};
+    vector<unsigned> batches_size = { 1150000, 1200000}; // 1000000, 1050000, 1100000,
+
+    // int data_size = 10000000;
+    int data_size = 1200000;
     auto insert_batches = generatePermutations(batches_size);
     string dataset_path = "";
     string query_path = "";
+    string index_path = "";
+
     unsigned index_k = 16;
     unsigned ef_max = 500;
     unsigned ef_construction = 100;
@@ -104,23 +121,40 @@ int main(int argc, char **argv) {
     string ef_con_str = "";
     string version = "Benchmark";
     vector<string> gt_paths = {
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-1k-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-10k-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-10m-num1000-k10.arbitrary.cvs"};
+        // "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
+        // "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1050k-num1000-k10.arbitrary.cvs",
+        // "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1100k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1150k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1200k-num1000-k10.arbitrary.cvs"};
+
+    // vector<string> gt_paths = {
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-1k-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-10k-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-10m-num1000-k10.arbitrary.cvs"};
+    
     for (int i = 0; i < argc; i++) {
         string arg = argv[i];
+        if (arg == "-dataset")
+            dataset = string(argv[i + 1]);
         if (arg == "-dataset_path")
             dataset_path = string(argv[i + 1]);
         if (arg == "-query_path")
             query_path = string(argv[i + 1]);
+        if (arg == "-index_path")
+            index_path = string(argv[i + 1]);
         if (arg == "-k")
             index_k = atoi(argv[i + 1]);
         if (arg == "-ef_max")
             ef_max = atoi(argv[i + 1]);
         if (arg == "-ef_construction")
             ef_construction = atoi(argv[i + 1]);
+    }
+
+    if (dataset != "wiki-image") {
+        ReplaceSubstringInPaths(gt_paths, "wiki-image", dataset);
+        cout << "Print the first groundtruth path" << gt_paths[0] << endl;
     }
 
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
@@ -144,8 +178,8 @@ int main(int argc, char **argv) {
     BaseIndex::IndexParams i_params(index_k, ef_construction,
                                     ef_construction, ef_max);
 
-    Compact::IndexCompactGraph *index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
-
+    // Compact::IndexCompactGraph *index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
+    SeRF::IndexSegmentGraph2D *index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
     cout << " parameters: ef_construction ( " + to_string(i_params.ef_construction) + " )  index-k( "
          << i_params.K << ")  ef_max (" << i_params.ef_max << ") "
          << endl;

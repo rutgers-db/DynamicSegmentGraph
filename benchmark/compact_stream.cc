@@ -1,3 +1,12 @@
+/**
+ * @file exp_halfbound.cc
+ * @author Chaoji Zuo (chaoji.zuo@rutgers.edu)
+ * @brief Benchmark Half-Bounded Range Filter Search
+ * @date 2023-12-22
+ *
+ * @copyright Copyright (c) 2023
+ */
+
 #include <algorithm>
 #include <iostream>
 #include <map>
@@ -63,7 +72,9 @@ std::vector<std::vector<unsigned>> generatePermutations(const std::vector<unsign
         }
 
         // Shuffle to create a random permutation
-        std::shuffle(batch.begin(), batch.end(), rng);
+        // Only for aribitrary order
+        // Attention here!!! TODO
+        // std::shuffle(batch.begin(), batch.end(), rng);
 
         // Store the permutation and update the starting point for the next batch
         permutations.push_back(batch);
@@ -89,16 +100,21 @@ int main(int argc, char **argv) {
 #endif
 
     // Parameters
-    string dataset = "wiki-image";
+    string dataset = "deep";
+    // vector<unsigned> batches_size = {1000, 10000, 100000, 1000000, 10000000};
+    vector<unsigned> batches_size = {1150000, 1200000}; //1000000, 1050000, 1100000, 
+    // vector<unsigned> batches_size = {1000, 10000};
+    // int data_size = 10000000;
+    // int data_size = 10000;
     int data_size = 1200000;
-    vector<unsigned> batches_size = {1000000, 1050000, 1100000, 1150000, 1200000};
-
+    
     auto insert_batches = generatePermutations(batches_size);
     string dataset_path = "";
     string query_path = "";
     string index_path = "";
-    unsigned index_k = 32;
-    unsigned ef_max = 1000;
+
+    unsigned index_k = 16;
+    unsigned ef_max = 500;
     unsigned ef_construction = 100;
     int query_num = 1000;
     int query_k = 10;
@@ -106,13 +122,20 @@ int main(int argc, char **argv) {
     string indexk_str = "";
     string ef_con_str = "";
     string version = "Benchmark";
-
     vector<string> gt_paths = {
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1050k-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1100k-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1150k-num1000-k10.arbitrary.cvs",
+        // "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
+        // "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1050k-num1000-k10.arbitrary.cvs",
+        // "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1100k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1150-num1000-k10.arbitrary.cvs",
         "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1200k-num1000-k10.arbitrary.cvs"};
+
+    // vector<string> gt_paths = {
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-1k-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-10k-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-10m-num1000-k10.arbitrary.cvs"};
+
     for (int i = 0; i < argc; i++) {
         string arg = argv[i];
         if (arg == "-dataset")
@@ -135,6 +158,7 @@ int main(int argc, char **argv) {
         ReplaceSubstringInPaths(gt_paths, "wiki-image", dataset);
         cout << "Print the first groundtruth path" << gt_paths[0] << endl;
     }
+
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path);
 
@@ -157,20 +181,16 @@ int main(int argc, char **argv) {
                                     ef_construction, ef_max);
 
     Compact::IndexCompactGraph *index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
-
+    // SeRF::IndexSegmentGraph2D *index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
     cout << " parameters: ef_construction ( " + to_string(i_params.ef_construction) + " )  index-k( "
          << i_params.K << ")  ef_max (" << i_params.ef_max << ") "
          << endl;
-    index->load(index_path);
     index->initForScabilityExp(&i_params, &ss);
 
     for (int i = 0; i < insert_batches.size(); i++) {
         auto &insert_batch = insert_batches[i];
         auto &gt_path = gt_paths[i];
-        if (i == 0)
-            index->rebuild_batchInHNSW(insert_batch);
-        else
-            index->insert_batch(insert_batch);
+        index->insert_batch(insert_batch);
         data_wrapper.LoadGroundtruth(gt_path);
         BaseIndex::SearchInfo search_info(&data_wrapper, &i_params, "SeRF_2D",
                                           "benchmark");

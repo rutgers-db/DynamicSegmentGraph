@@ -397,6 +397,10 @@ public:
             get_selectedNeighbors(current_pair.second, dist_to_query, index_k);
         }
 
+        // Not need to find compressed points, not need
+        if (if_rebuild_HNSW == true) 
+            return;
+
         // some initiliazation for some variables serving for dfs function
         vector<unsigned> prefix_idx;
         prefix_idx.reserve(Mcurmax);
@@ -473,9 +477,10 @@ public:
 
             init_selectedNeighbors();
 
-            if (if_rebuild_HNSW == false) {
-                generate_compressed_neighbors(queue_closest, external_id, (unsigned)Mcurmax);
+            
+            generate_compressed_neighbors(queue_closest, external_id, (unsigned)Mcurmax);
 
+            if (if_rebuild_HNSW == false) {
                 gen_rev_neighbors(external_id);
             }
 
@@ -716,7 +721,7 @@ public:
 
         gettimeofday(&tt2, NULL);
         index_info->index_time = CountTime(tt1, tt2);
-        cout << "Insert a  " << nodes_ids.size() << " batch need" << index_info->index_time << endl;
+        cout << "Reinsert for rebuilding a  " << nodes_ids.size() << " batch need" << index_info->index_time << endl;
         // count neighbors number
         countNeighbrs();
         hnsw->if_rebuild_HNSW = false;

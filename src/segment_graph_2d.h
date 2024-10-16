@@ -561,13 +561,14 @@ public:
     base_hnsw::DISTFUNC<float> fstdistfunc_;
     void *dist_func_param_;
 
-    VisitedListPool *visited_list_pool_;
+    VisitedListPool *visited_list_pool_ = nullptr;
     IndexInfo *index_info;
     const BaseIndex::IndexParams *index_params_;
+    SegmentGraph2DHNSW<float> *hnsw;
     unsigned index_k;
     // connect reverse neighbors, do pruning all sth else. In this base version,
     // just no prune and collect all reverse neighbor in one batch.
-    void processReverseNeighbors(SegmentGraph2DHNSW<float> &hnsw) {
+    void processReverseNeighbors() {
         for (size_t i = 0; i < data_wrapper->data_size; ++i) {
             for (auto batch : this->directed_indexed_arr.at(i).forward_nns) {
                 for (auto nn : batch.nns_id) {
@@ -580,6 +581,21 @@ public:
             }
         }
     }
+
+    void processReverseNeighbors(vector<unsigned> & nodes_ids) {
+        for (auto& i : nodes_ids) {
+            for (auto batch : this->directed_indexed_arr.at(i).forward_nns) {
+                for (auto nn : batch.nns_id) {
+                    // add reverse edge
+                    // this->directed_indexed_arr.at(nn).reverse_nns.emplace_back(i);
+                    // 在最开始的地方插入不会慢吗？ 不应该在最末尾插入吗
+                    this->directed_indexed_arr.at(nn).reverse_nns.insert(
+                        this->directed_indexed_arr.at(nn).reverse_nns.begin(), i);
+                }
+            }
+        }
+    }
+
 
     void printOnebatch() {
         for (auto nns :
@@ -677,26 +693,26 @@ public:
 
         // build HNSW
         L2Space space(data_wrapper->data_dim);
-        SegmentGraph2DHNSW<float> hnsw(
+        hnsw = new SegmentGraph2DHNSW<float>(
             *index_params, &space, 2 * data_wrapper->data_size, index_params->K,
             index_params->ef_construction, index_params->random_seed);
 
         directed_indexed_arr.clear();
         directed_indexed_arr.resize(data_wrapper->data_size);
-        hnsw.segment_graph = &directed_indexed_arr;
+        hnsw->segment_graph = &directed_indexed_arr;
         gettimeofday(&tt1, NULL);
 
         // multi-thread also work, but not guaranteed as the paper
         // may has minor recall decrement
         // #pragma omp parallel for schedule(monotonic : dynamic)
         for (size_t i = 0; i < data_wrapper->data_size; ++i) {
-            hnsw.addPoint(data_wrapper->nodes.at(i).data(), i);
+            hnsw->addPoint(data_wrapper->nodes.at(i).data(), i);
         }
         gettimeofday(&tt2, NULL);
         index_info->index_time = CountTime(tt1, tt2);
 
         // processing reverse neighbors
-        processReverseNeighbors(hnsw);
+        processReverseNeighbors();
 
         // count neighbors number
         countNeighbrs();
@@ -705,6 +721,37 @@ public:
             printOnebatch();
         }
     };
+
+    void initForScabilityExp(const IndexParams *index_params, L2Space *space) {
+        if(visited_list_pool_ == nullptr)
+            visited_list_pool_ =
+                new base_hnsw::VisitedListPool(1, data_wrapper->data_size);
+        index_params_ = index_params;
+        // build HNSW
+        hnsw = new SegmentGraph2DHNSW<float>(
+            *index_params, space, 2 * data_wrapper->data_size, index_params->K,
+            index_params->ef_construction, index_params->random_seed);
+
+        // directed_indexed_arr.clear();
+        directed_indexed_arr.resize(data_wrapper->data_size);
+        hnsw->segment_graph = &directed_indexed_arr;
+    }
+
+    void insert_batch(vector<unsigned> &nodes_ids) {
+        timeval tt1, tt2;
+        gettimeofday(&tt1, NULL);
+        for (auto i : nodes_ids) {
+            hnsw->addPoint(data_wrapper->nodes.at(i).data(), i);
+        }
+
+        gettimeofday(&tt2, NULL);
+        index_info->index_time = CountTime(tt1, tt2);
+        cout << "Insert a  " << nodes_ids.size() << " batch need" << index_info->index_time << endl;
+
+        processReverseNeighbors(nodes_ids);
+        // count neighbors number
+        countNeighbrs();
+    }
 
     vector<OneSegmentNeighbors>::const_iterator decompressForwardPath(
         const vector<OneSegmentNeighbors> &forward_nns,
@@ -1131,6 +1178,7 @@ public:
     }
 
     ~IndexSegmentGraph2D() {
+        delete hnsw;
         delete index_info;
         directed_indexed_arr.clear();
         delete visited_list_pool_;

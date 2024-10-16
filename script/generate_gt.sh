@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define root directory, N, dataset, and method as variables
-Ns=(1000000 ) #50000 100000 150000 200000
+Ns=(1200000) #50000 100000 150000 200000 1050000 1100000 1150000 
 data_root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/data/"
 gt_root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/"
 
@@ -11,7 +11,7 @@ DATASETS=("wiki-image" "yt8m-video" "deep") #
 # List of dataset paths with data_root_path appended
 DATASET_PATHS=(
     "${data_root_path}wiki_image_embedding.fvecs"
-    "${data_root_path}yt8m_sorted_by_timestamp_video_embedding_1M.fvecs"
+    "${data_root_path}exp2_used_data/yt8m_video_1_2m.fvecs"
     "${data_root_path}deep_sorted_10M.fvecs"
 ) #    
 
@@ -22,7 +22,8 @@ QUERY_PATHS=(
 ) #    
 
 # Iterate over datasets
-for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
+# for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
+for i in 1; do
     dataset="${DATASETS[$i]}"
     dataset_path="${DATASET_PATHS[$i]}"
     query_path="${QUERY_PATHS[$i]}"

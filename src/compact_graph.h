@@ -106,7 +106,7 @@ public:
 
     // 存储指向段图邻居列表的指针，表示图结构中的边信息
     vector<DirectedPointNeighbors<dist_t>> *compact_graph;
-
+    bool if_rebuild_HNSW = false;
     /**
      * 在构建HNSW图时优化搜索过程，保留更多邻居节点信息。
      * 这个是基本就是原本的search 就是在整个图里当前层搜最近的
@@ -473,9 +473,11 @@ public:
 
             init_selectedNeighbors();
 
-            generate_compressed_neighbors(queue_closest, external_id, (unsigned)Mcurmax);
+            if (if_rebuild_HNSW == false) {
+                generate_compressed_neighbors(queue_closest, external_id, (unsigned)Mcurmax);
 
-            gen_rev_neighbors(external_id);
+                gen_rev_neighbors(external_id);
+            }
 
             if (return_list.size()) // 这种情况是上面的while 跑完了 但是一个batch都没满 所以需要单独处理
             {
@@ -590,7 +592,7 @@ public:
     vector<DirectedPointNeighbors<float>> directed_indexed_arr;
     base_hnsw::DISTFUNC<float> fstdistfunc_;
     void *dist_func_param_;
-    VisitedListPool *visited_list_pool_;
+    VisitedListPool *visited_list_pool_ = nullptr;
     IndexInfo *index_info = nullptr;
     const BaseIndex::IndexParams *index_params_;
     CompactHNSW<float> *hnsw;
@@ -689,18 +691,35 @@ public:
         countNeighbrs();
     };
 
-    void initForScabilityExp(const IndexParams *index_params, L2Space* space) {
-        visited_list_pool_ =
-            new base_hnsw::VisitedListPool(1, data_wrapper->data_size);
+    void initForScabilityExp(const IndexParams *index_params, L2Space *space) {
+        if(visited_list_pool_ == nullptr)
+            visited_list_pool_ =
+                new base_hnsw::VisitedListPool(1, data_wrapper->data_size);
         index_params_ = index_params;
         // build HNSW
         hnsw = new CompactHNSW<float>(
             *index_params, space, 2 * data_wrapper->data_size, index_params->K,
             index_params->ef_construction, index_params->random_seed);
 
-        directed_indexed_arr.clear();
+        // directed_indexed_arr.clear();
         directed_indexed_arr.resize(data_wrapper->data_size);
         hnsw->compact_graph = &directed_indexed_arr;
+    }
+
+    void rebuild_batchInHNSW(vector<unsigned> &nodes_ids) {
+        hnsw->if_rebuild_HNSW = true;
+        timeval tt1, tt2;
+        gettimeofday(&tt1, NULL);
+        for (auto i : nodes_ids) {
+            hnsw->addPoint(data_wrapper->nodes.at(i).data(), i);
+        }
+
+        gettimeofday(&tt2, NULL);
+        index_info->index_time = CountTime(tt1, tt2);
+        cout << "Insert a  " << nodes_ids.size() << " batch need" << index_info->index_time << endl;
+        // count neighbors number
+        countNeighbrs();
+        hnsw->if_rebuild_HNSW = false;
     }
 
     void insert_batch(vector<unsigned> &nodes_ids) {

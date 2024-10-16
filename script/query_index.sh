@@ -2,10 +2,13 @@
 
 # Define root directory, dataset, and other variables
 ROOT_DIR="/research/projects/zp128/RangeIndexWithRandomInsertion/"
-N=10000
-index_k=8
-ef_max=500
-ef_construction=100
+N=1000
+index_k_arr=(16)
+# ef_max_arr=(1000)
+ef_construction_arr=(100)
+ef_max_arr=(400)
+# ef_max_arr=(400 600 800 1000)
+# ef_construction_arr=(100 200 300 400)
 
 # Define dataset paths
 # List of datasets #
@@ -26,13 +29,13 @@ GROUNDTRUTH_PATHs=("../groundtruth/wiki_image_benchmark-groundtruth-deep-1k-num1
 
 # Define methods and versions
 METHODS=("compact") # Example: "Seg2D"
-VERSIONS=("0_0" "0_1" "1_0" "1_1")
+VERSIONS=("1_1") #"0_0" "0_1" "1_0" 
 
 # Iterate over methods and versions
 for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
-  dataset="${DATASETS[$i]}"
-  dataset_path="${DATASET_PATHS[$i]}"
-  query_path="${QUERY_PATHS[$i]}"
+  DATASET="${DATASETS[$i]}"
+  DATASET_PATH="${DATASET_PATHS[$i]}"
+  QUERY_PATH="${QUERY_PATHS[$i]}"
   GROUNDTRUTH_PATH="${GROUNDTRUTH_PATHs[$i]}"
 
   # Determine index size suffix
@@ -83,6 +86,7 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
         done
       done
     done
+    break
   done
 done
 

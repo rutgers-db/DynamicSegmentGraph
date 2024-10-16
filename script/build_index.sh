@@ -4,7 +4,7 @@
 
 N=1000 #000
 METHOD="compact"
-VERSIONS=("0_0" "0_1" "1_0" "1_1")                                  #
+VERSIONS=( "1_1")         #"0_0" "0_1" "1_0"                          #
 root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/" # Define the root path
 
 # List of datasets #
@@ -19,7 +19,9 @@ DATASET_PATHS=(
 index_k_arr=(16)
 # ef_max_arr=(1000)
 ef_construction_arr=(100)
-ef_max_arr=(400 600 800 1000)
+ef_max_arr=(400)
+
+# ef_max_arr=(400 600 800 1000)
 
 # Iterate over datasets and their paths using proper indexing
 for i in $(seq 0 $((${#DATASETS[@]} - 1))); do

@@ -2,7 +2,7 @@
 
 # Define root directory and N
 
-N=10000 #000
+N=1000 #000
 METHOD="compact"
 VERSIONS=("0_0" "0_1" "1_0" "1_1")                                  #
 root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/" # Define the root path

@@ -16,11 +16,10 @@ DATASET_PATHS=(
     "${root_path}data/wiki_image_embedding.fvecs" "${root_path}data/deep_sorted_10M.fvecs" "${root_path}data/yt8m_sorted_by_timestamp_video_embedding_1M.fvecs") #
 
 # Define the arrays for index_k, ef_max, and ef_construction
-index_k_arr=(4 8 16 32)
-ef_max_arr=(400)
+index_k_arr=(16)
+# ef_max_arr=(1000)
 ef_construction_arr=(100)
-# ef_max_arr=(400 600 800 1000)
-# ef_construction_arr=(100 200 300 400)
+ef_max_arr=(400 600 800 1000)
 
 # Iterate over datasets and their paths using proper indexing
 for i in $(seq 0 $((${#DATASETS[@]} - 1))); do

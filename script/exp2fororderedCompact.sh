@@ -24,7 +24,7 @@ QUERY_PATHS=(
 
 # Iterate over datasets and their paths using proper indexing
 # for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
-for i in 1; do
+for i in 2; do
     dataset="${DATASETS[$i]}"
     dataset_path="${DATASET_PATHS[$i]}"
     query_path="${QUERY_PATHS[$i]}"

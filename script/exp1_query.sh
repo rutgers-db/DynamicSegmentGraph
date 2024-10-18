@@ -2,13 +2,13 @@
 
 # Define root directory, dataset, and other variables
 ROOT_DIR="/research/projects/zp128/RangeIndexWithRandomInsertion/"
-N=1000
-index_k_arr=(4 8 16 32)
+N=10000
+index_k_arr=(16) #4 8 16 32
 ef_construction_arr=(100)
-ef_max_arr=(400)
+# ef_max_arr=(400)
 
 # ef_max_arr=(1000)
-# ef_max_arr=(400 600 800 1000)
+ef_max_arr=(400 600 800 1000)
 # ef_construction_arr=(100 200 300 400)
 
 # Define dataset paths
@@ -24,15 +24,17 @@ DATASET_PATHS=(
 
 QUERY_PATHS=("${ROOT_DIR}data/wiki_image_querys.fvecs" "${ROOT_DIR}data/deep1B_queries.fvecs" "${ROOT_DIR}data/yt8m_video_querys_10k.fvecs") # Example: wiki_image_querys
 
+# always check the number
 GROUNDTRUTH_PATHs=("../groundtruth/wiki-image_benchmark-groundtruth-deep-1k-num1000-k10.arbitrary.cvs"
-  "../groundtruth/deep_benchmark-groundtruth-deep-1k-num1000-k10.arbitrary.cvs"
+  "../groundtruth/deep_benchmark-groundtruth-deep-10k-num1000-k10.arbitrary.cvs"
   "../groundtruth/yt8m-video_benchmark-groundtruth-deep-1k-num1000-k10.arbitrary.cvs")
 
 # Define methods and versions
-VERSIONS=("0_0" "0_1" "1_0" "1_1")
+VERSIONS=("1_1") #"0_0" "0_1" "1_0" 
 
 # Iterate over methods and versions
-for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
+# for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
+for i in 1; do
   DATASET="${DATASETS[$i]}"
   DATASET_PATH="${DATASET_PATHS[$i]}"
   QUERY_PATH="${QUERY_PATHS[$i]}"

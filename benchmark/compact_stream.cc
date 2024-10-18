@@ -63,7 +63,8 @@ std::vector<std::vector<unsigned>> generatePermutations(const std::vector<unsign
     // Seed the random number generator with current time
     std::default_random_engine rng(std::chrono::system_clock::now().time_since_epoch().count());
 
-    for (unsigned size : batch_sizes) {
+    for (auto i = 0; i < batch_sizes.size(); i++) {
+        auto &size = batch_sizes[i];
         std::vector<unsigned> batch;
 
         // Generate numbers from 'start' to 'size - 1'
@@ -73,8 +74,12 @@ std::vector<std::vector<unsigned>> generatePermutations(const std::vector<unsign
 
         // Shuffle to create a random permutation
         // Only for aribitrary order
-        // Attention here!!! TODO
-        // std::shuffle(batch.begin(), batch.end(), rng);
+        // Attention here!!! TODO just to test whether no shuffle at the beginning will increase QPS?   
+        if(i != 0 ){
+            cout<<"Shuffle"<<endl;
+            std::shuffle(batch.begin(), batch.end(), rng);
+        }
+            
 
         // Store the permutation and update the starting point for the next batch
         permutations.push_back(batch);
@@ -102,12 +107,12 @@ int main(int argc, char **argv) {
     // Parameters
     string dataset = "deep";
     // vector<unsigned> batches_size = {1000, 10000, 100000, 1000000, 10000000};
-    vector<unsigned> batches_size = {1150000, 1200000}; //1000000, 1050000, 1100000, 
+    vector<unsigned> batches_size = {1000000, 1050000, 1100000, 1150000, 1200000}; //
     // vector<unsigned> batches_size = {1000, 10000};
     // int data_size = 10000000;
     // int data_size = 10000;
     int data_size = 1200000;
-    
+
     auto insert_batches = generatePermutations(batches_size);
     string dataset_path = "";
     string query_path = "";
@@ -123,10 +128,10 @@ int main(int argc, char **argv) {
     string ef_con_str = "";
     string version = "Benchmark";
     vector<string> gt_paths = {
-        // "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
-        // "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1050k-num1000-k10.arbitrary.cvs",
-        // "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1100k-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1150-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1050k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1100k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1150k-num1000-k10.arbitrary.cvs",
         "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1200k-num1000-k10.arbitrary.cvs"};
 
     // vector<string> gt_paths = {
@@ -162,7 +167,7 @@ int main(int argc, char **argv) {
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path);
 
-    int st = 16;     // starting value
+    int st = 16;      // starting value
     int ed = 400;    // ending value (inclusive)
     int stride = 32; // stride value
     std::vector<int> searchef_para_range_list;

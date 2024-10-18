@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(RangeFiltering-ANNS)
 
-# 设置编译器
-# set(CMAKE_C_COMPILER /opt/homebrew/opt/gcc/bin/gcc-14)
-# set(CMAKE_CXX_COMPILER /opt/homebrew/opt/gcc/bin/g++-14)
-
 find_package(OpenMP REQUIRED)
 if(OpenMP_FOUND)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -34,18 +30,15 @@ include_directories(${PROJECT_SOURCE_DIR}/include/common)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
 
-# 如果想要Release而不是Debug 就cmake .. -DCMAKE_BUILD_TYPE=Release
 if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "")
    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build." FORCE)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-   # 开启调试信息
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
    message(STATUS "Debug Mode")
 else()
-   # 如果不是 Debug 模式，默认设置优化标志
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -msse4.2 -DUSE_SSE")
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
 endif()

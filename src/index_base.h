@@ -1,9 +1,3 @@
-/**
- * @file index_base.h
- * @brief 基类用于构建段图索引，包含关于索引建立和搜索的虚函数。
- * @details 此文件定义了一个基类 `BaseIndex`，用于创建和操作基于段图的索引结构，
- *          包括索引参数设置、索引信息记录以及范围查询等功能。
- */
 
 #pragma once
 
@@ -114,10 +108,7 @@ public:
         float avg_reverse_nns;
     };
 
-    /**
-     * @struct SearchParams
-     * @brief 查询参数结构体，存储查询过程中的配置参数。
-     */
+
     struct SearchParams {
         /// 查询返回的邻居数量
         unsigned query_K;
@@ -152,36 +143,26 @@ public:
 
         const DataWrapper *data_wrapper;
 
-        /// 索引参数指针
         const BaseIndex::IndexParams *index;
 
-        /// 版本号字符串
         string version;
 
-        /// 方法名称字符串
         string method;
 
-        /// 索引k值
         int index_k;
 
-        /// 查询总耗时
         double time;
 
-        /// 查准率
         double precision;
 
-        /// 近似比率
         double approximate_ratio;
 
-        /// 查询ID
         int query_id;
         double internal_search_time; // one query time
         double fetch_nns_time = 0;
         double cal_dist_time = 0;
         double other_process_time = 0;
-        // double one_query_time;
         size_t total_comparison = 0;
-        // size_t visited_num;
         size_t path_counter;
 
         size_t pos_point_traverse_counter = 0;
@@ -190,10 +171,8 @@ public:
         size_t neg_point_used_counter = 0;
         float total_traversed_nn_amount = 0;
 
-        /// 探查路径字符串
         string investigate_path;
 
-        /// 结果保存路径字符串
         string save_path;
 
         bool is_investigate = false;
@@ -208,7 +187,6 @@ public:
             file.open(save_path, std::ios_base::app);
             if (file) {
                 file <<
-                    // version << "," << method << "," <<
                     internal_search_time << "," << precision << "," << approximate_ratio
                      << "," << search->query_range << "," << search->search_ef << ","
                      << fetch_nns_time << "," << cal_dist_time << ","
@@ -223,20 +201,16 @@ public:
 
     const DataWrapper *data_wrapper;
 
-    /// 查询信息指针成员变量
     SearchInfo *search_info;
 
-    /// 构建索引的纯虚函数接口
     virtual void buildIndex(const IndexParams *index_params) = 0;
 
-    /// 在指定范围内执行过滤性范围查询的纯虚函数接口
     virtual vector<int> rangeFilteringSearchInRange(
         const SearchParams *search_params,
         SearchInfo *search_info,
         const vector<float> &query,
         const std::pair<int, int> query_bound) = 0;
 
-    /// 在指定范围外执行过滤性范围查询的纯虚函数接口
     virtual vector<int> rangeFilteringSearchOutBound(
         const SearchParams *search_params,
         SearchInfo *search_info,

@@ -3,10 +3,10 @@
 # Define root directory and N
 
 N=1000000
-index_k=16
-ef_max=500
+KS=(16 32 48 64)
+ef_max=2000
 ef_construction=100
-METHODS=("compact") #"Seg2D"
+METHODS=("Seg2D") #"Seg2D" "compact"
 root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/" # Define the root path
 
 # List of datasets
@@ -32,8 +32,7 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
 
     # Define index path and log file
     INDEX_PATH="${root_path}index/${dataset}/${INDEX_SIZE}"
-    LOG_PATH="${INDEX_PATH}/${index_k}_${ef_max}_${ef_construction}.log"
-
+    
     # Create the index path directory if it does not exist
     if [ ! -d "$INDEX_PATH" ]; then
         mkdir -p "$INDEX_PATH"
@@ -41,11 +40,14 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
 
     # Iterate over methods and run the benchmark
     for METHOD in "${METHODS[@]}"; do
-        echo "Running benchmark for dataset: $dataset, method: $METHOD"
-        echo "./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max -dataset $dataset -method $METHOD -dataset_path $dataset_path -index_path $INDEX_PATH"
+        for index_k in "${KS[@]}"; do
+            LOG_PATH="${INDEX_PATH}/${index_k}_${ef_max}_${ef_construction}_${METHOD}.log"
+            echo "Running benchmark for dataset: $dataset, method: $METHOD"
+            echo "./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max -dataset $dataset -method $METHOD -dataset_path $dataset_path -index_path $INDEX_PATH"
 
-        ./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max \
-            -dataset $dataset -method $METHOD -dataset_path "$dataset_path" -index_path "$INDEX_PATH" >>"$LOG_PATH"
+            ./benchmark/build_index -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max \
+                -dataset $dataset -method $METHOD -dataset_path "$dataset_path" -index_path "$INDEX_PATH" >>"$LOG_PATH"
+        done
     done
     
     # TODO Remove it just for build Deep10M

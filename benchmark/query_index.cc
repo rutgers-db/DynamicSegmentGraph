@@ -111,6 +111,20 @@ int main(int argc, char **argv) {
     int ed = 400;    // ending value (inclusive)
     int stride = 16; // stride value
     std::vector<int> searchef_para_range_list;
+
+    // add small seach ef
+    for (int i = 1; i < st; i += 1) {
+        searchef_para_range_list.push_back(i);
+    }
+
+    for (int i = st; i <= ed; i += stride) {
+        searchef_para_range_list.push_back(i);
+    }
+
+    // further add more large search ef
+    st = 500;     // starting value
+    ed = 1600;    // ending value (inclusive)
+    stride = 100; // stride value
     for (int i = st; i <= ed; i += stride) {
         searchef_para_range_list.push_back(i);
     }

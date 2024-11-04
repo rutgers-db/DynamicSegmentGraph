@@ -430,6 +430,7 @@ public:
     }
 
     void gen_rev_neighbors(unsigned center_external_id) {
+        //等下 这里是不是还得check 下正向边里有没有反向边呀。。。
         auto &nns = compact_graph->at(center_external_id).nns;
         for (auto &point : nns) {
             auto rev_point_id = point.external_id;
@@ -590,6 +591,24 @@ public:
 
         return next_closest_entry_point;
     }
+
+    // 试试直接entry point就是 cur_c
+    void gen_tmp_nn_list(const void *data_point, tableint cur_c){
+        auto top_candidates = searchBaseLayerLevel0(cur_c, data_point, 0);
+        Mcurmax = maxM0_; // 最大邻接数量
+        unsigned external_id = getExternalLabel(cur_c);
+        std::priority_queue<std::pair<dist_t, tableint>> queue_closest;
+        while (!top_candidates.empty()) {
+            queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second);
+            top_candidates.pop();
+        }
+        // actually init selected NEighbors is useless But I am afaid that there is some bugs if removing it
+        init_selectedNeighbors();
+        generate_compressed_neighbors(queue_closest, external_id, (unsigned)Mcurmax);
+        // TODO: 这里还没有把搜到的近邻的反向边拿过来呢
+        
+        // 不需要加上反向的compress neighbors 应该
+    }
 };
 
 class IndexCompactGraph : public BaseIndex {
@@ -683,9 +702,20 @@ public:
         // Step 3: Traverse the shuffled sequence
 
         cout << "First point" << permutation[0] << endl;
+
+        // Set rebuild_HNSW is true, then it will only build the inner HNSW
+        hnsw->if_rebuild_HNSW = true;
         for (size_t i : permutation) {
             hnsw->addPoint(data_wrapper->nodes.at(i).data(), i);
         }
+
+        // After the inner HNSW is build just find all the neighbors of each point
+        hnsw->if_rebuild_HNSW = false;
+        for (size_t i : permutation) {
+            auto cur_c = hnsw->getInnerIdByLabel(i);
+            hnsw->gen_tmp_nn_list(data_wrapper->nodes.at(i).data(), cur_c);
+        }
+
 
         gettimeofday(&tt2, NULL);
         index_info->index_time = CountTime(tt1, tt2);

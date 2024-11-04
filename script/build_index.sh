@@ -3,10 +3,10 @@
 # Define root directory and N
 
 N=1000000
-KS=(16 32 48 64)
-ef_max=2000
-ef_construction=100
-METHODS=("Seg2D") #"Seg2D" "compact"
+KS=(16 ) # 32 48 64
+ef_max=1000
+ef_construction=300
+METHODS=("compact") #"Seg2D" "compact"
 root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/" # Define the root path
 
 # List of datasets
@@ -31,7 +31,7 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
     fi
 
     # Define index path and log file
-    INDEX_PATH="${root_path}index/${dataset}/${INDEX_SIZE}"
+    INDEX_PATH="${root_path}test_index/${dataset}/${INDEX_SIZE}"
     
     # Create the index path directory if it does not exist
     if [ ! -d "$INDEX_PATH" ]; then

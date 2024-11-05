@@ -398,7 +398,7 @@ public:
         }
 
         // Not need to find compressed points, not need
-        if (if_rebuild_HNSW == true) 
+        if (if_rebuild_HNSW == true)
             return;
 
         // some initiliazation for some variables serving for dfs function
@@ -430,7 +430,7 @@ public:
     }
 
     void gen_rev_neighbors(unsigned center_external_id) {
-        //等下 这里是不是还得check 下正向边里有没有反向边呀。。。
+        // 等下 这里是不是还得check 下正向边里有没有反向边呀。。。
         auto &nns = compact_graph->at(center_external_id).nns;
         for (auto &point : nns) {
             auto rev_point_id = point.external_id;
@@ -478,7 +478,6 @@ public:
 
             init_selectedNeighbors();
 
-            
             generate_compressed_neighbors(queue_closest, external_id, (unsigned)Mcurmax);
 
             if (if_rebuild_HNSW == false) {
@@ -593,20 +592,22 @@ public:
     }
 
     // 试试直接entry point就是 cur_c
-    void gen_tmp_nn_list(const void *data_point, tableint cur_c){
+    void gen_tmp_nn_list(const void *data_point, tableint cur_c) {
         auto top_candidates = searchBaseLayerLevel0(cur_c, data_point, 0);
         Mcurmax = maxM0_; // 最大邻接数量
         unsigned external_id = getExternalLabel(cur_c);
         std::priority_queue<std::pair<dist_t, tableint>> queue_closest;
         while (!top_candidates.empty()) {
-            queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second);
+            // Fix bug Not adding the point myself
+            if (top_candidates.top().second != cur_c)
+                queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second);
             top_candidates.pop();
         }
         // actually init selected NEighbors is useless But I am afaid that there is some bugs if removing it
         init_selectedNeighbors();
         generate_compressed_neighbors(queue_closest, external_id, (unsigned)Mcurmax);
-        // TODO: 这里还没有把搜到的近邻的反向边拿过来呢
-        
+        // 测试过了 这里不需要把搜到的近邻的反向边拿过来呢 估计是本身搜到的精度就很高了 确实 ef max都很高了 估计精度很高
+
         // 不需要加上反向的compress neighbors 应该
     }
 };
@@ -716,7 +717,6 @@ public:
             hnsw->gen_tmp_nn_list(data_wrapper->nodes.at(i).data(), cur_c);
         }
 
-
         gettimeofday(&tt2, NULL);
         index_info->index_time = CountTime(tt1, tt2);
 
@@ -727,7 +727,7 @@ public:
     };
 
     void initForScabilityExp(const IndexParams *index_params, L2Space *space) {
-        if(visited_list_pool_ == nullptr)
+        if (visited_list_pool_ == nullptr)
             visited_list_pool_ =
                 new base_hnsw::VisitedListPool(1, data_wrapper->data_size);
         index_params_ = index_params;

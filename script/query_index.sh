@@ -2,7 +2,7 @@
 
 # Define root directory, N, dataset, and method as variables
 
-N=1000000
+N=100000 # 1000000
 KS=(16 ) #32 48 64
 ef_max=1000
 # index_k=8
@@ -27,7 +27,7 @@ QUERY_PATHS=("${root_path}data/deep1B_queries.fvecs"
   "${root_path}data/yt8m_audio_querys_10k.fvecs")
 
 # List of groundtruth paths with root_path appended
-GROUNDTRUTH_PATHS=("${root_path}groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"              # "${root_path}groundtruth/deep_compare_prefilter-1m-num1000-k10.arbitrary.cvs"
+GROUNDTRUTH_PATHS=("${root_path}groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs" # "${root_path}groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"              # "${root_path}groundtruth/deep_compare_prefilter-1m-num1000-k10.arbitrary.cvs"
   "${root_path}groundtruth/yt8m_video_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"
   "${root_path}groundtruth/wiki_image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"
   "${root_path}groundtruth/yt8m_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs")

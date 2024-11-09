@@ -2,7 +2,7 @@
 
 # Define root directory and N
 
-N=1000000
+N=100000
 KS=(16 ) # 32 48 64
 ef_max=1000
 ef_construction=300

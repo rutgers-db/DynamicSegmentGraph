@@ -58,6 +58,10 @@ void log_result_recorder(
     }
 }
 
+#ifdef SAVESEARCHPATH
+std::ofstream Compact::IndexCompactGraph::log_query_path_nns("path_nns_deep_96.bin", std::ios::out | std::ios::binary);
+#endif
+
 int main(int argc, char **argv) {
 #ifdef USE_SSE
     cout << "Use SSE" << endl;
@@ -111,23 +115,23 @@ int main(int argc, char **argv) {
     int ed = 400;    // ending value (inclusive)
     int stride = 16; // stride value
     std::vector<int> searchef_para_range_list;
+    searchef_para_range_list.push_back(96);
+    // // add small seach ef
+    // for (int i = 1; i < st; i += 1) {
+    //     searchef_para_range_list.push_back(i);
+    // }
 
-    // add small seach ef
-    for (int i = 1; i < st; i += 1) {
-        searchef_para_range_list.push_back(i);
-    }
+    // for (int i = st; i <= ed; i += stride) {
+    //     searchef_para_range_list.push_back(i);
+    // }
 
-    for (int i = st; i <= ed; i += stride) {
-        searchef_para_range_list.push_back(i);
-    }
-
-    // further add more large search ef
-    st = 500;     // starting value
-    ed = 1600;    // ending value (inclusive)
-    stride = 100; // stride value
-    for (int i = st; i <= ed; i += stride) {
-        searchef_para_range_list.push_back(i);
-    }
+    // // further add more large search ef
+    // st = 500;     // starting value
+    // ed = 1600;    // ending value (inclusive)
+    // stride = 100; // stride value
+    // for (int i = st; i <= ed; i += stride) {
+    //     searchef_para_range_list.push_back(i);
+    // }
 
     cout << "search ef:" << endl;
     print_set(searchef_para_range_list);
@@ -163,10 +167,14 @@ int main(int argc, char **argv) {
             std::map<int, std::tuple<double, double, double, double>> result_recorder; // first->precision, second-> caldist time, third->query_time
             std::map<int, std::tuple<float, float>> comparison_recorder;
             gettimeofday(&tt3, NULL);
+
             for (int idx = 0; idx < data_wrapper.query_ids.size(); idx++) {
                 int one_id = data_wrapper.query_ids.at(idx);
                 s_params.query_range =
                     data_wrapper.query_ranges.at(idx).second - data_wrapper.query_ranges.at(idx).first + 1;
+
+                // output the range in the log query path
+                Compact::IndexCompactGraph::log_query_path_nns.write(reinterpret_cast<const char*>(&s_params.query_range), sizeof(s_params.query_range));
                 if(method == "Seg2D"){
                     auto res = index->rangeFilteringSearchOutBound(
                     &s_params, &search_info, data_wrapper.querys.at(one_id),
@@ -189,6 +197,8 @@ int main(int argc, char **argv) {
                 std::get<1>(comparison_recorder[s_params.query_range]) += search_info.path_counter;
             }
 
+            Compact::IndexCompactGraph::log_query_path_nns.close();
+            
             cout << endl
                  << "Search ef: " << one_searchef << endl
                  << "========================" << endl;

@@ -19,6 +19,7 @@ def load_pickle_file(pickle_filename):
 # Usage Example
 pickle_filename = "../sample_data/path_nns_deep_96_sampled_5pct.pkl"
 data_chunks = load_pickle_file(pickle_filename)
+max_elements = 100000
 
 # Group search path lengths by query range
 search_path_lengths_by_range = defaultdict(list)
@@ -27,6 +28,10 @@ for query_range, search_path in data_chunks:
 
 def drop_useless_points(search_path, max_length=128):
     for point in search_path:
+        if point.rr > max_elements:
+            # print(point.rr)
+            point.rr = max_elements
+            
         # Calculate left and right ranges
         left_range = point.lr - point.ll + 1
         right_range = point.rr - point.rl + 1
@@ -56,6 +61,30 @@ def drop_useless_points(search_path, max_length=128):
 
     return search_path_selected
 
+#  A function check if there are some boundary not occurred in external ids and current node id 
+def check_any_boundary_lost_in_external_id(search_path, current_node_id):
+    # Collect all external IDs in the search path
+    external_ids = {point.external_id for point in search_path}
+    external_ids.add(current_node_id)
+
+    # List to store unique points
+    missing_values = set()
+
+    # Check each point to see if any of its ll, lr, rl, or rr values are in the external_ids
+    for point in search_path:
+        # If none of the point's ll, lr, rl, rr values are in external_ids, add it to unique_points
+        if point.ll != 0 and point.ll - 1 not in external_ids:
+            missing_values.add(point.ll- 1 )
+        if point.lr not in external_ids:
+            missing_values.add(point.lr)
+        if point.rl not in external_ids:
+            missing_values.add(point.rl)
+        if point.rr != max_elements and point.rr + 1 not in external_ids:
+        # if point.rr != 200000 and point.rr + 1 not in external_ids:
+            missing_values.add(point.rr + 1)
+
+    return missing_values
+
 # Set the maximum allowed length of each search path
 max_length = 128
 total_unexplorable_paths_count = 0
@@ -78,13 +107,17 @@ for query_range, paths in search_path_lengths_by_range.items():
             original_length = len(nns)
             total_points += original_length
             total_nns_amount += 1
-            
+              
             # Drop useless points if needed
             if original_length > max_length:
                 dropped_nns_count += 1
                 # Apply the dropping rule
                 nn_selected = drop_useless_points(nns, max_length=max_length)
                 
+                lost_points =check_any_boundary_lost_in_external_id(nn_selected, current_node_id)       
+                if lost_points:
+                    print("Lost points:", lost_points)  
+
                 # Calculate number of points dropped
                 dropped_points = original_length - len(nn_selected)
                 total_dropped_points += dropped_points
@@ -103,7 +136,7 @@ for query_range, paths in search_path_lengths_by_range.items():
         unexplorable_node_ids = original_node_ids - all_retained_external_ids
         if unexplorable_node_ids:
             unexplorable_paths_count += 1  # Increment if there are any unexplorable IDs
-            print(unexplorable_node_ids)
+            # print(unexplorable_node_ids)
             unexplorable_points_count += len(unexplorable_node_ids)
 
     # Calculate the average number of points dropped per path for this query range

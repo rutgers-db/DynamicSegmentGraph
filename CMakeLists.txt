@@ -17,7 +17,7 @@ endif()
 
 message(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 message(${CMAKE_SYSTEM})
 
 find_package(Boost REQUIRED COMPONENTS timer chrono system program_options)
@@ -30,6 +30,7 @@ else()
 endif()
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR}/include/irange_util)
 include_directories(${PROJECT_SOURCE_DIR}/include/common)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
@@ -46,8 +47,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
    message(STATUS "Debug Mode")
 else()
    # 如果不是 Debug 模式，默认设置优化标志
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -msse4.2 -DUSE_SSE")
-   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -msse4.2 -DUSE_SSE -march=native -lrt -DHAVE_CXX0X -fpic -w -fno-tree-vectorize")
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -msse4.2 -DUSE_SSE -march=native -lrt -DHAVE_CXX0X -fpic -w -fno-tree-vectorize")
 endif()
 
 

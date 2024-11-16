@@ -8,6 +8,8 @@
  * @copyright Copyright (c) 2023
  */
 
+#pragma once
+
 #include <algorithm>
 #include <boost/functional/hash.hpp>
 #include <ctime>
@@ -300,15 +302,15 @@ public:
     std::vector<unsigned> nbr_rl;
     std::vector<unsigned> nbr_rr;
 
-    size_t generateCurM(unsigned & L, unsigned & R){
+    size_t generateCurM(unsigned &L, unsigned &R) {
         unsigned total_len = R - L + 1;
         size_t count = 0;
-        if(total_len >= max_elements_)
+        if (total_len >= max_elements_)
             return Mcurmax;
         // total_len <<= 1;
         while (total_len < max_elements_) {
             total_len <<= 1;
-            count+=2;
+            count += 2;
         }
 
         return std::max((size_t)4, Mcurmax - count);
@@ -786,6 +788,7 @@ public:
     }
 
     vector<unsigned> fetched_nns;
+
 public:
     static std::ofstream log_query_path_nns;
 
@@ -939,27 +942,30 @@ public:
                 }
             }
             total_traversed_nn_amount += float(pos_edges.size()) + float(neg_edges.size());
-#ifdef SAVESEARCHPATH            
+#ifdef SAVESEARCHPATH
 
             // write the positive neighbors into log path file
             // Write the current_node_id
-            log_query_path_nns.write(reinterpret_cast<const char*>(&current_node_id), sizeof(current_node_id));
+            log_query_path_nns.write(reinterpret_cast<const char *>(&current_node_id), sizeof(current_node_id));
 
             // Write the size of the vector
             size_t size = pos_edges.size();
-            log_query_path_nns.write(reinterpret_cast<const char*>(&size), sizeof(size));
+            log_query_path_nns.write(reinterpret_cast<const char *>(&size), sizeof(size));
 
             // Write each CompressedPoint to the file
             for (const auto &point : pos_edges) {
-                log_query_path_nns.write(reinterpret_cast<const char*>(&point.external_id), sizeof(point.external_id));
-                log_query_path_nns.write(reinterpret_cast<const char*>(&point.ll), sizeof(point.ll));
-                log_query_path_nns.write(reinterpret_cast<const char*>(&point.lr), sizeof(point.lr));
-                log_query_path_nns.write(reinterpret_cast<const char*>(&point.rl), sizeof(point.rl));
-                log_query_path_nns.write(reinterpret_cast<const char*>(&point.rr), sizeof(point.rr));
+                log_query_path_nns.write(reinterpret_cast<const char *>(&point.external_id), sizeof(point.external_id));
+                log_query_path_nns.write(reinterpret_cast<const char *>(&point.ll), sizeof(point.ll));
+                log_query_path_nns.write(reinterpret_cast<const char *>(&point.lr), sizeof(point.lr));
+                log_query_path_nns.write(reinterpret_cast<const char *>(&point.rl), sizeof(point.rl));
+                log_query_path_nns.write(reinterpret_cast<const char *>(&point.rr), sizeof(point.rr));
             }
+#endif
         }
+
+#ifdef SAVESEARCHPATH
         int end_flag = 0x7fffffff;
-        log_query_path_nns.write(reinterpret_cast<const char*>(&end_flag), sizeof(end_flag));
+        log_query_path_nns.write(reinterpret_cast<const char *>(&end_flag), sizeof(end_flag));
 #endif
         // 构建结果列表
         vector<int> res;

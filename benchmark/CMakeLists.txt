@@ -37,6 +37,13 @@ target_compile_options(query_index PRIVATE -Wall ${OpenMP_CXX_FLAGS})
 target_link_libraries(query_index ${OpenMP_CXX_FLAGS})
 target_link_libraries(query_index OpenMP::OpenMP_CXX)
 
+add_executable(query_dsg query_opt_dsg.cc)
+target_link_libraries(query_dsg UTIL)
+target_compile_options(query_dsg PRIVATE -Wall ${OpenMP_CXX_FLAGS})
+target_link_libraries(query_dsg ${OpenMP_CXX_FLAGS})
+target_link_libraries(query_dsg OpenMP::OpenMP_CXX)
+
+
 add_executable(scalibility scalibility_exp.cc)
 target_link_libraries(scalibility UTIL)
 target_compile_options(scalibility PRIVATE -Wall ${OpenMP_CXX_FLAGS})

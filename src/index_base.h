@@ -55,7 +55,6 @@ public:
 
         /// 构建效率因子
         unsigned ef_construction = 400;
-        ;
 
         /// 随机种子
         unsigned random_seed = 100;
@@ -198,6 +197,17 @@ public:
 
         bool is_investigate = false;
 
+        void reset() {
+            total_comparison = 0;
+            internal_search_time = 0;
+            pos_point_traverse_counter = 0;
+            pos_point_used_counter = 0;
+            neg_point_traverse_counter = 0;
+            neg_point_used_counter = 0;
+            cal_dist_time = 0;
+            fetch_nns_time = 0;
+            path_counter = 0;
+        }
         void Path(const string &ver) {
             version = ver;
             save_path = "../exp/" + version + "-" + method + "-" + data_wrapper->dataset + "-" + std::to_string(data_wrapper->data_size) + ".csv";

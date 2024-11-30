@@ -3,7 +3,7 @@
 # Define root directory and N
 
 N=1200000
-ef_construction=100
+ef_construction=300
 root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/" # Define the root path
 
 # List of datasets
@@ -24,7 +24,7 @@ QUERY_PATHS=(
 
 # Iterate over datasets and their paths using proper indexing
 # for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
-for i in 2; do
+for i in 0; do
     dataset="${DATASETS[$i]}"
     dataset_path="${DATASET_PATHS[$i]}"
     query_path="${QUERY_PATHS[$i]}"

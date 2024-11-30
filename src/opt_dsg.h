@@ -84,7 +84,7 @@ public:
         // Allocate aligned memory for data and links for all elements
         data_memory_ = (char *)memory::align_mm<1 << 21>(max_elements_ * size_data_per_element_);
         tmp_nns_link_list = (unsigned int *)memory::align_mm<1 << 21>(size_links_per_element_);
-
+        
         if (data_memory_ == nullptr || tmp_nns_link_list == nullptr)
             throw std::runtime_error("Not enough memory");
 
@@ -311,131 +311,6 @@ public:
         return *((int *)ptr);
     }
 
-    // std::vector<tableint> SelectEdge(int pid, int ql, int qr, int edge_limit, searcher::Bitset<uint64_t> &visited_set) {
-    //     TreeNode *cur_node = nullptr, *nxt_node = tree->root; // Initialize pointers to navigate the segment tree
-    //     std::vector<tableint> selected_edges;
-    //     selected_edges.reserve(edge_limit); // Pre-allocate space for selected edges based on the edge limit
-
-    //     // Outer loop continues until `cur_node` range no longer overlaps with query range [ql, qr]
-    //     do {
-    //         cur_node = nxt_node;  // Set `cur_node` to current `nxt_node`
-    //         bool contain = false; // Flag to check if `cur_node` can fully contain `pid`
-
-    //         // Inner loop finds the most specific child node containing `pid` within [ql, qr]
-    //         do {
-    //             contain = false;
-
-    //             // If `cur_node` has no children, we are at a leaf; set `nxt_node` to null to exit loop
-    //             if (cur_node->childs.size() == 0)
-    //                 nxt_node = nullptr;
-    //             else {
-    //                 // Iterate over each child of `cur_node` to find the child containing `pid`
-    //                 for (int i = 0; i < cur_node->childs.size(); ++i) {
-    //                     if (cur_node->childs[i]->lbound <= pid && cur_node->childs[i]->rbound >= pid) {
-    //                         nxt_node = cur_node->childs[i]; // Set `nxt_node` to the child node containing `pid`
-    //                         break;                          // Exit the loop once the correct child is found
-    //                     }
-    //                 }
-    //                 // Check if the overlap of `cur_node` and query range [ql, qr] matches that of `nxt_node`
-    //                 // If they match, move `cur_node` to `nxt_node` and continue searching deeper
-    //                 if (GetOverLap(cur_node->lbound, cur_node->rbound, ql, qr) == GetOverLap(nxt_node->lbound, nxt_node->rbound, ql, qr)) {
-    //                     cur_node = nxt_node; // Update `cur_node` to `nxt_node`
-    //                     contain = true;      // Set flag to continue with the inner loop
-    //                 }
-    //             }
-    //         } while (contain);
-
-    //         // Retrieve the link list for `pid` at `cur_node`'s depth
-    //         int *data = (int *)get_linklist(pid, cur_node->depth);
-    //         size_t size = getListCount((linklistsizeint *)data); // Get the number of neighbors from the link list
-
-    //         // Iterate over each neighbor in the link list
-    //         for (size_t j = 1; j <= size; ++j) {
-    //             int neighborId = *(data + j); // Retrieve the neighbor ID from the link list
-
-    //             // Filter neighbors based on whether they fall within the query range [ql, qr]
-    //             if (neighborId < ql || neighborId > qr)
-    //                 continue;
-
-    //             // Skip neighbor if it has already been visited (checked in `visited_set`)
-    //             if (visited_set.get(neighborId))
-    //                 continue;
-
-    //             // Add the neighbor ID to the list of selected edges
-    //             selected_edges.emplace_back(neighborId);
-
-    //             // If the number of selected edges reaches the limit, return the results immediately
-    //             if (selected_edges.size() == edge_limit)
-    //                 return selected_edges;
-    //         }
-
-    //         // Continue until `cur_node` range no longer overlaps with the query range [ql, qr]
-    //     } while (cur_node->lbound < ql || cur_node->rbound > qr);
-
-    //     return selected_edges; // Return the list of selected edges within the specified range and limits
-    // }
-
-    // // Performs a top-down search across filtered nodes for k nearest neighbors
-    // std::priority_queue<PFI> TopDown_nodeentries_search(std::vector<TreeNode *> &filterednodes, const void *query_data, int ef, int query_k, int QL, int QR, int edge_limit) {
-    //     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    //     std::default_random_engine e(seed);
-
-    //     std::priority_queue<PFI, std::vector<PFI>, std::greater<PFI>> candidate_set;
-    //     std::priority_queue<PFI> top_candidates;
-    //     searcher::Bitset<uint64_t> visited_set(max_elements_);
-
-    //     for (auto u : filterednodes) {
-    //         std::uniform_int_distribution<int> u_start(u->lbound, u->rbound);
-    //         int pid = u_start(e);
-    //         visited_set.set(pid);
-    //         char *ep_data = getDataByInternalId(pid);
-    //         float dis = fstdistfunc_(query_data, ep_data, dist_func_param_);
-    //         candidate_set.emplace(dis, pid);
-    //         top_candidates.emplace(dis, pid);
-    //     }
-
-    //     float lowerBound = top_candidates.top().first;
-
-    //     while (!candidate_set.empty()) {
-    //         auto current_point_pair = candidate_set.top();
-    //         ++metric_hops;
-    //         if (current_point_pair.first > lowerBound) {
-    //             break;
-    //         }
-    //         candidate_set.pop();
-    //         int current_pid = current_point_pair.second;
-    //         auto selected_edges = SelectEdge(current_pid, QL, QR, edge_limit, visited_set);
-    //         int num_edges = selected_edges.size();
-    //         for (int i = 0; i < std::min(num_edges, 3); ++i) {
-    //             memory::mem_prefetch_L1(getDataByInternalId(selected_edges[i]), this->prefetch_lines);
-    //         }
-    //         for (int i = 0; i < num_edges; ++i) {
-    //             int neighbor_id = selected_edges[i];
-
-    //             if (visited_set.get(neighbor_id))
-    //                 continue;
-    //             visited_set.set(neighbor_id);
-    //             char *neighbor_data = getDataByInternalId(neighbor_id);
-    //             float dis = fstdistfunc_(query_data, neighbor_data, dist_func_param_);
-    //             ++metric_distance_computations;
-
-    //             if (top_candidates.size() < ef) {
-    //                 candidate_set.emplace(dis, neighbor_id);
-    //                 top_candidates.emplace(dis, neighbor_id);
-    //                 lowerBound = top_candidates.top().first;
-    //             } else if (dis < lowerBound) {
-    //                 candidate_set.emplace(dis, neighbor_id);
-    //                 top_candidates.emplace(dis, neighbor_id);
-    //                 top_candidates.pop();
-    //                 lowerBound = top_candidates.top().first;
-    //             }
-    //         }
-    //     }
-    //     while (top_candidates.size() > query_k)
-    //         top_candidates.pop();
-    //     return top_candidates;
-    // }
-
     std::vector<unsigned int> selectEdges(unsigned int point_id, int ql, int qr, searcher::Bitset<uint64_t> &visited_set) {
         std::vector<unsigned int> res;
         res.reserve(32);
@@ -567,14 +442,6 @@ public:
 
             candidate_set.pop();
 
-            // // only search when candidate point is inside the range
-            // this can be commented because no way to do this
-            // if (current_node_id < query_bound.first || current_node_id > query_bound.second) {
-            //     cout << "no satisfied range point" << endl;
-            //     continue;
-            // }
-            // gettimeofday(&tt1, NULL);
-
             auto const fetched_nns = selectEdges(current_node_id, query_bound.first, query_bound.second, visited_set);
 
             // gettimeofday(&tt2, NULL);                              // 结束时间记录
@@ -636,5 +503,20 @@ public:
         return res; // 返回结果列表
         
     }
+    
+
+    // insert a point
+    void insert(){
+        // get neighbors
+
+        // dfs
+
+        // get positive edges
+
+        // connect neg edges
+
+    }
+
+
 };
 } // namespace DSG

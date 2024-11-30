@@ -136,7 +136,7 @@ int main(int argc, char **argv) {
     BaseIndex::IndexParams i_params(index_k, ef_construction,
                                     ef_construction, ef_max);
     gettimeofday(&t1, NULL);
-    DSG::OPT_DSG *index = new DSG::OPT_DSG(index_path, i_params, &data_wrapper, &ss, 200); //250
+    DSG::OPT_DSG *index = new DSG::OPT_DSG(index_path, i_params, &data_wrapper, &ss, 250); //250
     BaseIndex::SearchInfo search_info(&data_wrapper, &i_params, "DSG",
                                       "benchmark");
     gettimeofday(&t2, NULL);

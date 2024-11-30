@@ -74,12 +74,11 @@ std::vector<std::vector<unsigned>> generatePermutations(const std::vector<unsign
 
         // Shuffle to create a random permutation
         // Only for aribitrary order
-        // Attention here!!! TODO just to test whether no shuffle at the beginning will increase QPS?   
-        if(i != 0 ){
-            cout<<"Shuffle"<<endl;
+        // Attention here!!! TODO just to test whether no shuffle at the beginning will increase QPS?
+        if (i != 0) {
+            cout << "Shuffle" << endl;
             std::shuffle(batch.begin(), batch.end(), rng);
         }
-            
 
         // Store the permutation and update the starting point for the next batch
         permutations.push_back(batch);
@@ -95,6 +94,17 @@ void ReplaceSubstringInPaths(std::vector<std::string> &paths, const std::string 
         size_t pos = path.find(old_str);
         if (pos != std::string::npos) {
             path.replace(pos, old_str.length(), new_str);
+        }
+    }
+}
+
+void tagParameters(vector<string>& gt_paths, unsigned index_k, unsigned ef_max, unsigned ef_construction) {
+    string suffix = "_" + to_string(index_k) + "_" + to_string(ef_max) + "_" + to_string(ef_construction);
+    
+    for (auto& path : gt_paths) {
+        size_t pos = path.find(".bin");
+        if (pos != string::npos) {
+            path.insert(pos, suffix);
         }
     }
 }
@@ -116,7 +126,6 @@ int main(int argc, char **argv) {
     auto insert_batches = generatePermutations(batches_size);
     string dataset_path = "";
     string query_path = "";
-    string index_path = "";
 
     unsigned index_k = 16;
     unsigned ef_max = 500;
@@ -149,8 +158,6 @@ int main(int argc, char **argv) {
             dataset_path = string(argv[i + 1]);
         if (arg == "-query_path")
             query_path = string(argv[i + 1]);
-        if (arg == "-index_path")
-            index_path = string(argv[i + 1]);
         if (arg == "-k")
             index_k = atoi(argv[i + 1]);
         if (arg == "-ef_max")
@@ -159,15 +166,26 @@ int main(int argc, char **argv) {
             ef_construction = atoi(argv[i + 1]);
     }
 
+    
+    vector<string> index_paths = {
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1m.bin",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1050k.bin",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1100k.bin",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1150k.bin",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1200k.bin"};
+
+    tagParameters(index_paths, index_k, ef_max, ef_construction);
+
     if (dataset != "wiki-image") {
         ReplaceSubstringInPaths(gt_paths, "wiki-image", dataset);
+        ReplaceSubstringInPaths(index_paths, "wiki-image", dataset);
         cout << "Print the first groundtruth path" << gt_paths[0] << endl;
     }
 
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path);
 
-    int st = 16;      // starting value
+    int st = 16;     // starting value
     int ed = 400;    // ending value (inclusive)
     int stride = 32; // stride value
     std::vector<int> searchef_para_range_list;
@@ -196,6 +214,7 @@ int main(int argc, char **argv) {
         auto &insert_batch = insert_batches[i];
         auto &gt_path = gt_paths[i];
         index->insert_batch(insert_batch);
+        index->save(index_paths[i]);
         data_wrapper.LoadGroundtruth(gt_path);
         BaseIndex::SearchInfo search_info(&data_wrapper, &i_params, "SeRF_2D",
                                           "benchmark");

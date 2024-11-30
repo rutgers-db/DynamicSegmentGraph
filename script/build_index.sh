@@ -2,8 +2,8 @@
 
 # Define root directory and N
 
-N=100000
-KS=(16 ) # 32 48 64
+N=1000000
+KS=(64 ) # 32 48 64
 ef_max=1000
 ef_construction=300
 METHODS=("compact") #"Seg2D" "compact"
@@ -19,7 +19,7 @@ DATASET_PATHS=("${root_path}data/deep_sorted_10M.fvecs"
     "${root_path}data/yt8m_audio_embedding.fvecs")
 
 # Iterate over datasets and their paths using proper indexing
-for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
+for i in $(seq 1 $((${#DATASETS[@]} - 2))); do
     dataset="${DATASETS[$i]}"
     dataset_path="${DATASET_PATHS[$i]}"
 
@@ -49,9 +49,8 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
                 -dataset $dataset -method $METHOD -dataset_path "$dataset_path" -index_path "$INDEX_PATH" >>"$LOG_PATH"
         done
     done
-    
-    # TODO Remove it just for build Deep10M
-    break
+
+    keep-job 48
 done
 
 exit 0

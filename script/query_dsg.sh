@@ -3,7 +3,7 @@
 # Define root directory, N, dataset, and method as variables
 
 N=1000000 # 1000000
-KS=(16)  #32 48 64
+KS=(32)  #16 48 64
 ef_max=1000
 # index_k=8
 # ef_max=500
@@ -28,12 +28,12 @@ QUERY_PATHS=("${root_path}data/deep1B_queries.fvecs"
 
 # List of groundtruth paths with root_path appended
 GROUNDTRUTH_PATHS=("${root_path}groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs" # "${root_path}groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"              # "${root_path}groundtruth/deep_compare_prefilter-1m-num1000-k10.arbitrary.cvs"
-  "${root_path}groundtruth/yt8m_video_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"
-  "${root_path}groundtruth/wiki_image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"
+  "${root_path}groundtruth/yt8m-video_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"
+  "${root_path}groundtruth/wiki-image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"
   "${root_path}groundtruth/yt8m_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs")
 
 # Iterate over methods and query index
-for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
+for i in $(seq 1 $((${#DATASETS[@]} - 2))); do
   dataset="${DATASETS[$i]}"
   dataset_path="${DATASET_PATHS[$i]}"
   query_path="${QUERY_PATHS[$i]}"
@@ -50,6 +50,5 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
     echo ./benchmark/query_dsg -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max -dataset $dataset -dataset_path $dataset_path -query_path $query_path -groundtruth_path $gt_path -index_path $INDEX_PATH
     ./benchmark/query_dsg -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max -dataset $dataset -dataset_path $dataset_path -query_path $query_path -groundtruth_path $gt_path -index_path "$INDEX_PATH" >>$LOG_PATH
   done
-  break
 done
 exit 0

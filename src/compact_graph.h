@@ -302,22 +302,22 @@ public:
     std::vector<unsigned> nbr_rl;
     std::vector<unsigned> nbr_rr;
 
-    size_t generateCurM(unsigned &L, unsigned &R) {
-        unsigned total_len = R - L + 1;
-        size_t count = 0;
-        if (total_len >= max_elements_)
-            return Mcurmax;
-        // total_len <<= 1;
-        while (total_len < max_elements_) {
-            total_len <<= 1;
-            count += 2;
-        }
+    // size_t generateCurM(unsigned &L, unsigned &R) {
+    //     unsigned total_len = R - L + 1;
+    //     size_t count = 0;
+    //     if (total_len >= max_elements_)
+    //         return Mcurmax;
+    //     // total_len <<= 1;
+    //     while (total_len < max_elements_) {
+    //         total_len <<= 1;
+    //         count += 2;
+    //     }
 
-        return std::max((size_t)4, Mcurmax - count);
-    }
+    //     return std::max((size_t)4, Mcurmax - count);
+    // }
 
     void dfs(vector<unsigned> &prefix_idx, unsigned PIVOT_ID, unsigned L, unsigned R, unsigned lr, unsigned rl) {
-        if (prefix_idx.size() == generateCurM(L, R)) {
+        if (prefix_idx.size() >= Mcurmax) {
             return;
         }
 
@@ -637,7 +637,7 @@ public:
     IndexInfo *index_info = nullptr;
     const BaseIndex::IndexParams *index_params_;
     CompactHNSW<float> *hnsw;
-
+    vector<unsigned> fetched_nns;
     IndexCompactGraph(base_hnsw::SpaceInterface<float> *s,
                       const DataWrapper *data) :
         BaseIndex(data) {
@@ -645,6 +645,7 @@ public:
         dist_func_param_ = s->get_dist_func_param();
         index_info = new IndexInfo();
         index_info->index_version_type = "IndexCompactGraph";
+        fetched_nns.reserve(100);
     }
 
     void printOnebatch() {
@@ -787,7 +788,7 @@ public:
         countNeighbrs();
     }
 
-    vector<unsigned> fetched_nns;
+    
 
 public:
     static std::ofstream log_query_path_nns;
@@ -809,7 +810,6 @@ public:
         SearchInfo *search_info,
         const vector<float> &query,
         const std::pair<int, int> query_bound) override {
-        fetched_nns.reserve(100);
         fetched_nns.clear();
 
         // 时间测量变量初始化
@@ -823,15 +823,7 @@ public:
         std::priority_queue<pair<float, int>> top_candidates;  // 优先队列存储候选结果
         std::priority_queue<pair<float, int>> candidate_set;   // 候选集优先队列
 
-        search_info->total_comparison = 0;
-        search_info->internal_search_time = 0;
-        search_info->pos_point_traverse_counter = 0;
-        search_info->pos_point_used_counter = 0;
-        search_info->neg_point_traverse_counter = 0;
-        search_info->neg_point_used_counter = 0;
-        search_info->cal_dist_time = 0;
-        search_info->fetch_nns_time = 0;
-        search_info->path_counter = 0;
+        search_info->reset();
         num_search_comparison = 0;
 
         // 初始化三个entry points
@@ -847,14 +839,8 @@ public:
         }
         gettimeofday(&tt3, NULL);
 
-        // TODO: How to find proper enters. // looks like useless Maybe it is not working well if we wanna find proper enters?
-
         size_t hop_counter = 0;
-        float total_traversed_nn_amount = 0;
-        float pos_point_traverse_counter = 0;
-        float pos_point_used_counter = 0;
-        float neg_point_traverse_counter = 0;
-        float neg_point_used_counter = 0;
+        auto ef = search_params->search_ef;
 
         while (!candidate_set.empty()) {
             std::pair<float, int> current_node_pair = candidate_set.top(); // 获取当前节点
@@ -865,22 +851,11 @@ public:
                 break;
             }
 
-#ifdef LOG_DEBUG_MODE
-            cout << "current node: " << current_node_pair.second << "  -- "
-                 << -current_node_pair.first << endl;
-#endif
-
             hop_counter++;
 
             candidate_set.pop();
 
-            // // only search when candidate point is inside the range
-            // this can be commented because no way to do this
-            if (current_node_id < query_bound.first || current_node_id > query_bound.second) {
-                cout << "no satisfied range point" << endl;
-                continue;
-            }
-            gettimeofday(&tt1, NULL);
+            // gettimeofday(&tt1, NULL);
 
             auto const &pos_edges = directed_indexed_arr[current_node_id].nns;
             auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
@@ -892,56 +867,49 @@ public:
                     continue;
                 if (candidate_id > query_bound.second) // 后面的点都是越界节点
                     break;
-                const auto &cp = pos_edges[i];
-                if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
+                if (visited_array[candidate_id] == visited_array_tag) 
                     continue;
+                const auto &cp = pos_edges[i];
+                if (cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
+                    fetched_nns.emplace_back(candidate_id);
                 }
-                fetched_nns.emplace_back(candidate_id);
             }
 
             for (auto i = 0; i < neg_edges.size(); i++) {
                 const unsigned &candidate_id = neg_edges[i].external_id;
-                if (candidate_id < query_bound.first)
+                if (candidate_id < query_bound.first || candidate_id > query_bound.second)
                     continue;
-                if (candidate_id > query_bound.second) // 后面的点都是越界节点
+                if (visited_array[candidate_id] == visited_array_tag) 
                     continue;
                 auto &cp = neg_edges[i];
                 if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
-                    continue;
+                    fetched_nns.emplace_back(candidate_id);
                 }
-                fetched_nns.emplace_back(candidate_id);
             }
-            gettimeofday(&tt2, NULL);                              // 结束时间记录
-            AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
+            // gettimeofday(&tt2, NULL);                              // 结束时间记录
+            // AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
 
             // now iterate fetched nn and calculate distance
             for (auto &candidate_id : fetched_nns) {
-                if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
-                {
-                    visited_array[candidate_id] = visited_array_tag; // 标记为已访问
+                visited_array[candidate_id] = visited_array_tag; // 标记为已访问
 
-                    // 计算距离
-                    gettimeofday(&tt1, NULL); // 开始时间记录
-                    float dist = fstdistfunc_(query.data(),
-                                              data_wrapper->nodes[candidate_id].data(),
-                                              dist_func_param_);
+                // 计算距离
+                float dist = fstdistfunc_(query.data(),
+                                            data_wrapper->nodes[candidate_id].data(),
+                                            dist_func_param_);
 
-                    num_search_comparison++; // 更新比较次数
-                    if (top_candidates.size() < search_params->search_ef || lower_bound > dist) {
-                        candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
-                        top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
-                        if (top_candidates.size() > search_params->search_ef) {
-                            top_candidates.pop(); // 维护候选集大小
-                        }
-                        if (!top_candidates.empty()) {
-                            lower_bound = top_candidates.top().first; // 更新最低界限
-                        }
-                    }
-                    gettimeofday(&tt2, NULL);                             // 结束时间记录
-                    AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
+                num_search_comparison++; // 更新比较次数
+                if (top_candidates.size() < ef) {
+                    candidate_set.emplace(-dist, candidate_id); // 推入候选集
+                    top_candidates.emplace(dist, candidate_id); // 推入顶级候选集
+                    lower_bound = top_candidates.top().first;
+                } else if (dist < lower_bound) {
+                    candidate_set.emplace(-dist, candidate_id); // 推入候选集
+                    top_candidates.emplace(dist, candidate_id); // 推入顶级候选集
+                    top_candidates.pop();
+                    lower_bound = top_candidates.top().first;
                 }
             }
-            total_traversed_nn_amount += float(pos_edges.size()) + float(neg_edges.size());
 #ifdef SAVESEARCHPATH
 
             // write the positive neighbors into log path file
@@ -967,23 +935,23 @@ public:
         int end_flag = 0x7fffffff;
         log_query_path_nns.write(reinterpret_cast<const char *>(&end_flag), sizeof(end_flag));
 #endif
-        // 构建结果列表
-        vector<int> res;
         while (top_candidates.size() > search_params->query_K) {
             top_candidates.pop(); // 减少候选集至所需K个
         }
 
+        // 构建结果列表
+        vector<int> res;
         while (!top_candidates.empty()) {
             res.emplace_back(top_candidates.top().second); // 提取节点ID构建结果
             top_candidates.pop();
         }
         search_info->total_comparison += num_search_comparison; // 更新总比较次数
         search_info->path_counter += hop_counter;
-        search_info->pos_point_traverse_counter = pos_point_traverse_counter;
-        search_info->pos_point_used_counter = pos_point_used_counter;
-        search_info->neg_point_traverse_counter = neg_point_traverse_counter;
-        search_info->neg_point_used_counter = neg_point_used_counter;
-        search_info->total_traversed_nn_amount = total_traversed_nn_amount;
+        // search_info->pos_point_traverse_counter = pos_point_traverse_counter;
+        // search_info->pos_point_used_counter = pos_point_used_counter;
+        // search_info->neg_point_traverse_counter = neg_point_traverse_counter;
+        // search_info->neg_point_used_counter = neg_point_used_counter;
+        // search_info->total_traversed_nn_amount = total_traversed_nn_amount;
 
         // 释放资源和更新时间统计
         visited_list_pool_->releaseVisitedList(vl);

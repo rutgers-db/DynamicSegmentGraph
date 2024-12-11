@@ -302,20 +302,6 @@ public:
     std::vector<unsigned> nbr_rl;
     std::vector<unsigned> nbr_rr;
 
-    // size_t generateCurM(unsigned &L, unsigned &R) {
-    //     unsigned total_len = R - L + 1;
-    //     size_t count = 0;
-    //     if (total_len >= max_elements_)
-    //         return Mcurmax;
-    //     // total_len <<= 1;
-    //     while (total_len < max_elements_) {
-    //         total_len <<= 1;
-    //         count += 2;
-    //     }
-
-    //     return std::max((size_t)4, Mcurmax - count);
-    // }
-
     void dfs(vector<unsigned> &prefix_idx, unsigned PIVOT_ID, unsigned L, unsigned R, unsigned lr, unsigned rl) {
         if (prefix_idx.size() >= Mcurmax) {
             return;
@@ -882,7 +868,7 @@ public:
                 if (visited_array[candidate_id] == visited_array_tag) 
                     continue;
                 auto &cp = neg_edges[i];
-                if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
+                if (cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
                     fetched_nns.emplace_back(candidate_id);
                 }
             }

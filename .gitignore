@@ -12,3 +12,4 @@ test
 *.log
 *.json
 *.pkl
+res_process

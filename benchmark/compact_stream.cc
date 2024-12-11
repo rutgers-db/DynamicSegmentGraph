@@ -16,6 +16,7 @@
 #include <vector>
 #include <tuple>
 #include <iomanip>
+#include <sys/stat.h>
 
 #include "data_processing.h"
 #include "data_wrapper.h"
@@ -36,6 +37,45 @@ using std::endl;
 using std::string;
 using std::to_string;
 using std::vector;
+
+#include <sys/resource.h> // Linux/macOS
+
+#ifdef _WIN32
+SIZE_T getMemoryUsage() {
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+        return pmc.WorkingSetSize; // Returns memory usage in bytes
+    }
+    return 0;
+}
+#else
+long getMemoryUsage() {
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    return usage.ru_maxrss; // Memory usage in kilobytes
+}
+#endif
+
+class MemoryRecorder {
+public:
+    MemoryRecorder(const std::string &description) :
+        description_(description), memoryBefore_(getMemoryUsage()) {
+    }
+
+    ~MemoryRecorder() {
+        auto memoryAfter = getMemoryUsage();
+        std::cout << description_ << ": " << (memoryAfter - memoryBefore_)
+#ifdef _WIN32
+                  << " bytes memory used." << std::endl;
+#else
+                  << " KB memory used." << std::endl;
+#endif
+    }
+
+private:
+    std::string description_;
+    long memoryBefore_;
+};
 
 void log_result_recorder(
     const std::map<int, std::tuple<double, double, double, double>> &result_recorder,
@@ -98,15 +138,21 @@ void ReplaceSubstringInPaths(std::vector<std::string> &paths, const std::string 
     }
 }
 
-void tagParameters(vector<string>& gt_paths, unsigned index_k, unsigned ef_max, unsigned ef_construction) {
+void tagParameters(vector<string> &gt_paths, unsigned index_k, unsigned ef_max, unsigned ef_construction) {
     string suffix = "_" + to_string(index_k) + "_" + to_string(ef_max) + "_" + to_string(ef_construction);
-    
-    for (auto& path : gt_paths) {
+
+    for (auto &path : gt_paths) {
         size_t pos = path.find(".bin");
         if (pos != string::npos) {
             path.insert(pos, suffix);
         }
     }
+}
+
+bool fileExists(const string &filePath) {
+    struct stat buffer;
+    // stat() returns 0 if the file exists
+    return (stat(filePath.c_str(), &buffer) == 0);
 }
 
 int main(int argc, char **argv) {
@@ -143,13 +189,6 @@ int main(int argc, char **argv) {
         "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1150k-num1000-k10.arbitrary.cvs",
         "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1200k-num1000-k10.arbitrary.cvs"};
 
-    // vector<string> gt_paths = {
-    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-1k-num1000-k10.arbitrary.cvs",
-    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-10k-num1000-k10.arbitrary.cvs",
-    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs",
-    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
-    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-10m-num1000-k10.arbitrary.cvs"};
-
     for (int i = 0; i < argc; i++) {
         string arg = argv[i];
         if (arg == "-dataset")
@@ -166,7 +205,6 @@ int main(int argc, char **argv) {
             ef_construction = atoi(argv[i + 1]);
     }
 
-    
     vector<string> index_paths = {
         "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1m.bin",
         "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1050k.bin",
@@ -185,10 +223,15 @@ int main(int argc, char **argv) {
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path);
 
-    int st = 16;     // starting value
+    int st = 32;     // starting value
     int ed = 400;    // ending value (inclusive)
-    int stride = 32; // stride value
+    int stride = 16; // stride value
+
     std::vector<int> searchef_para_range_list;
+    // add small seach ef
+    for (int i = 1; i < st; i += 1) {
+        searchef_para_range_list.push_back(i);
+    }
     for (int i = st; i <= ed; i += stride) {
         searchef_para_range_list.push_back(i);
     }
@@ -213,8 +256,16 @@ int main(int argc, char **argv) {
     for (int i = 0; i < insert_batches.size(); i++) {
         auto &insert_batch = insert_batches[i];
         auto &gt_path = gt_paths[i];
-        index->insert_batch(insert_batch);
-        index->save(index_paths[i]);
+        {   
+            // A temporary region for record the memory allocation
+            MemoryRecorder memoryRecorder("Global Array Allocation");
+            if (fileExists(index_paths[i])) {
+                index->load(index_paths[i]);
+            } else {
+                index->insert_batch(insert_batch);
+                index->save(index_paths[i]);
+            }
+        }
         data_wrapper.LoadGroundtruth(gt_path);
         BaseIndex::SearchInfo search_info(&data_wrapper, &i_params, "SeRF_2D",
                                           "benchmark");

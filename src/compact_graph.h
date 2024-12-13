@@ -375,19 +375,19 @@ public:
         }
     }
 
-    void generate_compressed_neighbors(
+    void generate_compressed_neighbors(const void *data_point,
         std::priority_queue<std::pair<dist_t, tableint>> &queue_closest,
         unsigned center_external_id,
         const unsigned &index_k) {
         if (queue_closest.size() == 0) {
             return;
         }
-        // unsigned tmp_left_bound = min_external_id_ == 0 ? 0 : min_external_id_ - 1;                                                              // consider we have 0 as min external id
-        // unsigned tmp_right_bound = max_external_id_ == std::numeric_limits<int>::max() ? std::numeric_limits<int>::max() : max_external_id_ + 1; // consider we have too maximum value as max external id
 
         // // TODO: Make sure left bound as 0 is perfect? no any bugs? if -1 that will be fined but if 0 I am not sure
         unsigned tmp_left_bound = 0;
         unsigned tmp_right_bound = max_elements_;
+        int rmost_inL = -1;
+        int lmost_inR = max_elements_ + 1;
 
         sorted_cands.clear();
         while (!queue_closest.empty()) {
@@ -397,11 +397,22 @@ public:
             queue_closest.pop();
             /*这里调用回掉函数*/
             get_selectedNeighbors(current_pair.second, dist_to_query, index_k);
+
+            // Update lmost and rmost
+            int tmp_label = getExternalLabel(current_pair.second);
+            if (tmp_label < center_external_id)
+                rmost_inL = std::max(rmost_inL, tmp_label);
+            else
+                lmost_inR = std::min(lmost_inR, tmp_label);
         }
 
         // Not need to find compressed points, not need
         if (if_rebuild_HNSW == true)
             return;
+
+        // search second time to fill the neighbors that falls in short range and also avoid ef_max is too short
+        // auto inner_range = make_pair(rmost_inL, lmost_inR);
+        // innerSearchInRange(data_point, center_external_id, inner_range);
 
         // some initiliazation for some variables serving for dfs function
         vector<unsigned> prefix_idx;
@@ -442,6 +453,125 @@ public:
         return;
     }
 
+    vector<unsigned> fetched_nns;
+    void innerSearchInRange(const void *data_point,
+        unsigned center_external_id,
+        std::pair<int, int> query_bound) {
+        fetched_nns.clear();
+
+        // 初始化访问列表
+        VisitedList *vl = visited_list_pool_->getFreeVisitedList();
+        vl_type *visited_array = vl->mass;
+        vl_type visited_array_tag = vl->curV;
+        float lower_bound = std::numeric_limits<float>::max(); // 最低界限初始化为最大浮点数
+        std::priority_queue<pair<dist_t, tableint>> top_candidates;  // 优先队列存储候选结果
+        std::priority_queue<pair<dist_t, tableint>> candidate_set;   // 候选集优先队列
+
+        // we choose entry points as the points in the sorted_cands that are attributely closest to center_external_id
+        if (query_bound.first != -1) {
+            auto point = query_bound.first;
+            float dist = fstdistfunc_(getDataByLabel(point), data_point, dist_func_param_);
+            candidate_set.push(make_pair(-dist, point)); // 将负距离和点ID推入候选集
+            visited_array[point] = visited_array_tag;
+        }
+
+        if (query_bound.second != max_elements_ + 1) {
+            auto point = query_bound.second;
+            float dist = fstdistfunc_(getDataByLabel(point), data_point, dist_func_param_);
+            candidate_set.push(make_pair(-dist, point)); // 将负距离和点ID推入候选集
+            visited_array[point] = visited_array_tag;
+        }
+
+        // avoid the boundary that have been accounted for
+        query_bound.first++;
+        query_bound.second--;
+
+        auto ef = ef_max_;
+
+        while (!candidate_set.empty()) {
+            std::pair<float, int> current_node_pair = candidate_set.top(); // 获取当前节点
+            int current_node_id = current_node_pair.second;
+
+            if (-current_node_pair.first > lower_bound) // 如果当前节点的距离大于topk里最远的，则跳出循环
+            {
+                break;
+            }
+
+            candidate_set.pop();
+
+            auto const &pos_edges = compact_graph->at(current_node_id).nns;
+            auto const &neg_edges = compact_graph->at(current_node_id).rev_nns;
+            // fetch nns first
+            fetched_nns.clear();
+            for (auto i = 0; i < pos_edges.size(); i++) {
+                const unsigned &candidate_id = pos_edges[i].external_id;
+                if (candidate_id < query_bound.first)
+                    continue;
+                if (candidate_id > query_bound.second) // 后面的点都是越界节点
+                    break;
+                if (visited_array[candidate_id] == visited_array_tag)
+                    continue;
+                const auto &cp = pos_edges[i];
+                if (cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
+                    fetched_nns.emplace_back(candidate_id);
+                }
+            }
+
+            for (auto i = 0; i < neg_edges.size(); i++) {
+                const unsigned &candidate_id = neg_edges[i].external_id;
+                if (candidate_id < query_bound.first || candidate_id > query_bound.second)
+                    continue;
+                if (visited_array[candidate_id] == visited_array_tag)
+                    continue;
+                auto &cp = neg_edges[i];
+                if (cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
+                    fetched_nns.emplace_back(candidate_id);
+                }
+            }
+
+            // now iterate fetched nn and calculate distance
+            for (auto &candidate_id : fetched_nns) {
+                visited_array[candidate_id] = visited_array_tag; // 标记为已访问
+                float dist = fstdistfunc_(data_point,
+                                          getDataByLabel(candidate_id),
+                                          dist_func_param_);
+
+                if (top_candidates.size() < ef) {
+                    candidate_set.emplace(-dist, candidate_id); // 推入候选集
+                    top_candidates.emplace(dist, candidate_id); // 推入顶级候选集
+                    lower_bound = top_candidates.top().first;
+                } else if (dist < lower_bound) {
+                    candidate_set.emplace(-dist, candidate_id); // 推入候选集
+                    top_candidates.emplace(dist, candidate_id); // 推入顶级候选集
+                    top_candidates.pop();
+                    lower_bound = top_candidates.top().first;
+                }
+            }
+        }
+
+        // push the results in top_candidates into a small heap
+        auto small_range_filter = 2000;
+        std::priority_queue<std::pair<dist_t, tableint>> queue_closest;
+        auto pre_farthest_dist = sorted_cands.back().second;
+        while (!top_candidates.empty()) {
+            // if it is closer, highly likely that it has been in sorted_cands.
+            // We do not need the points inside small_range_filter
+            if (top_candidates.top().first > pre_farthest_dist && std::abs((int)top_candidates.top().second - (int)center_external_id) > small_range_filter)
+                queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second); // 提取节点ID构建结果
+            top_candidates.pop();
+        }
+
+        while (!queue_closest.empty()) {
+            std::pair<dist_t, tableint> current_pair = queue_closest.top();
+            dist_t dist_to_query = -current_pair.first;
+            sorted_cands.emplace_back(current_pair.second, dist_to_query);
+            queue_closest.pop();
+        }
+
+        // 释放资源和更新时间统计
+        visited_list_pool_->releaseVisitedList(vl);
+    }
+
     /**
      * @file src/compact_graph.h
      * @brief 互连新元素并递归地应用启发式剪枝算法并且对插入元素的attribute没有要求
@@ -480,7 +610,7 @@ public:
 
             init_selectedNeighbors();
 
-            generate_compressed_neighbors(queue_closest, external_id, (unsigned)Mcurmax);
+            generate_compressed_neighbors(data_point, queue_closest, external_id, (unsigned)Mcurmax);
 
             if (if_rebuild_HNSW == false) {
                 gen_rev_neighbors(external_id);
@@ -607,7 +737,7 @@ public:
         }
         // actually init selected NEighbors is useless But I am afaid that there is some bugs if removing it
         init_selectedNeighbors();
-        generate_compressed_neighbors(queue_closest, external_id, (unsigned)Mcurmax);
+        generate_compressed_neighbors(data_point, queue_closest, external_id, (unsigned)Mcurmax);
         // 测试过了 这里不需要把搜到的近邻的反向边拿过来呢 估计是本身搜到的精度就很高了 确实 ef max都很高了 估计精度很高
 
         // 不需要加上反向的compress neighbors 应该
@@ -774,8 +904,6 @@ public:
         countNeighbrs();
     }
 
-    
-
 public:
     static std::ofstream log_query_path_nns;
 
@@ -853,7 +981,7 @@ public:
                     continue;
                 if (candidate_id > query_bound.second) // 后面的点都是越界节点
                     break;
-                if (visited_array[candidate_id] == visited_array_tag) 
+                if (visited_array[candidate_id] == visited_array_tag)
                     continue;
                 const auto &cp = pos_edges[i];
                 if (cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
@@ -865,7 +993,7 @@ public:
                 const unsigned &candidate_id = neg_edges[i].external_id;
                 if (candidate_id < query_bound.first || candidate_id > query_bound.second)
                     continue;
-                if (visited_array[candidate_id] == visited_array_tag) 
+                if (visited_array[candidate_id] == visited_array_tag)
                     continue;
                 auto &cp = neg_edges[i];
                 if (cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
@@ -881,8 +1009,8 @@ public:
 
                 // 计算距离
                 float dist = fstdistfunc_(query.data(),
-                                            data_wrapper->nodes[candidate_id].data(),
-                                            dist_func_param_);
+                                          data_wrapper->nodes[candidate_id].data(),
+                                          dist_func_param_);
 
                 num_search_comparison++; // 更新比较次数
                 if (top_candidates.size() < ef) {

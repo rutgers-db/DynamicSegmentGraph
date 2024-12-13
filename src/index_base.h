@@ -136,6 +136,8 @@ public:
      * @brief 查询信息结构体，记录查询过程中的统计信息和日志。
      */
     struct SearchInfo {
+        SearchInfo(){}
+        
         /// 构造函数：初始化数据包装器、索引参数、方法名称和版本号
         SearchInfo(const DataWrapper *data,
                    const BaseIndex::IndexParams *index_params,

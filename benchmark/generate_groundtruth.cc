@@ -32,8 +32,7 @@ using std::string;
 using std::to_string;
 using std::vector;
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     // Parameters
     string dataset = "deep";
     int data_size = 100000;
@@ -43,10 +42,9 @@ int main(int argc, char **argv)
     int query_num = 1000;
     int query_k = 10;
 
-    for (int i = 0; i < argc; i++)
-    {
+    for (int i = 0; i < argc; i++) {
         string arg = argv[i];
-        // if (arg == "-dataset") dataset = string(argv[i + 1]);
+        if (arg == "-dataset") dataset = string(argv[i + 1]);
         if (arg == "-N")
             data_size = atoi(argv[i + 1]);
         if (arg == "-dataset_path")
@@ -58,15 +56,12 @@ int main(int argc, char **argv)
     }
 
     string size_symbol = "";
-    if (data_size == 100000)
-    {
-        size_symbol = "100k";
+    if (data_size % 1000000 == 0 && data_size >= 1000000) {
+        size_symbol = std::to_string(data_size / 1000000) + "m";
+    } else {
+        size_symbol = std::to_string(data_size / 1000) + "k";
     }
-    else if (data_size == 1000000)
-    {
-        size_symbol = "1m";
-    }
-
+    cout << "Size Symbole is " << size_symbol << endl;
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path);
 
@@ -79,11 +74,10 @@ int main(int argc, char **argv)
     //     +
     //               "-num1000-k10.arbitrary.cvs");
 
-    data_wrapper.generateHalfBoundedQueriesAndGroundtruthBenchmark(
-        true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol +
-                  "-num1000-k10.halfbounded.cvs");
+    // data_wrapper.generateHalfBoundedQueriesAndGroundtruthBenchmark(
+    //     true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol +
+    //               "-num1000-k10.halfbounded.cvs");
     data_wrapper.generateRangeFilteringQueriesAndGroundtruthBenchmark(
-        true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol +
-                  "-num1000-k10.arbitrary.cvs");
+        true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol + "-num1000-k10.arbitrary.cvs");
     return 0;
 }

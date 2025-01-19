@@ -96,7 +96,6 @@ class BaseIndex {
       save_path = "../exp/search/" + version + "-" + method + "-" +
                   data_wrapper->dataset + "-" +
                   std::to_string(data_wrapper->data_size) + ".csv";
-      std::cout << "Save result to :" << save_path << std::endl;
     };
 
     void SaveCsv() {

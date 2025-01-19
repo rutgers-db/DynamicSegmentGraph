@@ -50,8 +50,7 @@ using std::vector;
  * @param lensDim 向量长度。
  * @return 欧几里得距离。
  */
-float EuclideanDistance(const vector<float> &lhs, const vector<float> &rhs,
-                        const int &startDim, int lensDim);
+float EuclideanDistance(const vector<float> &lhs, const vector<float> &rhs, const int &startDim, int lensDim);
 
 /**
  * 简化版计算两个向量之间的欧几里得距离。
@@ -101,33 +100,27 @@ double CountTime(timeval &t1, timeval &t2);
 
 // the same to sort_indexes
 template <typename T>
-std::vector<std::size_t> sort_permutation(const std::vector<T> &vec)
-{
+std::vector<std::size_t> sort_permutation(const std::vector<T> &vec) {
     std::vector<std::size_t> p(vec.size());
     std::iota(p.begin(), p.end(), 0);
     std::sort(p.begin(), p.end(),
-              [&](std::size_t i, std::size_t j)
-              { return vec[i] < vec[j]; });
+              [&](std::size_t i, std::size_t j) { return vec[i] < vec[j]; });
     return p;
 }
 
 // apply permutation
 template <typename T>
 void apply_permutation_in_place(std::vector<T> &vec,
-                                const std::vector<std::size_t> &p)
-{
+                                const std::vector<std::size_t> &p) {
     std::vector<bool> done(vec.size());
-    for (std::size_t i = 0; i < vec.size(); ++i)
-    {
-        if (done[i])
-        {
+    for (std::size_t i = 0; i < vec.size(); ++i) {
+        if (done[i]) {
             continue;
         }
         done[i] = true;
         std::size_t prev_j = i;
         std::size_t j = p[i];
-        while (i != j)
-        {
+        while (i != j) {
             std::swap(vec[prev_j], vec[j]);
             done[j] = true;
             prev_j = j;
@@ -137,8 +130,7 @@ void apply_permutation_in_place(std::vector<T> &vec,
 }
 
 template <typename T>
-vector<int> sort_indexes(const vector<T> &v)
-{
+vector<int> sort_indexes(const vector<T> &v) {
     // initialize original index locations
     vector<int> idx(v.size());
     iota(idx.begin(), idx.end(), 0);
@@ -148,16 +140,13 @@ vector<int> sort_indexes(const vector<T> &v)
     // to avoid unnecessary index re-orderings
     // when v contains elements of equal values
     stable_sort(idx.begin(), idx.end(),
-                [&v](size_t i1, size_t i2)
-                { return v[i1] < v[i2]; });
+                [&v](size_t i1, size_t i2) { return v[i1] < v[i2]; });
 
     return idx;
 }
 
 template <typename T>
-vector<int> sort_indexes(const vector<T> &v, const int begin_bias,
-                         const int end_bias)
-{
+vector<int> sort_indexes(const vector<T> &v, const int begin_bias, const int end_bias) {
     // initialize original index locations
     vector<int> idx(end_bias - begin_bias);
     iota(idx.begin() + begin_bias, idx.begin() + end_bias, 0);
@@ -167,23 +156,25 @@ vector<int> sort_indexes(const vector<T> &v, const int begin_bias,
     // to avoid unnecessary index re-orderings
     // when v contains elements of equal values
     stable_sort(idx.begin() + begin_bias, idx.begin() + end_bias,
-                [&v](size_t i1, size_t i2)
-                { return v[i1] < v[i2]; });
+                [&v](size_t i1, size_t i2) { return v[i1] < v[i2]; });
 
     return idx;
 }
 
+void WriteVectorToFile(const std::string &file_path, const std::vector<int> &vec);
+
+std::vector<int> ReadVectorFromFile(const std::string &file_path);
+
+std::vector<std::vector<unsigned>> ReadAndSplit(const std::string &file_path, int part_num);
+
 template <typename T>
-void print_set(const vector<T> &v)
-{
-    if (v.size() == 0)
-    {
+void print_set(const vector<T> &v) {
+    if (v.size() == 0) {
         cout << "ERROR: EMPTY VECTOR!" << endl;
         return;
     }
     cout << "vertex in set: {";
-    for (size_t i = 0; i < v.size() - 1; i++)
-    {
+    for (size_t i = 0; i < v.size() - 1; i++) {
         cout << v[i] << ", ";
     }
     cout << v.back() << "}" << endl;
@@ -237,23 +228,30 @@ void record_memory(long long &memory);
  * @return 最近邻点的索引列表。
  */
 vector<int> greedyNearest(const vector<vector<float>> &dpts,
-                          const vector<float> query, const int k_smallest);
+                          const vector<float> query,
+                          const int k_smallest);
 
 // void evaluateKNNG(const vector<vector<int>> &gt,
 //                   const vector<vector<int>> &knng, const int K, double
 //                   &recall, double &precision);
 
-void rangeGreedy(const vector<vector<float>> &nodes, const int k_smallest,
-                 const int l_bound, const int r_bound);
+void rangeGreedy(const vector<vector<float>> &nodes, const int k_smallest, const int l_bound, const int r_bound);
 
-void greedyNearest(const int query_pos, const vector<vector<float>> &dpts,
-                   const int k_smallest, const int l_bound, const int r_bound);
+void greedyNearest(const int query_pos, const vector<vector<float>> &dpts, const int k_smallest, const int l_bound, const int r_bound);
 
 vector<int> greedyNearest(const vector<vector<float>> &dpts,
-                          const vector<float> query, const int l_bound,
-                          const int r_bound, const int k_smallest);
-
+                          const vector<float> query,
+                          const int l_bound,
+                          const int r_bound,
+                          const int k_smallest);
+vector<int> scanNearest(const vector<vector<float>> &dpts,
+                        const vector<int> &keys,
+                        const vector<float> query,
+                        const int l_bound,
+                        const int r_bound,
+                        const int k_smallest);
 void heuristicPrune(const vector<vector<float>> &nodes,
-                    vector<pair<int, float>> &top_candidates, const size_t M);
+                    vector<pair<int, float>> &top_candidates,
+                    const size_t M);
 
 vector<int> str2vec(const string str);

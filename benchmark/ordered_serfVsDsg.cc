@@ -1,12 +1,3 @@
-/**
- * @file exp_halfbound.cc
- * @author Chaoji Zuo (chaoji.zuo@rutgers.edu)
- * @brief Benchmark Half-Bounded Range Filter Search
- * @date 2023-12-22
- *
- * @copyright Copyright (c) 2023
- */
-
 #include <algorithm>
 #include <iostream>
 #include <map>
@@ -39,23 +30,11 @@ using std::to_string;
 using std::vector;
 
 #include <sys/resource.h> // Linux/macOS
-
-#ifdef _WIN32
-SIZE_T getMemoryUsage() {
-    PROCESS_MEMORY_COUNTERS pmc;
-    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
-        return pmc.WorkingSetSize; // Returns memory usage in bytes
-    }
-    return 0;
-}
-#else
 long getMemoryUsage() {
     struct rusage usage;
     getrusage(RUSAGE_SELF, &usage);
     return usage.ru_maxrss; // Memory usage in kilobytes
 }
-#endif
-
 class MemoryRecorder {
 public:
     MemoryRecorder(const std::string &description) :
@@ -98,10 +77,6 @@ void log_result_recorder(
 std::vector<std::vector<unsigned>> generatePermutations(const std::vector<unsigned> &batch_sizes) {
     std::vector<std::vector<unsigned>> permutations;
     unsigned start = 0; // Starting point for the first batch
-    if (batch_sizes.size() > 1)
-        assert(batch_sizes[0] < batch_sizes[1]);
-    // Seed the random number generator with current time
-    std::default_random_engine rng(std::chrono::system_clock::now().time_since_epoch().count());
 
     for (auto i = 0; i < batch_sizes.size(); i++) {
         auto &size = batch_sizes[i];
@@ -110,14 +85,6 @@ std::vector<std::vector<unsigned>> generatePermutations(const std::vector<unsign
         // Generate numbers from 'start' to 'size - 1'
         for (unsigned i = start; i < size; ++i) {
             batch.push_back(i);
-        }
-
-        // Shuffle to create a random permutation
-        // Only for aribitrary order
-        // Attention here!!! TODO just to test whether no shuffle at the beginning will increase QPS?
-        if (i != 0) {
-            cout << "Shuffle" << endl;
-            std::shuffle(batch.begin(), batch.end(), rng);
         }
 
         // Store the permutation and update the starting point for the next batch
@@ -151,7 +118,6 @@ void tagParameters(vector<string> &gt_paths, unsigned index_k, unsigned ef_max, 
 
 bool fileExists(const string &filePath) {
     struct stat buffer;
-    // stat() returns 0 if the file exists
     return (stat(filePath.c_str(), &buffer) == 0);
 }
 
@@ -162,12 +128,11 @@ int main(int argc, char **argv) {
 
     // Parameters
     string dataset = "deep";
-    // vector<unsigned> batches_size = {1000, 10000, 100000, 1000000, 10000000};
-    vector<unsigned> batches_size = {1000000}; // , 1050000, 1100000, 1150000, 1200000
-    // vector<unsigned> batches_size = {1000, 10000};
-    // int data_size = 10000000;
-    // int data_size = 10000;
-    int data_size = 1200000;
+    vector<unsigned> batches_size;
+    for (unsigned i = 100000; i <= 1000000; i += 100000) {
+        batches_size.push_back(i);
+    }
+    int data_size = 1000000;
 
     auto insert_batches = generatePermutations(batches_size);
     string dataset_path = "";
@@ -176,19 +141,30 @@ int main(int argc, char **argv) {
     unsigned index_k = 16;
     unsigned ef_max = 500;
     unsigned ef_construction = 100;
-    float alpha = 1.0;
     int query_num = 1000;
     int query_k = 10;
 
     string indexk_str = "";
     string ef_con_str = "";
     string version = "Benchmark";
+    // vector<string> gt_paths = {
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-50k-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-150k-num1000-k10.arbitrary.cvs",
+    //     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-200k-num1000-k10.arbitrary.cvs"};
+
     vector<string> gt_paths = {
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1050k-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1100k-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1150k-num1000-k10.arbitrary.cvs",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1200k-num1000-k10.arbitrary.cvs"};
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-100k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-200k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-300k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-400k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-500k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-600k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-700k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-800k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-900k-num1000-k10.arbitrary.cvs",
+        "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/ordered_stream/wiki-image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs"
+    };
 
     for (int i = 0; i < argc; i++) {
         string arg = argv[i];
@@ -204,18 +180,14 @@ int main(int argc, char **argv) {
             ef_max = atoi(argv[i + 1]);
         if (arg == "-ef_construction")
             ef_construction = atoi(argv[i + 1]);
-        if (arg == "-alpha")
-            alpha = atof(argv[i + 1]);
     }
 
-    vector<string> index_paths = {
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1m.bin",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1050k.bin",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1100k.bin",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1150k.bin",
-        "/research/projects/zp128/RangeIndexWithRandomInsertion/index/stream/wiki-image_1200k.bin"};
-
-    tagParameters(index_paths, index_k, ef_max, ef_construction);
+    string root_path = "/research/projects/zp128/RangeIndexWithRandomInsertion";
+    vector<string> index_paths;
+    string index_dir = "/index/ordered_stream/dsg/wiki-image/";
+    for(auto i = 0 ; i< batches_size.size(); i ++){
+        index_paths.emplace_back(root_path + index_dir + to_string(i) + ".bin");
+    }
 
     if (dataset != "wiki-image") {
         ReplaceSubstringInPaths(gt_paths, "wiki-image", dataset);
@@ -224,23 +196,20 @@ int main(int argc, char **argv) {
     }
 
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
-    {
-        MemoryRecorder memoryRecorder("Reading Dataset Cost: ");
-        data_wrapper.readData(dataset_path, query_path);
-    }
+    data_wrapper.readData(dataset_path, query_path);
 
     int st = 32;     // starting value
     int ed = 400;    // ending value (inclusive)
     int stride = 16; // stride value
 
     std::vector<int> searchef_para_range_list;
-    // add small seach ef
-    for (int i = 1; i < st; i += 1) {
-        searchef_para_range_list.push_back(i);
-    }
-    for (int i = st; i <= ed; i += stride) {
-        searchef_para_range_list.push_back(i);
-    }
+    // // add small seach ef
+    // for (int i = 1; i < st; i += 1) {
+    //     searchef_para_range_list.push_back(i);
+    // }
+    // for (int i = st; i <= ed; i += stride) {
+    //     searchef_para_range_list.push_back(i);
+    // }
     cout << "search ef:" << endl;
     print_set(searchef_para_range_list);
     cout << "index K:" << index_k << " ef construction: " << ef_construction << " ef_max: " << ef_max << endl;
@@ -249,8 +218,12 @@ int main(int argc, char **argv) {
     base_hnsw::L2Space ss(data_wrapper.data_dim);
     timeval t1, t2;
 
+    float alpha = 1.0;
+    if (dataset == "yt8m-video") {
+        alpha = 1.3;
+    }
     BaseIndex::IndexParams i_params(index_k, ef_construction,
-                                    ef_construction, ef_max);
+                                    ef_construction, ef_max, alpha);
 
     Compact::IndexCompactGraph *index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
     // SeRF::IndexSegmentGraph2D *index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
@@ -262,15 +235,11 @@ int main(int argc, char **argv) {
     for (int i = 0; i < insert_batches.size(); i++) {
         auto &insert_batch = insert_batches[i];
         auto &gt_path = gt_paths[i];
-        {   
+        {
             // A temporary region for record the memory allocation
             MemoryRecorder memoryRecorder("Global Array Allocation");
-            if (fileExists(index_paths[i])) {
-                index->load(index_paths[i]);
-            } else {
-                index->insert_batch(insert_batch);
-                index->save(index_paths[i]);
-            }
+            index->insert_batch(insert_batch);
+            index->save(index_paths[i]);
         }
         index->initLabelSet();
         data_wrapper.LoadGroundtruth(gt_path);

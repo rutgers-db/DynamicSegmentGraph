@@ -35,8 +35,44 @@ using std::string;
 using std::to_string;
 using std::vector;
 
-long long before_memory, after_memory;
+#include <sys/resource.h> // Linux/macOS
 
+#ifdef _WIN32
+SIZE_T getMemoryUsage() {
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+        return pmc.WorkingSetSize; // Returns memory usage in bytes
+    }
+    return 0;
+}
+#else
+long getMemoryUsage() {
+    struct rusage usage;
+    getrusage(RUSAGE_SELF, &usage);
+    return usage.ru_maxrss; // Memory usage in kilobytes
+}
+#endif
+
+class MemoryRecorder {
+public:
+    MemoryRecorder(const std::string &description) :
+        description_(description), memoryBefore_(getMemoryUsage()) {
+    }
+
+    ~MemoryRecorder() {
+        auto memoryAfter = getMemoryUsage();
+        std::cout << description_ << ": " << (memoryAfter - memoryBefore_)
+#ifdef _WIN32
+                  << " bytes memory used." << std::endl;
+#else
+                  << " KB memory used." << std::endl;
+#endif
+    }
+
+private:
+    std::string description_;
+    long memoryBefore_;
+};
 std::vector<std::vector<unsigned>> generatePermutations(const std::vector<unsigned> &batch_sizes) {
     std::vector<std::vector<unsigned>> permutations;
     unsigned start = 0; // Starting point for the first batch
@@ -75,7 +111,7 @@ void ReplaceSubstringInPaths(std::vector<std::string> &paths, const std::string 
 }
 
 int data_size = 1200000;
-vector<unsigned> batches_size = {1000000, 1050000, 1100000, 1150000, 1200000};
+vector<unsigned> batches_size = {1000000}; // 1050000, 1100000, 1150000, 1200000
 auto insert_batches = generatePermutations(batches_size);
 vector<string> gt_paths = {
     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs",
@@ -83,13 +119,6 @@ vector<string> gt_paths = {
     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1100k-num1000-k10.arbitrary.cvs",
     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1150k-num1000-k10.arbitrary.cvs",
     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/wiki-image_benchmark-groundtruth-deep-1200k-num1000-k10.arbitrary.cvs"};
-
-// int data_size = 10000;
-// vector<unsigned> batches_size = {1000, 10000};
-// auto insert_batches = generatePermutations(batches_size);
-// vector<string> gt_paths = {
-//     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-1k-num1000-k10.arbitrary.cvs",
-//     "/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/deep_benchmark-groundtruth-deep-10k-num1000-k10.arbitrary.cvs"};
 
 int exp(string dataset, int data_size, string dataset_path, string query_path, const bool is_amarel, string gt_path, unsigned index_k, unsigned ef_construction, string version) {
 #ifdef USE_SSE
@@ -103,7 +132,14 @@ int exp(string dataset, int data_size, string dataset_path, string query_path, c
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path);
     data_wrapper.LoadGroundtruth(gt_path);
-    vector<int> searchef_para_range_list = {100, 200, 300, 400};
+
+    vector<int> searchef_para_range_list;
+    for (int i = 1; i <= 100; i += 10) {
+        searchef_para_range_list.push_back(i);
+    }
+    for (int i = 100; i <= 400; i += 100) {
+        searchef_para_range_list.push_back(i);
+    }
 
     version = "search-" + version;
     if (is_amarel) {
@@ -133,21 +169,28 @@ int exp(string dataset, int data_size, string dataset_path, string query_path, c
         cout << endl;
 
         KnnFirstWrapper index(&data_wrapper);
-        auto * ss = new hnswlib_incre::L2Space(data_wrapper.data_dim);
-        index.initForBuilding(&i_params, ss);
+        auto *ss = new hnswlib_incre::L2Space(data_wrapper.data_dim);
+        {
+            MemoryRecorder memoryRecorder("Global Array Allocation");
+            index.initForBuilding(&i_params, ss);
+        }
 
         for (int i = 0; i < insert_batches.size(); i++) {
             auto &insert_batch = insert_batches[i];
-        auto &gt_path = gt_paths[i];
+            auto &gt_path = gt_paths[i];
 
             gettimeofday(&t1, NULL);
-            index.insertBatch(insert_batch);
+            {
+                MemoryRecorder memoryRecorder("Insertion Allocation");
+                index.insertBatch(insert_batch);
+            }
+            
             gettimeofday(&t2, NULL);
             logTime(t1, t2, "Build knnfirst HNSW Index Time");
 
             data_wrapper.LoadGroundtruth(gt_path);
             cout << "HNSW Total # of Neighbors: " << index.index_info->nodes_amount
-             << endl;
+                 << endl;
 
             cout << "twoside" << endl;
             BaseIndex::SearchInfo search_info(&data_wrapper, &i_params,
@@ -155,10 +198,8 @@ int exp(string dataset, int data_size, string dataset_path, string query_path, c
                                               "knnfirst/twoside");
             execute_knn_first_search(index, search_info, data_wrapper,
                                      searchef_para_range_list);
-
         }
     }
-
     return 0;
 }
 
@@ -195,8 +236,8 @@ int main(int argc, char **argv) {
         cout << "Print the first groundtruth path" << gt_paths[0] << endl;
     }
 
-    cout << "index K:" << index_k<< endl;
-    cout << "ef construction:" <<ef_construction<< endl;
+    cout << "index K:" << index_k << endl;
+    cout << "ef construction:" << ef_construction << endl;
     // assert(groundtruth_path != "");
 
     exp(dataset, data_size, dataset_path, query_path, is_amarel, groundtruth_path,

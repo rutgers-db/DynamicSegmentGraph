@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
     int data_size = 100000;
     string dataset_path = "";
     string method = "";
-    string query_path = "";
+    string query_path = "/research/projects/zp128/RangeIndexWithRandomInsertion/data/deep1B_queries.fvecs";
     unsigned index_k = 8;
     unsigned ef_max = 500;
     unsigned ef_construction = 100;

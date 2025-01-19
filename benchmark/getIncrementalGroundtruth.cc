@@ -41,6 +41,7 @@ int main(int argc, char **argv) {
     string groundtruth_prefix = "";
     int query_num = 1000;
     int query_k = 10;
+    int part_num = 10;
 
     for (int i = 0; i < argc; i++) {
         string arg = argv[i];
@@ -53,6 +54,8 @@ int main(int argc, char **argv) {
             query_path = string(argv[i + 1]);
         if (arg == "-groundtruth_prefix")
             groundtruth_prefix = string(argv[i + 1]);
+        if (arg == "-pn")
+            part_num = atoi(argv[i + 1]);
     }
 
     string size_symbol = "";
@@ -65,7 +68,7 @@ int main(int argc, char **argv) {
     DataWrapper data_wrapper(query_num, query_k, dataset, data_size);
     data_wrapper.readData(dataset_path, query_path);
     
-    data_wrapper.generateRangeFilteringQueriesAndGroundtruthBenchmark(
-        true, groundtruth_prefix + "benchmark-groundtruth-deep-" + size_symbol + "-num1000-k10.arbitrary.cvs");
+    data_wrapper.generateIncrementalInsertionGroundtruth(
+        part_num, groundtruth_prefix + size_symbol + "-num1000-k10");
     return 0;
 }

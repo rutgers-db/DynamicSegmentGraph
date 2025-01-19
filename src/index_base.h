@@ -71,12 +71,14 @@ public:
         /// 是否打印每批处理结果
         bool print_one_batch = false;
 
+        float alpha = 1.0;
+
         /// 构造函数：允许用户自定义参数
-        IndexParams(unsigned K, unsigned ef_construction, unsigned ef_large_for_pruning, unsigned ef_max) :
+        IndexParams(unsigned K, unsigned ef_construction, unsigned ef_large_for_pruning, unsigned ef_max, float _alpha = 1.0) :
             K(K),
             ef_construction(ef_construction),
             ef_large_for_pruning(ef_large_for_pruning),
-            ef_max(ef_max){};
+            ef_max(ef_max), alpha(_alpha){};
 
         // which position to cut during the recursion
         enum Recursion_Type_t {
@@ -136,8 +138,9 @@ public:
      * @brief 查询信息结构体，记录查询过程中的统计信息和日志。
      */
     struct SearchInfo {
-        SearchInfo(){}
-        
+        SearchInfo() {
+        }
+
         /// 构造函数：初始化数据包装器、索引参数、方法名称和版本号
         SearchInfo(const DataWrapper *data,
                    const BaseIndex::IndexParams *index_params,

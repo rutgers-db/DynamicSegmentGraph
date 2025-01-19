@@ -161,7 +161,7 @@ public:
         space = new hnswlib_incre::L2Space(data_wrapper->data_dim);
 
         hnsw_index = new hnswlib_incre::HierarchicalNSW<float>(
-            space, 2 * data_wrapper->data_size, index_params->K,
+            space, data_wrapper->data_size, index_params->K,
             index_params->ef_construction);
         for (size_t i = 0; i < data_wrapper->data_size; ++i) {
             hnsw_index->addPoint(data_wrapper->nodes.at(i).data(), i);
@@ -173,7 +173,7 @@ public:
 
     void initForBuilding(const IndexParams *index_params, hnswlib_incre::L2Space *space) {
         hnsw_index = new hnswlib_incre::HierarchicalNSW<float>(
-            space, 2 * data_wrapper->data_size, index_params->K,
+            space, data_wrapper->data_size, index_params->K,
             index_params->ef_construction);
     }
 

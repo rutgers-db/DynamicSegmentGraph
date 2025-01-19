@@ -82,37 +82,14 @@ public:
     void readData(string &dataset_path, string &query_path);
     
     /**
-     * 生成范围过滤查询和地面实况数据
-     */
-    void generateRangeFilteringQueriesAndGroundtruth(bool is_save = false, const string path = "");
-    
-    /**
-     * 生成半边界查询和地面实况数据
-     */
-    void generateHalfBoundedQueriesAndGroundtruth(bool is_save = false, const string path = "");
-    
-    /**
      * 加载地面实况数据
      */
     void LoadGroundtruth(const string &gt_path);
 
     /**
-     * 生成范围过滤查询和地面实况数据（可扩展性版本）
-     */
-    void generateRangeFilteringQueriesAndGroundtruthScalability(bool is_save = false, const string path = "");
-    
-    /**
-     * 生成半边界查询和地面实况数据（可扩展性版本）
-     */
-    void generateHalfBoundedQueriesAndGroundtruthScalability(bool is_save = false, const string path = "");
-    
-    /**
-     * 生成半边界查询和地面实况数据（基准测试版本）
-     */
-    void generateHalfBoundedQueriesAndGroundtruthBenchmark(bool is_save_to_file, const string save_path = "");
-    
-    /**
      * 生成范围过滤查询和地面实况数据（基准测试版本）
      */
     void generateRangeFilteringQueriesAndGroundtruthBenchmark(bool is_save_to_file, const string save_path = "");
+
+    void generateIncrementalInsertionGroundtruth(int num_parts, const string &save_dir);
 };

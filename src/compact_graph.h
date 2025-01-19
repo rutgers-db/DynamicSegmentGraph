@@ -19,6 +19,7 @@
 #include <queue>
 #include <vector>
 #include <random>
+#include <set>
 #include <unordered_map>
 #include <fstream>
 
@@ -84,7 +85,7 @@ public:
                 size_t max_elements,
                 size_t M = 16,
                 size_t ef_construction = 200,
-                size_t random_seed = 100) :
+                size_t random_seed = 100) : alpha(index_params.alpha),
         HierarchicalNSW(s, max_elements, M, index_params.ef_construction, random_seed) {
         // 将传入的索引参数指针赋值给成员变量
         params = &index_params;
@@ -92,6 +93,9 @@ public:
         // 设置最大扩展因子为索引参数中的ef_max值
         ef_max_ = index_params.ef_max;
     }
+
+    // alpha in Vamana
+    const float alpha = 1.0;
 
     unsigned max_external_id_ = 0;
     unsigned min_external_id_ = std::numeric_limits<unsigned>::max();
@@ -329,7 +333,7 @@ public:
                     } else {
                         // if not calculated, we need to calculate the result
                         dist_t tmp_dist = fstdistfunc_(getDataByInternalId(sorted_cands[i].first), getDataByInternalId(sorted_cands[pre_nb_idx].first), dist_func_param_);
-                        auto domination_result = tmp_dist < cur_dist;
+                        auto domination_result = alpha * tmp_dist < cur_dist; // alpha inspired by Vamana
                         calculated_pair[encoded_pair] = domination_result;
                         if (domination_result) {
                             dominated_flag = true;
@@ -376,9 +380,9 @@ public:
     }
 
     void generate_compressed_neighbors(const void *data_point,
-        std::priority_queue<std::pair<dist_t, tableint>> &queue_closest,
-        unsigned center_external_id,
-        const unsigned &index_k) {
+                                       std::priority_queue<std::pair<dist_t, tableint>> &queue_closest,
+                                       unsigned center_external_id,
+                                       const unsigned &index_k) {
         if (queue_closest.size() == 0) {
             return;
         }
@@ -386,8 +390,6 @@ public:
         // // TODO: Make sure left bound as 0 is perfect? no any bugs? if -1 that will be fined but if 0 I am not sure
         unsigned tmp_left_bound = 0;
         unsigned tmp_right_bound = max_elements_;
-        int rmost_inL = -1;
-        int lmost_inR = max_elements_ + 1;
 
         sorted_cands.clear();
         while (!queue_closest.empty()) {
@@ -400,10 +402,6 @@ public:
 
             // Update lmost and rmost
             int tmp_label = getExternalLabel(current_pair.second);
-            if (tmp_label < center_external_id)
-                rmost_inL = std::max(rmost_inL, tmp_label);
-            else
-                lmost_inR = std::min(lmost_inR, tmp_label);
         }
 
         // Not need to find compressed points, not need
@@ -411,7 +409,12 @@ public:
             return;
 
         // search second time to fill the neighbors that falls in short range and also avoid ef_max is too short
-        // auto inner_range = make_pair(rmost_inL, lmost_inR);
+        // int inL = 0;
+        // int inR = max_elements_;
+        // int half_srange_size = max_elements_ * 0.02;
+        // inL = std::max(inL, (int)center_external_id - half_srange_size); 
+        // inR = std::min(inR, (int)center_external_id + half_srange_size);
+        // auto inner_range = make_pair((unsigned)inL, (unsigned)inR);
         // innerSearchInRange(data_point, center_external_id, inner_range);
 
         // some initiliazation for some variables serving for dfs function
@@ -455,36 +458,38 @@ public:
 
     vector<unsigned> fetched_nns;
     void innerSearchInRange(const void *data_point,
-        unsigned center_external_id,
-        std::pair<int, int> query_bound) {
+                            unsigned center_external_id,
+                            std::pair<unsigned, unsigned> query_bound) {
         fetched_nns.clear();
 
         // 初始化访问列表
         VisitedList *vl = visited_list_pool_->getFreeVisitedList();
         vl_type *visited_array = vl->mass;
         vl_type visited_array_tag = vl->curV;
-        float lower_bound = std::numeric_limits<float>::max(); // 最低界限初始化为最大浮点数
-        std::priority_queue<pair<dist_t, tableint>> top_candidates;  // 优先队列存储候选结果
-        std::priority_queue<pair<dist_t, tableint>> candidate_set;   // 候选集优先队列
+        float lower_bound = std::numeric_limits<float>::max();      // 最低界限初始化为最大浮点数
+        std::priority_queue<pair<dist_t, tableint>> top_candidates; // 优先队列存储候选结果
+        std::priority_queue<pair<dist_t, tableint>> candidate_set;  // 候选集优先队列
 
-        // we choose entry points as the points in the sorted_cands that are attributely closest to center_external_id
-        if (query_bound.first != -1) {
-            auto point = query_bound.first;
-            float dist = fstdistfunc_(getDataByLabel(point), data_point, dist_func_param_);
-            candidate_set.push(make_pair(-dist, point)); // 将负距离和点ID推入候选集
-            visited_array[point] = visited_array_tag;
+        // To choose the entry points, we can iterate the sorted_cands and choose the points that are in the query_bound alreay
+        for (auto &point : sorted_cands) {
+            auto point_id = point.first;
+            if (point_id < query_bound.first || point_id > query_bound.second)
+                continue;
+            auto dist = point.second;
+            candidate_set.push(make_pair(-dist, point_id)); // 将负距离和点ID推入候选集
+            visited_array[point_id] = visited_array_tag;
         }
 
-        if (query_bound.second != max_elements_ + 1) {
-            auto point = query_bound.second;
-            float dist = fstdistfunc_(getDataByLabel(point), data_point, dist_func_param_);
-            candidate_set.push(make_pair(-dist, point)); // 将负距离和点ID推入候选集
-            visited_array[point] = visited_array_tag;
+        // We need to consider the case that there are no points in the query_bound in the sorted_cands
+        if (candidate_set.empty()) {
+            // Because we only use this when inserted points are all in the query_bound.first,central_id
+            // So we can just use some points located in the range [query_bound.first, central_id]
+            // Init the entry as (central_id-query_bound.first) /2
+            unsigned point_id = query_bound.first + (center_external_id - query_bound.first) / 2;
+            float dist = fstdistfunc_(getDataByLabel(point_id), data_point, dist_func_param_);
+            candidate_set.push(make_pair(-dist, point_id)); // 将负距离和点ID推入候选集
+            visited_array[point_id] = visited_array_tag;
         }
-
-        // avoid the boundary that have been accounted for
-        query_bound.first++;
-        query_bound.second--;
 
         auto ef = ef_max_;
 
@@ -550,23 +555,22 @@ public:
         }
 
         // push the results in top_candidates into a small heap
-        auto small_range_filter = 2000;
+        auto small_range_filter = max_elements_ * 0.002;
         std::priority_queue<std::pair<dist_t, tableint>> queue_closest;
-        auto pre_farthest_dist = sorted_cands.back().second;
         while (!top_candidates.empty()) {
             // if it is closer, highly likely that it has been in sorted_cands.
             // We do not need the points inside small_range_filter
-            if (top_candidates.top().first > pre_farthest_dist && std::abs((int)top_candidates.top().second - (int)center_external_id) > small_range_filter)
-                queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second); // 提取节点ID构建结果
+            if (std::abs((int)top_candidates.top().second - (int)center_external_id) > small_range_filter)
+                sorted_cands.emplace_back(top_candidates.top().second, top_candidates.top().first);
             top_candidates.pop();
         }
 
-        while (!queue_closest.empty()) {
-            std::pair<dist_t, tableint> current_pair = queue_closest.top();
-            dist_t dist_to_query = -current_pair.first;
-            sorted_cands.emplace_back(current_pair.second, dist_to_query);
-            queue_closest.pop();
-        }
+        // We need to resort the sorted_cands and unique them because we may have duplicate points after the above process
+        // Sorting is based on the pair.second which is the distance
+        std::sort(sorted_cands.begin(), sorted_cands.end(), [](const std::pair<unsigned, dist_t> &a, const std::pair<unsigned, dist_t> &b) {
+            return a.second < b.second;
+        });
+        sorted_cands.erase(std::unique(sorted_cands.begin(), sorted_cands.end()), sorted_cands.end());
 
         // 释放资源和更新时间统计
         visited_list_pool_->releaseVisitedList(vl);
@@ -813,7 +817,7 @@ public:
         // build HNSW
         L2Space space(data_wrapper->data_dim);
         hnsw = new CompactHNSW<float>(
-            *index_params, &space, 2 * data_wrapper->data_size, index_params->K,
+            *index_params, &space, 2*data_wrapper->data_size, index_params->K,  // 2*
             index_params->ef_construction, index_params->random_seed);
 
         directed_indexed_arr.clear();
@@ -827,11 +831,11 @@ public:
         std::iota(permutation.begin(), permutation.end(), 0);
 
         // Step 2: Shuffle the sequence
-        std::random_device rd;    // obtain a random number from hardware
-        unsigned int seed = 2024; // fix the seed for debug
-        // std::mt19937 g(rd());
-        std::mt19937 g(seed); // seed the generator
-        std::shuffle(permutation.begin(), permutation.end(), g);
+        // std::random_device rd;    // obtain a random number from hardware
+        // unsigned int seed = 2024; // fix the seed for debug
+        // // std::mt19937 g(rd());
+        // std::mt19937 g(seed); // seed the generator
+        // std::shuffle(permutation.begin(), permutation.end(), g);
 
         // Step 3: Traverse the shuffled sequence
 
@@ -866,12 +870,21 @@ public:
         index_params_ = index_params;
         // build HNSW
         hnsw = new CompactHNSW<float>(
-            *index_params, space, 2 * data_wrapper->data_size, index_params->K,
+            *index_params, space, data_wrapper->data_size, index_params->K, // 2*
             index_params->ef_construction, index_params->random_seed);
 
-        // directed_indexed_arr.clear();
+        directed_indexed_arr.clear();
         directed_indexed_arr.resize(data_wrapper->data_size);
         hnsw->compact_graph = &directed_indexed_arr;
+    }
+
+    std::set<int> label_set;
+    void initLabelSet() {
+        for (int i = 0; i < directed_indexed_arr.size(); i++) {
+            if (directed_indexed_arr[i].nns.size() != 0){
+                label_set.insert(i);
+            }
+        }
     }
 
     void rebuild_batchInHNSW(vector<unsigned> &nodes_ids) {
@@ -937,24 +950,43 @@ public:
         std::priority_queue<pair<float, int>> top_candidates;  // 优先队列存储候选结果
         std::priority_queue<pair<float, int>> candidate_set;   // 候选集优先队列
 
-        search_info->reset();
-        num_search_comparison = 0;
+        // search_info->reset();
+        // num_search_comparison = 0;
 
-        // 初始化三个entry points
         {
             int lbound = query_bound.first;
-            int interval = (query_bound.second - lbound) / 3;
-            for (size_t i = 0; i < 3; i++) {
-                int point = lbound + interval * i;
-                float dist = EuclideanDistance(data_wrapper->nodes[point], query); // 计算距离
-                candidate_set.push(make_pair(-dist, point));                       // 将负距离和点ID推入候选集
-                visited_array[point] = visited_array_tag;                          // 标记已访问
+            int interval = (query_bound.second - lbound) / 4;
+            for (size_t i = 0; i < 4; i++) {
+                int target_label = lbound + interval * i;
+                auto it = label_set.lower_bound(target_label); // Find the lower bound in the label_set
+                for (; it != label_set.end(); ++it) {
+                    int point = *it;
+
+                    // Check if the point is already visited
+                    if (visited_array[point] == visited_array_tag) {
+                        continue;
+                    }
+
+                    // Calculate distance
+                    float dist = EuclideanDistance(data_wrapper->nodes[point], query);
+
+                    // Push the negative distance and point ID into candidate_set
+                    candidate_set.push(make_pair(-dist, point));
+
+                    // Mark the point as visited
+                    visited_array[point] = visited_array_tag;
+
+                    // Break after finding one point (modify this if you need more than one point from label_set)
+                    break;
+                }
             }
         }
         gettimeofday(&tt3, NULL);
 
-        size_t hop_counter = 0;
+        // size_t hop_counter = 0;
         auto ef = search_params->search_ef;
+        auto M = index_params_->K;
+        auto query_k = search_params->query_K;
 
         while (!candidate_set.empty()) {
             std::pair<float, int> current_node_pair = candidate_set.top(); // 获取当前节点
@@ -965,7 +997,7 @@ public:
                 break;
             }
 
-            hop_counter++;
+            // hop_counter++;
 
             candidate_set.pop();
 
@@ -973,29 +1005,38 @@ public:
 
             auto const &pos_edges = directed_indexed_arr[current_node_id].nns;
             auto const &neg_edges = directed_indexed_arr[current_node_id].rev_nns;
+            auto total_left = pos_edges.size() + neg_edges.size();
             // fetch nns first
             fetched_nns.clear();
             for (auto i = 0; i < pos_edges.size(); i++) {
+                total_left--;
                 const unsigned &candidate_id = pos_edges[i].external_id;
                 if (candidate_id < query_bound.first)
                     continue;
-                if (candidate_id > query_bound.second) // 后面的点都是越界节点
+                if (candidate_id > query_bound.second) { // 后面的点都是越界节点
+                    total_left -= pos_edges.size() - i;
+                    total_left++;
                     break;
+                }
+
                 if (visited_array[candidate_id] == visited_array_tag)
                     continue;
                 const auto &cp = pos_edges[i];
+                // if (fetched_nns.size() + total_left < M ||cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
                 if (cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
                     fetched_nns.emplace_back(candidate_id);
                 }
             }
 
             for (auto i = 0; i < neg_edges.size(); i++) {
+                total_left--;
                 const unsigned &candidate_id = neg_edges[i].external_id;
                 if (candidate_id < query_bound.first || candidate_id > query_bound.second)
                     continue;
                 if (visited_array[candidate_id] == visited_array_tag)
                     continue;
                 auto &cp = neg_edges[i];
+                // if (fetched_nns.size() + total_left < M || cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
                 if (cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
                     fetched_nns.emplace_back(candidate_id);
                 }
@@ -1012,7 +1053,7 @@ public:
                                           data_wrapper->nodes[candidate_id].data(),
                                           dist_func_param_);
 
-                num_search_comparison++; // 更新比较次数
+                // num_search_comparison++; // 更新比较次数
                 if (top_candidates.size() < ef) {
                     candidate_set.emplace(-dist, candidate_id); // 推入候选集
                     top_candidates.emplace(dist, candidate_id); // 推入顶级候选集
@@ -1049,7 +1090,8 @@ public:
         int end_flag = 0x7fffffff;
         log_query_path_nns.write(reinterpret_cast<const char *>(&end_flag), sizeof(end_flag));
 #endif
-        while (top_candidates.size() > search_params->query_K) {
+        
+        while (top_candidates.size() > query_k) {
             top_candidates.pop(); // 减少候选集至所需K个
         }
 
@@ -1059,8 +1101,8 @@ public:
             res.emplace_back(top_candidates.top().second); // 提取节点ID构建结果
             top_candidates.pop();
         }
-        search_info->total_comparison += num_search_comparison; // 更新总比较次数
-        search_info->path_counter += hop_counter;
+        // search_info->total_comparison += num_search_comparison; // 更新总比较次数
+        // search_info->path_counter += hop_counter;
         // search_info->pos_point_traverse_counter = pos_point_traverse_counter;
         // search_info->pos_point_used_counter = pos_point_used_counter;
         // search_info->neg_point_traverse_counter = neg_point_traverse_counter;

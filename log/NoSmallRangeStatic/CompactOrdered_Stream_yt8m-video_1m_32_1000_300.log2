@@ -1,0 +1,485 @@
+Use SSE
+Print the first groundtruth path/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/yt8m-video_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs
+Reading Data: /research/projects/zp128/RangeIndexWithRandomInsertion/data/exp2_used_data/yt8m_video_1_2m.fvecs
+Finish Reading Data
+Reading Data: /research/projects/zp128/RangeIndexWithRandomInsertion/data/yt8m_video_querys_10k.fvecs
+Finish Reading Data
+Load vecs from: /research/projects/zp128/RangeIndexWithRandomInsertion/data/exp2_used_data/yt8m_video_1_2m.fvecs
+# of vecs: 1200000
+search ef:
+vertex in set: {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400}
+index K:32 ef construction: 300 ef_max: 1000
+ parameters: ef_construction ( 300 )  index-k( 32)  ef_max (1000) 
+Max. nns length of one point246
+Sum of forward nn #: 40128032
+Avg. forward nn #: 33.44
+Avg. delta nn #: 33.44
+Global Array Allocation: 808896 KB memory used.
+Loading Groundtruth from/research/projects/zp128/RangeIndexWithRandomInsertion/groundtruth/yt8m-video_benchmark-groundtruth-deep-1m-num1000-k10.arbitrary.cvs...    Done!
+
+Search ef: 1
+========================
+range: 10000	 recall: 0.0845	 QPS: 1695	Comps: 578	 Hops: 4.2850
+range: 20000	 recall: 0.0785	 QPS: 1135	Comps: 732	 Hops: 4.4440
+range: 40000	 recall: 0.0741	 QPS: 909	Comps: 842	 Hops: 4.6550
+range: 80000	 recall: 0.0656	 QPS: 712	Comps: 956	 Hops: 4.9650
+range: 160000	 recall: 0.0610	 QPS: 595	Comps: 1108	 Hops: 5.1530
+range: 320000	 recall: 0.0578	 QPS: 730	Comps: 1262	 Hops: 5.4410
+range: 640000	 recall: 0.0491	 QPS: 800	Comps: 1298	 Hops: 5.5560
+========================
+# total query time: 8.3615910s
+
+Search ef: 2
+========================
+range: 10000	 recall: 0.1796	 QPS: 1148	Comps: 714	 Hops: 5.6300
+range: 20000	 recall: 0.1737	 QPS: 1293	Comps: 912	 Hops: 5.8750
+range: 40000	 recall: 0.1637	 QPS: 1215	Comps: 1057	 Hops: 6.2050
+range: 80000	 recall: 0.1539	 QPS: 1017	Comps: 1213	 Hops: 6.6690
+range: 160000	 recall: 0.1489	 QPS: 895	Comps: 1402	 Hops: 6.9920
+range: 320000	 recall: 0.1415	 QPS: 816	Comps: 1556	 Hops: 7.3230
+range: 640000	 recall: 0.1302	 QPS: 783	Comps: 1614	 Hops: 7.6660
+========================
+# total query time: 7.1408090s
+
+Search ef: 3
+========================
+range: 10000	 recall: 0.2725	 QPS: 2012	Comps: 816	 Hops: 6.7410
+range: 20000	 recall: 0.2660	 QPS: 1458	Comps: 1021	 Hops: 6.9940
+range: 40000	 recall: 0.2508	 QPS: 1217	Comps: 1164	 Hops: 7.3760
+range: 80000	 recall: 0.2432	 QPS: 978	Comps: 1346	 Hops: 8.0260
+range: 160000	 recall: 0.2370	 QPS: 812	Comps: 1542	 Hops: 8.3540
+range: 320000	 recall: 0.2299	 QPS: 739	Comps: 1743	 Hops: 8.8040
+range: 640000	 recall: 0.2165	 QPS: 697	Comps: 1832	 Hops: 9.3080
+========================
+# total query time: 7.0855070s
+
+Search ef: 4
+========================
+range: 10000	 recall: 0.3643	 QPS: 1859	Comps: 899	 Hops: 7.7990
+range: 20000	 recall: 0.3578	 QPS: 1391	Comps: 1126	 Hops: 8.1260
+range: 40000	 recall: 0.3409	 QPS: 1095	Comps: 1262	 Hops: 8.5420
+range: 80000	 recall: 0.3286	 QPS: 917	Comps: 1438	 Hops: 9.1310
+range: 160000	 recall: 0.3209	 QPS: 771	Comps: 1663	 Hops: 9.5420
+range: 320000	 recall: 0.3097	 QPS: 696	Comps: 1881	 Hops: 9.9810
+range: 640000	 recall: 0.3019	 QPS: 662	Comps: 1972	 Hops: 10.6710
+========================
+# total query time: 7.5413540s
+
+Search ef: 5
+========================
+range: 10000	 recall: 0.4515	 QPS: 1754	Comps: 960	 Hops: 8.7330
+range: 20000	 recall: 0.4444	 QPS: 1264	Comps: 1191	 Hops: 9.1370
+range: 40000	 recall: 0.4221	 QPS: 1030	Comps: 1346	 Hops: 9.5410
+range: 80000	 recall: 0.4108	 QPS: 868	Comps: 1524	 Hops: 10.2160
+range: 160000	 recall: 0.4037	 QPS: 736	Comps: 1776	 Hops: 10.6880
+range: 320000	 recall: 0.3895	 QPS: 670	Comps: 1970	 Hops: 11.1230
+range: 640000	 recall: 0.3842	 QPS: 621	Comps: 2064	 Hops: 11.8880
+========================
+# total query time: 7.9819990s
+
+Search ef: 6
+========================
+range: 10000	 recall: 0.5398	 QPS: 1633	Comps: 1023	 Hops: 9.7460
+range: 20000	 recall: 0.5274	 QPS: 1199	Comps: 1265	 Hops: 10.1140
+range: 40000	 recall: 0.5061	 QPS: 987	Comps: 1422	 Hops: 10.6250
+range: 80000	 recall: 0.4816	 QPS: 840	Comps: 1598	 Hops: 11.1800
+range: 160000	 recall: 0.4819	 QPS: 693	Comps: 1868	 Hops: 11.7780
+range: 320000	 recall: 0.4723	 QPS: 627	Comps: 2063	 Hops: 12.2910
+range: 640000	 recall: 0.4625	 QPS: 581	Comps: 2190	 Hops: 13.0480
+========================
+# total query time: 8.4472590s
+
+Search ef: 7
+========================
+range: 10000	 recall: 0.6214	 QPS: 1645	Comps: 1079	 Hops: 10.6490
+range: 20000	 recall: 0.6049	 QPS: 1202	Comps: 1332	 Hops: 11.0620
+range: 40000	 recall: 0.5849	 QPS: 959	Comps: 1516	 Hops: 11.6920
+range: 80000	 recall: 0.5611	 QPS: 792	Comps: 1685	 Hops: 12.3110
+range: 160000	 recall: 0.5576	 QPS: 659	Comps: 1968	 Hops: 12.8470
+range: 320000	 recall: 0.5466	 QPS: 609	Comps: 2132	 Hops: 13.3460
+range: 640000	 recall: 0.5317	 QPS: 569	Comps: 2273	 Hops: 14.0800
+========================
+# total query time: 8.7018490s
+
+Search ef: 8
+========================
+range: 10000	 recall: 0.6916	 QPS: 1550	Comps: 1140	 Hops: 11.6030
+range: 20000	 recall: 0.6777	 QPS: 1145	Comps: 1401	 Hops: 12.0440
+range: 40000	 recall: 0.6519	 QPS: 924	Comps: 1581	 Hops: 12.6530
+range: 80000	 recall: 0.6261	 QPS: 748	Comps: 1767	 Hops: 13.2620
+range: 160000	 recall: 0.6256	 QPS: 627	Comps: 2049	 Hops: 13.8850
+range: 320000	 recall: 0.6116	 QPS: 594	Comps: 2212	 Hops: 14.3590
+range: 640000	 recall: 0.5940	 QPS: 547	Comps: 2342	 Hops: 15.1220
+========================
+# total query time: 9.0838390s
+
+Search ef: 9
+========================
+range: 10000	 recall: 0.7522	 QPS: 1460	Comps: 1198	 Hops: 12.5310
+range: 20000	 recall: 0.7355	 QPS: 1099	Comps: 1455	 Hops: 12.9800
+range: 40000	 recall: 0.7067	 QPS: 893	Comps: 1658	 Hops: 13.6120
+range: 80000	 recall: 0.6781	 QPS: 733	Comps: 1832	 Hops: 14.2010
+range: 160000	 recall: 0.6797	 QPS: 627	Comps: 2122	 Hops: 14.8220
+range: 320000	 recall: 0.6680	 QPS: 569	Comps: 2288	 Hops: 15.4040
+range: 640000	 recall: 0.6533	 QPS: 538	Comps: 2421	 Hops: 16.1930
+========================
+# total query time: 9.3300450s
+
+Search ef: 10
+========================
+range: 10000	 recall: 0.7907	 QPS: 1408	Comps: 1248	 Hops: 13.4650
+range: 20000	 recall: 0.7778	 QPS: 1065	Comps: 1508	 Hops: 13.9380
+range: 40000	 recall: 0.7501	 QPS: 845	Comps: 1723	 Hops: 14.6130
+range: 80000	 recall: 0.7164	 QPS: 677	Comps: 1903	 Hops: 15.1460
+range: 160000	 recall: 0.7145	 QPS: 579	Comps: 2187	 Hops: 15.7440
+range: 320000	 recall: 0.7092	 QPS: 532	Comps: 2357	 Hops: 16.3840
+range: 640000	 recall: 0.6957	 QPS: 508	Comps: 2499	 Hops: 17.1750
+========================
+# total query time: 9.9268060s
+
+Search ef: 11
+========================
+range: 10000	 recall: 0.8052	 QPS: 1345	Comps: 1302	 Hops: 14.4330
+range: 20000	 recall: 0.7893	 QPS: 1038	Comps: 1569	 Hops: 14.8590
+range: 40000	 recall: 0.7608	 QPS: 817	Comps: 1788	 Hops: 15.5250
+range: 80000	 recall: 0.7330	 QPS: 682	Comps: 1975	 Hops: 16.1730
+range: 160000	 recall: 0.7318	 QPS: 563	Comps: 2266	 Hops: 16.7570
+range: 320000	 recall: 0.7250	 QPS: 534	Comps: 2428	 Hops: 17.3790
+range: 640000	 recall: 0.7105	 QPS: 498	Comps: 2560	 Hops: 18.1640
+========================
+# total query time: 10.0929010s
+
+Search ef: 12
+========================
+range: 10000	 recall: 0.8180	 QPS: 1298	Comps: 1351	 Hops: 15.3780
+range: 20000	 recall: 0.8002	 QPS: 998	Comps: 1621	 Hops: 15.7870
+range: 40000	 recall: 0.7714	 QPS: 809	Comps: 1848	 Hops: 16.4630
+range: 80000	 recall: 0.7456	 QPS: 656	Comps: 2037	 Hops: 17.1370
+range: 160000	 recall: 0.7468	 QPS: 560	Comps: 2330	 Hops: 17.7730
+range: 320000	 recall: 0.7417	 QPS: 529	Comps: 2495	 Hops: 18.3750
+range: 640000	 recall: 0.7248	 QPS: 487	Comps: 2638	 Hops: 19.1530
+========================
+# total query time: 10.3035530s
+
+Search ef: 13
+========================
+range: 10000	 recall: 0.8264	 QPS: 1250	Comps: 1399	 Hops: 16.3040
+range: 20000	 recall: 0.8131	 QPS: 955	Comps: 1673	 Hops: 16.7570
+range: 40000	 recall: 0.7795	 QPS: 792	Comps: 1897	 Hops: 17.3520
+range: 80000	 recall: 0.7595	 QPS: 628	Comps: 2105	 Hops: 18.1370
+range: 160000	 recall: 0.7588	 QPS: 540	Comps: 2395	 Hops: 18.7210
+range: 320000	 recall: 0.7504	 QPS: 477	Comps: 2556	 Hops: 19.2970
+range: 640000	 recall: 0.7387	 QPS: 447	Comps: 2703	 Hops: 20.1600
+========================
+# total query time: 10.9258790s
+
+Search ef: 14
+========================
+range: 10000	 recall: 0.8364	 QPS: 1231	Comps: 1445	 Hops: 17.2670
+range: 20000	 recall: 0.8234	 QPS: 927	Comps: 1730	 Hops: 17.7180
+range: 40000	 recall: 0.7888	 QPS: 746	Comps: 1967	 Hops: 18.2860
+range: 80000	 recall: 0.7709	 QPS: 609	Comps: 2175	 Hops: 19.1130
+range: 160000	 recall: 0.7688	 QPS: 513	Comps: 2452	 Hops: 19.6940
+range: 320000	 recall: 0.7600	 QPS: 473	Comps: 2607	 Hops: 20.2490
+range: 640000	 recall: 0.7514	 QPS: 439	Comps: 2777	 Hops: 21.1940
+========================
+# total query time: 11.2532760s
+
+Search ef: 15
+========================
+range: 10000	 recall: 0.8465	 QPS: 1182	Comps: 1492	 Hops: 18.2520
+range: 20000	 recall: 0.8307	 QPS: 901	Comps: 1785	 Hops: 18.6210
+range: 40000	 recall: 0.7971	 QPS: 728	Comps: 2027	 Hops: 19.2350
+range: 80000	 recall: 0.7811	 QPS: 604	Comps: 2237	 Hops: 20.0640
+range: 160000	 recall: 0.7759	 QPS: 504	Comps: 2510	 Hops: 20.6340
+range: 320000	 recall: 0.7704	 QPS: 485	Comps: 2665	 Hops: 21.2480
+range: 640000	 recall: 0.7600	 QPS: 445	Comps: 2835	 Hops: 22.1720
+========================
+# total query time: 11.3196390s
+
+Search ef: 16
+========================
+range: 10000	 recall: 0.8574	 QPS: 1146	Comps: 1541	 Hops: 19.2630
+range: 20000	 recall: 0.8400	 QPS: 882	Comps: 1837	 Hops: 19.6000
+range: 40000	 recall: 0.8061	 QPS: 708	Comps: 2080	 Hops: 20.1920
+range: 80000	 recall: 0.7895	 QPS: 586	Comps: 2289	 Hops: 21.0030
+range: 160000	 recall: 0.7837	 QPS: 491	Comps: 2565	 Hops: 21.5480
+range: 320000	 recall: 0.7788	 QPS: 450	Comps: 2724	 Hops: 22.1890
+range: 640000	 recall: 0.7705	 QPS: 426	Comps: 2893	 Hops: 23.1670
+========================
+# total query time: 11.7678910s
+
+Search ef: 17
+========================
+range: 10000	 recall: 0.8635	 QPS: 1106	Comps: 1591	 Hops: 20.2200
+range: 20000	 recall: 0.8470	 QPS: 839	Comps: 1892	 Hops: 20.5600
+range: 40000	 recall: 0.8115	 QPS: 674	Comps: 2146	 Hops: 21.1530
+range: 80000	 recall: 0.7960	 QPS: 565	Comps: 2347	 Hops: 21.9040
+range: 160000	 recall: 0.7927	 QPS: 490	Comps: 2629	 Hops: 22.5250
+range: 320000	 recall: 0.7863	 QPS: 448	Comps: 2787	 Hops: 23.1580
+range: 640000	 recall: 0.7775	 QPS: 426	Comps: 2948	 Hops: 24.0750
+========================
+# total query time: 12.0114390s
+
+Search ef: 18
+========================
+range: 10000	 recall: 0.8694	 QPS: 1071	Comps: 1632	 Hops: 21.1500
+range: 20000	 recall: 0.8516	 QPS: 811	Comps: 1944	 Hops: 21.4920
+range: 40000	 recall: 0.8183	 QPS: 638	Comps: 2217	 Hops: 22.1180
+range: 80000	 recall: 0.8038	 QPS: 554	Comps: 2414	 Hops: 22.8730
+range: 160000	 recall: 0.8002	 QPS: 478	Comps: 2691	 Hops: 23.4660
+range: 320000	 recall: 0.7917	 QPS: 445	Comps: 2850	 Hops: 24.1060
+range: 640000	 recall: 0.7827	 QPS: 422	Comps: 3029	 Hops: 25.0060
+========================
+# total query time: 12.2916470s
+
+Search ef: 19
+========================
+range: 10000	 recall: 0.8752	 QPS: 1069	Comps: 1676	 Hops: 22.1360
+range: 20000	 recall: 0.8571	 QPS: 786	Comps: 1992	 Hops: 22.4250
+range: 40000	 recall: 0.8238	 QPS: 635	Comps: 2279	 Hops: 23.0440
+range: 80000	 recall: 0.8120	 QPS: 533	Comps: 2485	 Hops: 23.8510
+range: 160000	 recall: 0.8084	 QPS: 469	Comps: 2755	 Hops: 24.4160
+range: 320000	 recall: 0.7989	 QPS: 442	Comps: 2919	 Hops: 25.0620
+range: 640000	 recall: 0.7895	 QPS: 413	Comps: 3082	 Hops: 25.9320
+========================
+# total query time: 12.5072510s
+
+Search ef: 20
+========================
+range: 10000	 recall: 0.8799	 QPS: 1019	Comps: 1719	 Hops: 23.0700
+range: 20000	 recall: 0.8623	 QPS: 777	Comps: 2047	 Hops: 23.3710
+range: 40000	 recall: 0.8322	 QPS: 622	Comps: 2336	 Hops: 24.0420
+range: 80000	 recall: 0.8174	 QPS: 524	Comps: 2541	 Hops: 24.7820
+range: 160000	 recall: 0.8139	 QPS: 443	Comps: 2817	 Hops: 25.3590
+range: 320000	 recall: 0.8042	 QPS: 403	Comps: 2982	 Hops: 25.9970
+range: 640000	 recall: 0.7966	 QPS: 380	Comps: 3158	 Hops: 26.9500
+========================
+# total query time: 13.1998270s
+
+Search ef: 21
+========================
+range: 10000	 recall: 0.8853	 QPS: 1011	Comps: 1759	 Hops: 24.0250
+range: 20000	 recall: 0.8705	 QPS: 764	Comps: 2104	 Hops: 24.4030
+range: 40000	 recall: 0.8396	 QPS: 609	Comps: 2399	 Hops: 25.0420
+range: 80000	 recall: 0.8233	 QPS: 507	Comps: 2610	 Hops: 25.7450
+range: 160000	 recall: 0.8214	 QPS: 431	Comps: 2879	 Hops: 26.3620
+range: 320000	 recall: 0.8103	 QPS: 397	Comps: 3048	 Hops: 26.9590
+range: 640000	 recall: 0.8016	 QPS: 373	Comps: 3224	 Hops: 27.8660
+========================
+# total query time: 13.4692930s
+
+Search ef: 22
+========================
+range: 10000	 recall: 0.8888	 QPS: 984	Comps: 1799	 Hops: 24.9510
+range: 20000	 recall: 0.8753	 QPS: 740	Comps: 2155	 Hops: 25.3520
+range: 40000	 recall: 0.8435	 QPS: 588	Comps: 2450	 Hops: 25.9720
+range: 80000	 recall: 0.8288	 QPS: 494	Comps: 2670	 Hops: 26.7230
+range: 160000	 recall: 0.8255	 QPS: 418	Comps: 2937	 Hops: 27.3190
+range: 320000	 recall: 0.8174	 QPS: 382	Comps: 3109	 Hops: 27.9640
+range: 640000	 recall: 0.8058	 QPS: 378	Comps: 3292	 Hops: 28.7720
+========================
+# total query time: 13.7920040s
+
+Search ef: 23
+========================
+range: 10000	 recall: 0.8937	 QPS: 988	Comps: 1840	 Hops: 25.9370
+range: 20000	 recall: 0.8794	 QPS: 727	Comps: 2201	 Hops: 26.2650
+range: 40000	 recall: 0.8496	 QPS: 562	Comps: 2504	 Hops: 26.9780
+range: 80000	 recall: 0.8329	 QPS: 481	Comps: 2725	 Hops: 27.6720
+range: 160000	 recall: 0.8291	 QPS: 430	Comps: 2994	 Hops: 28.2440
+range: 320000	 recall: 0.8221	 QPS: 406	Comps: 3165	 Hops: 28.9520
+range: 640000	 recall: 0.8116	 QPS: 387	Comps: 3357	 Hops: 29.7710
+========================
+# total query time: 13.6626600s
+
+Search ef: 24
+========================
+range: 10000	 recall: 0.8982	 QPS: 958	Comps: 1880	 Hops: 26.8840
+range: 20000	 recall: 0.8835	 QPS: 725	Comps: 2257	 Hops: 27.2580
+range: 40000	 recall: 0.8532	 QPS: 564	Comps: 2553	 Hops: 27.8850
+range: 80000	 recall: 0.8383	 QPS: 488	Comps: 2785	 Hops: 28.6250
+range: 160000	 recall: 0.8330	 QPS: 431	Comps: 3045	 Hops: 29.1530
+range: 320000	 recall: 0.8273	 QPS: 411	Comps: 3226	 Hops: 29.9080
+range: 640000	 recall: 0.8185	 QPS: 377	Comps: 3415	 Hops: 30.7530
+========================
+# total query time: 13.6892980s
+
+Search ef: 25
+========================
+range: 10000	 recall: 0.9017	 QPS: 947	Comps: 1918	 Hops: 27.8260
+range: 20000	 recall: 0.8864	 QPS: 703	Comps: 2304	 Hops: 28.1550
+range: 40000	 recall: 0.8562	 QPS: 579	Comps: 2614	 Hops: 28.8230
+range: 80000	 recall: 0.8422	 QPS: 474	Comps: 2843	 Hops: 29.5490
+range: 160000	 recall: 0.8387	 QPS: 415	Comps: 3105	 Hops: 30.0990
+range: 320000	 recall: 0.8320	 QPS: 390	Comps: 3284	 Hops: 30.8770
+range: 640000	 recall: 0.8229	 QPS: 373	Comps: 3463	 Hops: 31.7020
+========================
+# total query time: 14.0146760s
+
+Search ef: 26
+========================
+range: 10000	 recall: 0.9054	 QPS: 927	Comps: 1956	 Hops: 28.7990
+range: 20000	 recall: 0.8911	 QPS: 704	Comps: 2353	 Hops: 29.1270
+range: 40000	 recall: 0.8610	 QPS: 559	Comps: 2667	 Hops: 29.7600
+range: 80000	 recall: 0.8474	 QPS: 467	Comps: 2905	 Hops: 30.5670
+range: 160000	 recall: 0.8420	 QPS: 410	Comps: 3176	 Hops: 31.0320
+range: 320000	 recall: 0.8349	 QPS: 385	Comps: 3340	 Hops: 31.7960
+range: 640000	 recall: 0.8264	 QPS: 369	Comps: 3512	 Hops: 32.6160
+========================
+# total query time: 14.2166300s
+
+Search ef: 27
+========================
+range: 10000	 recall: 0.9100	 QPS: 912	Comps: 1992	 Hops: 29.7540
+range: 20000	 recall: 0.8937	 QPS: 679	Comps: 2404	 Hops: 30.1320
+range: 40000	 recall: 0.8640	 QPS: 549	Comps: 2728	 Hops: 30.7320
+range: 80000	 recall: 0.8500	 QPS: 460	Comps: 2961	 Hops: 31.4970
+range: 160000	 recall: 0.8450	 QPS: 395	Comps: 3236	 Hops: 31.9870
+range: 320000	 recall: 0.8387	 QPS: 377	Comps: 3403	 Hops: 32.7120
+range: 640000	 recall: 0.8296	 QPS: 358	Comps: 3573	 Hops: 33.5650
+========================
+# total query time: 14.5859890s
+
+Search ef: 28
+========================
+range: 10000	 recall: 0.9124	 QPS: 882	Comps: 2031	 Hops: 30.7110
+range: 20000	 recall: 0.8977	 QPS: 670	Comps: 2458	 Hops: 31.1200
+range: 40000	 recall: 0.8664	 QPS: 529	Comps: 2777	 Hops: 31.6650
+range: 80000	 recall: 0.8535	 QPS: 446	Comps: 3014	 Hops: 32.4710
+range: 160000	 recall: 0.8482	 QPS: 387	Comps: 3304	 Hops: 32.9560
+range: 320000	 recall: 0.8434	 QPS: 366	Comps: 3451	 Hops: 33.6830
+range: 640000	 recall: 0.8319	 QPS: 352	Comps: 3622	 Hops: 34.5190
+========================
+# total query time: 14.9623970s
+
+Search ef: 29
+========================
+range: 10000	 recall: 0.9147	 QPS: 881	Comps: 2067	 Hops: 31.6580
+range: 20000	 recall: 0.9019	 QPS: 656	Comps: 2508	 Hops: 32.1180
+range: 40000	 recall: 0.8694	 QPS: 519	Comps: 2828	 Hops: 32.6230
+range: 80000	 recall: 0.8561	 QPS: 429	Comps: 3071	 Hops: 33.4080
+range: 160000	 recall: 0.8517	 QPS: 372	Comps: 3370	 Hops: 33.9030
+range: 320000	 recall: 0.8468	 QPS: 353	Comps: 3516	 Hops: 34.6200
+range: 640000	 recall: 0.8354	 QPS: 346	Comps: 3672	 Hops: 35.5110
+========================
+# total query time: 15.3728280s
+
+Search ef: 30
+========================
+range: 10000	 recall: 0.9169	 QPS: 874	Comps: 2099	 Hops: 32.6180
+range: 20000	 recall: 0.9051	 QPS: 649	Comps: 2556	 Hops: 33.0590
+range: 40000	 recall: 0.8722	 QPS: 515	Comps: 2878	 Hops: 33.5700
+range: 80000	 recall: 0.8589	 QPS: 424	Comps: 3129	 Hops: 34.3760
+range: 160000	 recall: 0.8547	 QPS: 365	Comps: 3430	 Hops: 34.8690
+range: 320000	 recall: 0.8513	 QPS: 350	Comps: 3587	 Hops: 35.6920
+range: 640000	 recall: 0.8388	 QPS: 331	Comps: 3753	 Hops: 36.5240
+========================
+# total query time: 15.6387470s
+
+Search ef: 31
+========================
+range: 10000	 recall: 0.9195	 QPS: 860	Comps: 2132	 Hops: 33.5910
+range: 20000	 recall: 0.9087	 QPS: 620	Comps: 2603	 Hops: 34.0160
+range: 40000	 recall: 0.8751	 QPS: 498	Comps: 2930	 Hops: 34.6150
+range: 80000	 recall: 0.8627	 QPS: 411	Comps: 3193	 Hops: 35.3410
+range: 160000	 recall: 0.8577	 QPS: 366	Comps: 3494	 Hops: 35.8750
+range: 320000	 recall: 0.8539	 QPS: 341	Comps: 3657	 Hops: 36.6280
+range: 640000	 recall: 0.8443	 QPS: 328	Comps: 3815	 Hops: 37.5480
+========================
+# total query time: 15.9769390s
+
+Search ef: 32
+========================
+range: 10000	 recall: 0.9213	 QPS: 841	Comps: 2163	 Hops: 34.5540
+range: 20000	 recall: 0.9109	 QPS: 620	Comps: 2649	 Hops: 34.9760
+range: 40000	 recall: 0.8783	 QPS: 492	Comps: 2980	 Hops: 35.5920
+range: 80000	 recall: 0.8666	 QPS: 418	Comps: 3258	 Hops: 36.3100
+range: 160000	 recall: 0.8605	 QPS: 361	Comps: 3560	 Hops: 36.8360
+range: 320000	 recall: 0.8575	 QPS: 339	Comps: 3730	 Hops: 37.6080
+range: 640000	 recall: 0.8470	 QPS: 327	Comps: 3877	 Hops: 38.5280
+========================
+# total query time: 16.0472410s
+
+Search ef: 48
+========================
+range: 10000	 recall: 0.9443	 QPS: 680	Comps: 2643	 Hops: 50.2740
+range: 20000	 recall: 0.9367	 QPS: 500	Comps: 3330	 Hops: 50.5050
+range: 40000	 recall: 0.9155	 QPS: 387	Comps: 3814	 Hops: 51.1440
+range: 80000	 recall: 0.8985	 QPS: 321	Comps: 4190	 Hops: 51.8430
+range: 160000	 recall: 0.8931	 QPS: 276	Comps: 4504	 Hops: 52.3470
+range: 320000	 recall: 0.8917	 QPS: 263	Comps: 4694	 Hops: 53.1510
+range: 640000	 recall: 0.8805	 QPS: 254	Comps: 4899	 Hops: 53.9120
+========================
+# total query time: 20.5914400s
+
+Search ef: 64
+========================
+range: 10000	 recall: 0.9592	 QPS: 602	Comps: 3024	 Hops: 66.1040
+range: 20000	 recall: 0.9510	 QPS: 429	Comps: 3911	 Hops: 66.3340
+range: 40000	 recall: 0.9331	 QPS: 329	Comps: 4555	 Hops: 66.8750
+range: 80000	 recall: 0.9196	 QPS: 267	Comps: 5044	 Hops: 67.4950
+range: 160000	 recall: 0.9116	 QPS: 229	Comps: 5445	 Hops: 67.9880
+range: 320000	 recall: 0.9077	 QPS: 216	Comps: 5669	 Hops: 68.7560
+range: 640000	 recall: 0.9029	 QPS: 215	Comps: 5841	 Hops: 69.7050
+========================
+# total query time: 24.4644600s
+
+Search ef: 80
+========================
+range: 10000	 recall: 0.9658	 QPS: 556	Comps: 3328	 Hops: 81.9470
+range: 20000	 recall: 0.9631	 QPS: 381	Comps: 4410	 Hops: 82.1580
+range: 40000	 recall: 0.9438	 QPS: 285	Comps: 5248	 Hops: 82.6610
+range: 80000	 recall: 0.9304	 QPS: 228	Comps: 5840	 Hops: 83.2440
+range: 160000	 recall: 0.9249	 QPS: 193	Comps: 6351	 Hops: 83.7940
+range: 320000	 recall: 0.9232	 QPS: 186	Comps: 6613	 Hops: 84.5380
+range: 640000	 recall: 0.9171	 QPS: 186	Comps: 6798	 Hops: 85.5340
+========================
+# total query time: 28.3195760s
+
+Search ef: 96
+========================
+range: 10000	 recall: 0.9722	 QPS: 516	Comps: 3582	 Hops: 97.8840
+range: 20000	 recall: 0.9692	 QPS: 348	Comps: 4831	 Hops: 98.0810
+range: 40000	 recall: 0.9539	 QPS: 257	Comps: 5863	 Hops: 98.5570
+range: 80000	 recall: 0.9390	 QPS: 203	Comps: 6600	 Hops: 99.0680
+range: 160000	 recall: 0.9366	 QPS: 171	Comps: 7247	 Hops: 99.6470
+range: 320000	 recall: 0.9324	 QPS: 157	Comps: 7581	 Hops: 100.2900
+range: 640000	 recall: 0.9263	 QPS: 157	Comps: 7729	 Hops: 101.2790
+========================
+# total query time: 32.2738070s
+
+Search ef: 112
+========================
+range: 10000	 recall: 0.9763	 QPS: 476	Comps: 3798	 Hops: 113.8260
+range: 20000	 recall: 0.9735	 QPS: 320	Comps: 5200	 Hops: 114.0120
+range: 40000	 recall: 0.9604	 QPS: 224	Comps: 6430	 Hops: 114.4510
+range: 80000	 recall: 0.9481	 QPS: 174	Comps: 7323	 Hops: 114.9860
+range: 160000	 recall: 0.9425	 QPS: 153	Comps: 8077	 Hops: 115.4000
+range: 320000	 recall: 0.9386	 QPS: 147	Comps: 8444	 Hops: 116.0450
+range: 640000	 recall: 0.9353	 QPS: 145	Comps: 8660	 Hops: 117.1370
+========================
+# total query time: 35.7456800s
+
+Search ef: 128
+========================
+range: 10000	 recall: 0.9803	 QPS: 457	Comps: 3983	 Hops: 129.7810
+range: 20000	 recall: 0.9760	 QPS: 303	Comps: 5534	 Hops: 129.9260
+range: 40000	 recall: 0.9653	 QPS: 212	Comps: 6944	 Hops: 130.3580
+range: 80000	 recall: 0.9541	 QPS: 165	Comps: 7998	 Hops: 130.8210
+range: 160000	 recall: 0.9473	 QPS: 142	Comps: 8874	 Hops: 131.2720
+range: 320000	 recall: 0.9444	 QPS: 132	Comps: 9321	 Hops: 131.9600
+range: 640000	 recall: 0.9419	 QPS: 126	Comps: 9590	 Hops: 133.0010
+========================
+# total query time: 38.8566930s
+
+Search ef: 144
+========================
+range: 10000	 recall: 0.9823	 QPS: 440	Comps: 4149	 Hops: 145.7600
+range: 20000	 recall: 0.9787	 QPS: 289	Comps: 5840	 Hops: 145.9040
+range: 40000	 recall: 0.9697	 QPS: 203	Comps: 7422	 Hops: 146.2710
+range: 80000	 recall: 0.9578	 QPS: 156	Comps: 8663	 Hops: 146.7120
+range: 160000	 recall: 0.9520	 QPS: 132	Comps: 9660	 Hops: 147.2320
+range: 320000	 recall: 0.9487	 QPS: 117	Comps: 10147	 Hops: 147.8330
+range: 640000	 recall: 0.9458	 QPS: 113	Comps: 10454	 Hops: 148.8310
+========================

@@ -264,8 +264,8 @@ namespace base_hnsw
             tableint label_c;
             auto search = label_lookup_.find(label);
             if (search == label_lookup_.end() || isMarkedDeleted(search->second))
-            {
-                throw std::runtime_error("Label not found");
+            {   
+                throw std::runtime_error("Label not found: " + std::to_string(label));
             }
             label_c = search->second;
 

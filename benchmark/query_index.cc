@@ -52,9 +52,6 @@ void log_result_recorder(
              << cur_range_amount / internal_search_time << "\t"
              << "Comps: " << comps / cur_range_amount << std::setprecision(4)
              << "\t Hops: " << hops / cur_range_amount << std::setprecision(4) << std::endl;
-        //  << "\t Internal Search Time: " << internal_search_time
-        //  << "\t Fetch NN Time: " << fetch_nn_time
-        //  << "\t CalDist Time: " << calDistTime << std::endl; // 新增一行显示CalDist时间
     }
 }
 
@@ -144,17 +141,18 @@ int main(int argc, char **argv) {
 
     BaseIndex::IndexParams i_params(index_k, ef_construction,
                                     ef_construction, ef_max);
-    BaseIndex* index;
-    if(method == "Seg2D"){
-        index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
-    }else{
+    Compact::IndexCompactGraph* index;
+    // if(method == "Seg2D"){
+    //     index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
+    // }else{
         index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
-    }
+    // }
     BaseIndex::SearchInfo search_info(&data_wrapper, &i_params, "SeRF_2D",
                                       "benchmark");
 
     gettimeofday(&t1, NULL);
     index->load(index_path);
+    index->initLabelSet();
     gettimeofday(&t2, NULL);
     logTime(t1, t2, "Load Index Time");
 

@@ -2,14 +2,14 @@
 
 # Define root directory and N
 
-N=1200000
+N=1000000
 ef_construction=300
 root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/" # Define the root path
 
 # List of datasets
 DATASETS=("deep" "yt8m-video" "wiki-image")
-Ks=(16 32 32)  #16 32 32
-ef_maxs=(500 951 1000) 
+Ks=(16 32 32)  #16 32 32 #32 32 64
+ef_maxs=(500 1000 1000) 
 
 # List of dataset paths with root_path appended
 DATASET_PATHS=("${root_path}data/deep_sorted_10M.fvecs"
@@ -23,8 +23,7 @@ QUERY_PATHS=(
 ) #
 
 # Iterate over datasets and their paths using proper indexing
-for i in $(seq 1 $((${#DATASETS[@]} - 1))); do
-# for i in 0; do
+for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
     dataset="${DATASETS[$i]}"
     dataset_path="${DATASET_PATHS[$i]}"
     query_path="${QUERY_PATHS[$i]}"
@@ -39,18 +38,17 @@ for i in $(seq 1 $((${#DATASETS[@]} - 1))); do
     fi
 
     # Define index path and log file
-    LOG_PATH="${root_path}log/CompactOrdered_Stream_${dataset}_${INDEX_SIZE}_${index_k}_${ef_max}_${ef_construction}.log"
-
+    LOG_PATH="${root_path}log/ordered_stream/dsg/${dataset}_${INDEX_SIZE}_${index_k}_${ef_max}_${ef_construction}.log"
+    # LOG_PATH="${root_path}log/ordered_stream/serf/${dataset}_${INDEX_SIZE}_${index_k}_${ef_max}_${ef_construction}.log"
     # Iterate over methods and run the benchmark
 
     echo "Running benchmark for dataset: $dataset"
-    echo "./benchmark/compact_stream -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max -dataset $dataset -dataset_path $dataset_path -query_path $query_path"
+    echo "./benchmark/ordered_stream -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max -dataset $dataset -dataset_path $dataset_path -query_path $query_path"
 
-    ./benchmark/compact_stream -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max \
+    ./benchmark/ordered_stream -N $N -k $index_k -ef_construction $ef_construction -ef_max $ef_max \
         -dataset $dataset -dataset_path "$dataset_path" -query_path "$query_path" >>"$LOG_PATH"
 
     keep-job 48
-    break
 done
 
 exit 0

@@ -2,9 +2,9 @@
 
 # Define root directory and N
 
-N=1000000
-KS=(64 ) # 32 48 64
-ef_max=1000
+N=100000 #0
+KS=(4 8 16 32 ) # 32 48 64
+ef_max=400
 ef_construction=300
 METHODS=("compact") #"Seg2D" "compact"
 root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/" # Define the root path
@@ -19,7 +19,7 @@ DATASET_PATHS=("${root_path}data/deep_sorted_10M.fvecs"
     "${root_path}data/yt8m_audio_embedding.fvecs")
 
 # Iterate over datasets and their paths using proper indexing
-for i in $(seq 1 $((${#DATASETS[@]} - 2))); do
+for i in $(seq 2 $((${#DATASETS[@]} - 1))); do
     dataset="${DATASETS[$i]}"
     dataset_path="${DATASET_PATHS[$i]}"
 
@@ -49,7 +49,7 @@ for i in $(seq 1 $((${#DATASETS[@]} - 2))); do
                 -dataset $dataset -method $METHOD -dataset_path "$dataset_path" -index_path "$INDEX_PATH" >>"$LOG_PATH"
         done
     done
-
+    break
     keep-job 48
 done
 

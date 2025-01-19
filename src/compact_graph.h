@@ -1,13 +1,3 @@
-/**
- * @file index_recursion_batch.h
- * @author Chaoji Zuo (chaoji.zuo@rutgers.edu)
- * @brief Index for arbitrary range filtering search
- * Compress N SegmentGraph
- * @date 2023-06-19; Revised 2024-01-10
- *
- * @copyright Copyright (c) 2023
- */
-
 #include <algorithm>
 #include <boost/functional/hash.hpp>
 #include <ctime>
@@ -30,13 +20,11 @@ using namespace base_hnsw;
 namespace Compact {
 template <typename dist_t>
 struct CompressedPoint {
-    // 使用初始化列表构造函数，简化赋值操作并提高效率
     // TODO: here it should be a tuple not a pair, there should be ll, lr, rl, rr
     CompressedPoint(unsigned _external_id, unsigned _ll, unsigned _lr, unsigned _rl, unsigned _rr) :
         external_id(_external_id), ll(_ll), lr(_lr), rl(_rl), rr(_rr) {
     }
 
-    // 默认构造函数
     CompressedPoint() {
     }
 
@@ -47,7 +35,6 @@ struct CompressedPoint {
         return ((ll <= query_L && query_L <= lr) && (rl <= query_R && query_R <= rr));
     }
 
-    // 重载小于运算符 (<)，用于按照（距离） or （索引）从小到大排序
     bool operator<(const CompressedPoint &other) const {
         // return this->dist < other.dist;
         return this->external_id < other.external_id;
@@ -68,14 +55,14 @@ template <typename dist_t>
 class CompactHNSW : public HierarchicalNSW<float> {
 public:
     /**
-     * 构造一个二维段图层次邻近搜索树（Hierarchical Navigable Small World graph）实例.
+     * Construct a 2D segment graph hierarchical nearest neighbor search tree (Hierarchical Navigable Small World graph) instance.
      *
-     * @param index_params 索引参数配置对象，包含索引构建过程中的关键参数.
-     * @param s 距离计算空间接口，用于执行距离度量操作.
-     * @param max_elements 最大元素数量，即索引能容纳的最大数据点数.
-     * @param M 默认连接度，每个节点默认与其他M个节点相连.
-     * @param ef_construction 扩展因子，在构造过程中使用的查询效率参数.
-     * @param random_seed 随机种子，用于初始化随机数生成器.
+     * @param index_params Index parameter configuration object, containing key parameters for the index construction process.
+     * @param s Distance calculation space interface, used for performing distance measurement operations.
+     * @param max_elements Maximum number of elements, i.e., the maximum number of data points the index can accommodate.
+     * @param M Default connectivity, each node is connected to M other nodes by default.
+     * @param ef_construction Expansion factor, query efficiency parameter used during construction.
+     * @param random_seed Random seed, used to initialize the random number generator.
      */
     CompactHNSW(const BaseIndex::IndexParams &index_params,
                 SpaceInterface<float> *s,
@@ -84,10 +71,10 @@ public:
                 size_t ef_construction = 200,
                 size_t random_seed = 100) :
         HierarchicalNSW(s, max_elements, M, index_params.ef_construction, random_seed) {
-        // 将传入的索引参数指针赋值给成员变量
+        // Assign the passed index parameter pointer to the member variable
         params = &index_params;
 
-        // 设置最大扩展因子为索引参数中的ef_max值
+        // Set the maximum expansion factor to the ef_max value in the index parameters
         ef_max_ = index_params.ef_max;
     }
 
@@ -101,32 +88,32 @@ public:
 
     size_t Mcurmax;
 
-    // 指向BaseIndex::IndexParams类型的常量指针，存储索引参数
+    // Pointer to a constant BaseIndex::IndexParams type, storing index parameters
     const BaseIndex::IndexParams *params;
 
-    // 存储指向段图邻居列表的指针，表示图结构中的边信息
+    // Pointer to the segment graph neighbor list, representing edge information in the graph structure
     vector<DirectedPointNeighbors<dist_t>> *compact_graph;
     bool if_rebuild_HNSW = false;
     /**
-     * 在构建HNSW图时优化搜索过程，保留更多邻居节点信息。
-     * 这个是基本就是原本的search 就是在整个图里当前层搜最近的
-     * 或许可以结合（RNN-descent）以提升效率??? chaoji left 的。
+     * Optimize the search process when building the HNSW graph, retaining more neighbor node information.
+     * This is basically the original search, searching for the nearest in the current layer of the entire graph.
+     * Perhaps it can be combined with (RNN-descent) to improve efficiency??? chaoji left it.
      *
-     * @param ep_id 起始点ID
-     * @param data_point 数据点指针
-     * @param layer 当前层级
-     * @return 返回一个优先队列，其中包含距离和节点ID对，按距离排序。
+     * @param ep_id Starting point ID
+     * @param data_point Data point pointer
+     * @param layer Current layer
+     * @return Returns a priority queue containing distance and node ID pairs, sorted by distance.
      */
     virtual std::priority_queue<std::pair<dist_t, tableint>,
                                 std::vector<std::pair<dist_t, tableint>>,
                                 CompareByFirst>
     searchBaseLayerLevel0(tableint ep_id, const void *data_point, int layer) {
-        // 获取空闲访问列表
+        // Get free visited list
         VisitedList *vl = visited_list_pool_->getFreeVisitedList();
         vl_type *visited_array = vl->mass;
         vl_type visited_array_tag = vl->curV;
 
-        // 初始化候选集和待处理集合
+        // Initialize candidate set and processing set
         std::priority_queue<std::pair<dist_t, tableint>,
                             std::vector<std::pair<dist_t, tableint>>,
                             CompareByFirst>
@@ -136,13 +123,13 @@ public:
                             CompareByFirst>
             candidateSet;
 
-        // 存储删除的邻接节点列表
+        // Store the list of deleted adjacent nodes
         std::vector<pair<dist_t, tableint>> deleted_list;
 
-        // 设置构造时的EF值
+        // Set the EF value during construction
         size_t ef_construction = ef_max_;
 
-        // 计算起始点的距离下界
+        // Calculate the lower bound of the starting point distance
         dist_t lowerBound;
         if (!isMarkedDeleted(ep_id)) {
             dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id),
@@ -156,7 +143,7 @@ public:
         }
         visited_array[ep_id] = visited_array_tag;
 
-        // 主循环：遍历候选集直到为空
+        // Main loop: traverse the candidate set until it is empty
         while (!candidateSet.empty()) {
             std::pair<dist_t, tableint> curr_el_pair = candidateSet.top();
             if ((-curr_el_pair.first) > lowerBound) {
@@ -164,11 +151,11 @@ public:
             }
             candidateSet.pop();
 
-            // 处理当前节点
+            // Process the current node
             tableint curNodeNum = curr_el_pair.second;
             std::unique_lock<std::mutex> lock(link_list_locks_[curNodeNum]);
 
-            // 根据层级获取链接列表数据
+            // Get link list data based on the layer
             int *data;
             if (layer == 0) {
                 data = (int *)get_linklist0(curNodeNum);
@@ -179,18 +166,18 @@ public:
             tableint *datal = (tableint *)(data + 1);
 
 #ifdef USE_SSE
-            // 预取指令提高性能
+            // Prefetch instructions to improve performance
             _mm_prefetch((char *)(visited_array + *(data + 1)), _MM_HINT_T0);
             _mm_prefetch((char *)(visited_array + *(data + 1) + 64), _MM_HINT_T0);
             _mm_prefetch(getDataByInternalId(*datal), _MM_HINT_T0);
             _mm_prefetch(getDataByInternalId(*(datal + 1)), _MM_HINT_T0);
 #endif
 
-            // 遍历链接列表中的每个元素
+            // Traverse each element in the link list
             for (size_t j = 0; j < size; j++) {
                 tableint candidate_id = *(datal + j);
 #ifdef USE_SSE
-                // 预取指令提高性能
+                // Prefetch instructions to improve performance
                 _mm_prefetch((char *)(visited_array + *(datal + j + 1)), _MM_HINT_T0);
                 _mm_prefetch(getDataByInternalId(*(datal + j + 1)), _MM_HINT_T0);
 #endif
@@ -198,15 +185,15 @@ public:
                     continue;
                 visited_array[candidate_id] = visited_array_tag;
 
-                // 计算候选节点到目标点的距离
+                // Calculate the distance from the candidate node to the target point
                 char *currObj1 = (getDataByInternalId(candidate_id));
                 dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_);
 
-                // 更新候选集和已访问节点
+                // Update the candidate set and visited nodes
                 if (top_candidates.size() < ef_construction || lowerBound > dist1) {
                     candidateSet.emplace(-dist1, candidate_id);
 #ifdef USE_SSE
-                    // 预取指令提高性能
+                    // Prefetch instructions to improve performance
                     _mm_prefetch(getDataByInternalId(candidateSet.top().second),
                                  _MM_HINT_T0);
 #endif
@@ -214,7 +201,7 @@ public:
                     if (!isMarkedDeleted(candidate_id))
                         top_candidates.emplace(dist1, candidate_id);
 
-                    // 记录并移除超出EF限制的节点
+                    // Record and remove nodes that exceed the EF limit
                     if (top_candidates.size() > ef_construction) {
                         deleted_list.emplace_back(top_candidates.top());
                         top_candidates.pop();
@@ -226,10 +213,10 @@ public:
             }
         }
 
-        // 释放访问列表资源
+        // Release visited list resources
         visited_list_pool_->releaseVisitedList(vl);
 
-        // 将之前记录的删除节点重新加入候选集
+        // Re-add previously recorded deleted nodes to the candidate set
         for (auto deleted_candidate : deleted_list) {
             top_candidates.emplace(deleted_candidate);
         }
@@ -262,7 +249,7 @@ public:
                 selectedNeighbors.push_back((tableint)point);
             }
 
-            return_list.clear(); // 这里会清空return list
+            return_list.clear(); // Clear the return list here
             iter_counter = 0;
             complete = true;
             return;
@@ -271,7 +258,7 @@ public:
         iter_counter++;
         bool good = true;
 
-        // 查看会不会被在return list的给prune掉
+        // Check if it will be pruned by the return list
         for (auto point : return_list) {
             dist_t curdist = fstdistfunc_(getDataByInternalId(point),
                                           getDataByInternalId(passed_c),
@@ -393,7 +380,6 @@ public:
             dist_t dist_to_query = -current_pair.first;
             sorted_cands.emplace_back(current_pair.second, dist_to_query); // 把queue_closest里的按照顺序塞进sorted_cands里面
             queue_closest.pop();
-            /*这里调用回掉函数*/
             get_selectedNeighbors(current_pair.second, dist_to_query, index_k);
         }
 
@@ -439,36 +425,27 @@ public:
         return;
     }
 
-    /**
-     * @file src/compact_graph.h
-     * @brief 互连新元素并递归地应用启发式剪枝算法并且对插入元素的attribute没有要求
-     *
-     * 此函数用于连接新的数据点到图中的现有节点，
-     * 并通过优先队列处理候选邻居以优化连接过程。
-     */
 
     virtual tableint mutuallyConnectNewElementLevel0(
-        const void *data_point, /**< 当前数据点 */
-        tableint cur_c,         /**< 当前节点的内部标识符 */
+        const void *data_point, 
+        tableint cur_c,        
         std::priority_queue<std::pair<dist_t, tableint>,
                             std::vector<std::pair<dist_t, tableint>>,
-                            CompareByFirst> &top_candidates, /**< 候选邻居列表 */
-        int level,                                           /**< layer level */
-        bool isUpdate)                                       /**< 是否是更新已有的点 还是插入新的点 */
+                            CompareByFirst> &top_candidates, 
+        int level,                                           
+        bool isUpdate)                                       
     {
-        Mcurmax = maxM0_; // 最大邻接数量
+        Mcurmax = maxM0_; 
 
-        // 获取当前节点的外部标签
+
         unsigned external_id = getExternalLabel(cur_c);
 
-        // 更新目前所有节点的最大和最小外部标签值
         if (external_id > max_external_id_)
             max_external_id_ = external_id;
         if (external_id < min_external_id_)
             min_external_id_ = external_id;
 
         {
-            // 处理优先级队列：从最近到最远排序候选者
             std::priority_queue<std::pair<dist_t, tableint>> queue_closest;
             while (!top_candidates.empty()) {
                 queue_closest.emplace(-top_candidates.top().first, top_candidates.top().second);
@@ -496,7 +473,6 @@ public:
             }
         }
 
-        // 把找到的selectedNeighbors放进cur_c的邻接列表
         {
             linklistsizeint *ll_cur;
             ll_cur = get_linklist0(cur_c);
@@ -547,7 +523,6 @@ public:
                 }
             }
 
-            // 这里就正常跑就完事了
             // If cur_c is already present in the neighboring connections of
             // `selectedNeighbors[idx]` then no need to modify any connections or
             // run the heuristics.
@@ -621,12 +596,6 @@ public:
         cout << endl;
     }
 
-    /**
-     * @brief 计算图中的邻居节点数量统计信息
-     *
-     * 此方法遍历有向图索引数组以计算平均前向邻居数、最大前向批量邻居数，
-     * 平均反向邻居数、最大反向邻居数以及相关批处理计数。
-     */
     void countNeighbrs() {
         size_t max_nns_len = 0;
         // 如果有向图索引不为空，则开始处理
@@ -742,18 +711,7 @@ public:
     }
 
     vector<unsigned> fetched_nns;
-    /**
-     * @brief 范围过滤搜索，在范围内节点上计算距离。
-     *
-     * 此方法执行范围过滤搜索算法，仅在指定范围内的节点上计算距离，
-     * 并返回最邻近点列表。
-     *
-     * @param search_params 搜索参数指针，包含控制批处理阈值和搜索ef值。
-     * @param search_info 搜索信息结构体指针，用于记录搜索过程中的统计信息。
-     * @param query 查询向量。
-     * @param query_bound 查询边界对，定义查询范围。
-     * @return vector<int> 返回最邻近点ID列表。
-     */
+
     vector<int> rangeFilteringSearchInRange(
         const SearchParams *search_params,
         SearchInfo *search_info,
@@ -769,9 +727,9 @@ public:
         VisitedList *vl = visited_list_pool_->getFreeVisitedList();
         vl_type *visited_array = vl->mass;
         vl_type visited_array_tag = vl->curV;
-        float lower_bound = std::numeric_limits<float>::max(); // 最低界限初始化为最大浮点数
-        std::priority_queue<pair<float, int>> top_candidates;  // 优先队列存储候选结果
-        std::priority_queue<pair<float, int>> candidate_set;   // 候选集优先队列
+        float lower_bound = std::numeric_limits<float>::max(); 
+        std::priority_queue<pair<float, int>> top_candidates;  
+        std::priority_queue<pair<float, int>> candidate_set;   
 
         search_info->total_comparison = 0;
         search_info->internal_search_time = 0;
@@ -790,14 +748,13 @@ public:
             int interval = (query_bound.second - lbound) / 3;
             for (size_t i = 0; i < 3; i++) {
                 int point = lbound + interval * i;
-                float dist = EuclideanDistance(data_wrapper->nodes[point], query); // 计算距离
-                candidate_set.push(make_pair(-dist, point));                       // 将负距离和点ID推入候选集
-                visited_array[point] = visited_array_tag;                          // 标记已访问
+                float dist = EuclideanDistance(data_wrapper->nodes[point], query); 
+                candidate_set.push(make_pair(-dist, point));                       
+                visited_array[point] = visited_array_tag;                          
             }
         }
         gettimeofday(&tt3, NULL);
 
-        // TODO: How to find proper enters. // looks like useless Maybe it is not working well if we wanna find proper enters?
 
         size_t hop_counter = 0;
         float total_traversed_nn_amount = 0;
@@ -807,10 +764,10 @@ public:
         float neg_point_used_counter = 0;
 
         while (!candidate_set.empty()) {
-            std::pair<float, int> current_node_pair = candidate_set.top(); // 获取当前节点
+            std::pair<float, int> current_node_pair = candidate_set.top(); 
             int current_node_id = current_node_pair.second;
 
-            if (-current_node_pair.first > lower_bound) // 如果当前节点的距离大于topk里最远的，则跳出循环
+            if (-current_node_pair.first > lower_bound) 
             {
                 break;
             }
@@ -840,7 +797,7 @@ public:
                 const unsigned &candidate_id = pos_edges[i].external_id;
                 if (candidate_id < query_bound.first)
                     continue;
-                if (candidate_id > query_bound.second) // 后面的点都是越界节点
+                if (candidate_id > query_bound.second) 
                     break;
                 const auto &cp = pos_edges[i];
                 if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
@@ -853,7 +810,7 @@ public:
                 const unsigned &candidate_id = neg_edges[i].external_id;
                 if (candidate_id < query_bound.first)
                     continue;
-                if (candidate_id > query_bound.second) // 后面的点都是越界节点
+                if (candidate_id > query_bound.second) 
                     continue;
                 auto &cp = neg_edges[i];
                 if (!cp.if_in_compressed_range(query_bound.first, query_bound.second)) {
@@ -861,34 +818,34 @@ public:
                 }
                 fetched_nns.emplace_back(candidate_id);
             }
-            gettimeofday(&tt2, NULL);                              // 结束时间记录
-            AccumulateTime(tt1, tt2, search_info->fetch_nns_time); // 累加邻居检索时间
+            gettimeofday(&tt2, NULL);                              
+            AccumulateTime(tt1, tt2, search_info->fetch_nns_time); 
 
             // now iterate fetched nn and calculate distance
             for (auto &candidate_id : fetched_nns) {
-                if (!(visited_array[candidate_id] == visited_array_tag)) // 若未被访问过
+                if (!(visited_array[candidate_id] == visited_array_tag)) 
                 {
-                    visited_array[candidate_id] = visited_array_tag; // 标记为已访问
+                    visited_array[candidate_id] = visited_array_tag; 
 
-                    // 计算距离
-                    gettimeofday(&tt1, NULL); // 开始时间记录
+
+                    gettimeofday(&tt1, NULL); 
                     float dist = fstdistfunc_(query.data(),
                                               data_wrapper->nodes[candidate_id].data(),
                                               dist_func_param_);
 
                     num_search_comparison++; // 更新比较次数
                     if (top_candidates.size() < search_params->search_ef || lower_bound > dist) {
-                        candidate_set.push(make_pair(-dist, candidate_id)); // 推入候选集
-                        top_candidates.push(make_pair(dist, candidate_id)); // 推入顶级候选集
+                        candidate_set.push(make_pair(-dist, candidate_id)); 
+                        top_candidates.push(make_pair(dist, candidate_id)); 
                         if (top_candidates.size() > search_params->search_ef) {
-                            top_candidates.pop(); // 维护候选集大小
+                            top_candidates.pop(); 
                         }
                         if (!top_candidates.empty()) {
-                            lower_bound = top_candidates.top().first; // 更新最低界限
+                            lower_bound = top_candidates.top().first; 
                         }
                     }
-                    gettimeofday(&tt2, NULL);                             // 结束时间记录
-                    AccumulateTime(tt1, tt2, search_info->cal_dist_time); // 累加距离计算时间
+                    gettimeofday(&tt2, NULL);                            
+                    AccumulateTime(tt1, tt2, search_info->cal_dist_time);
                 }
             }
             total_traversed_nn_amount += float(pos_edges.size()) + float(neg_edges.size());
@@ -897,14 +854,14 @@ public:
         // 构建结果列表
         vector<int> res;
         while (top_candidates.size() > search_params->query_K) {
-            top_candidates.pop(); // 减少候选集至所需K个
+            top_candidates.pop(); 
         }
 
         while (!top_candidates.empty()) {
-            res.emplace_back(top_candidates.top().second); // 提取节点ID构建结果
+            res.emplace_back(top_candidates.top().second); 
             top_candidates.pop();
         }
-        search_info->total_comparison += num_search_comparison; // 更新总比较次数
+        search_info->total_comparison += num_search_comparison;  
         search_info->path_counter += hop_counter;
         search_info->pos_point_traverse_counter = pos_point_traverse_counter;
         search_info->pos_point_used_counter = pos_point_used_counter;

@@ -10,3 +10,7 @@ __pycache__
 *.bin
 test
 *.log
+unittest
+test
+script
+index

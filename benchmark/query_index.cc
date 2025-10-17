@@ -16,14 +16,11 @@
 #include <vector>
 #include <tuple>
 
-#include "data_processing.h"
-#include "data_wrapper.h"
-#include "index_base.h"
-#include "logger.h"
-#include "reader.h"
-#include "segment_graph_2d.h"
-#include "compact_graph.h"
-#include "utils.h"
+#include "infrastructure/io/data_loader.h"
+#include "interfaces/search_interface.h"
+#include "infrastructure/utils/utils.h"
+#include "core/algorithms/segment_graph_2d.h"
+#include "core/algorithms/compact_graph.h"
 #include <iomanip>
 
 #ifdef __linux__

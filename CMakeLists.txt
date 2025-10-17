@@ -14,10 +14,10 @@ find_package(Boost REQUIRED COMPONENTS timer chrono system program_options)
 find_package(OpenMP REQUIRED)
 
 # 设置包含目录 - 优先使用原始项目的头文件
-set(ORIGINAL_PROJECT_ROOT "/home/scavenger/DSG/DynamicSegmentGraph")
-include_directories(${ORIGINAL_PROJECT_ROOT}/src)
-include_directories(${ORIGINAL_PROJECT_ROOT}/include)
-include_directories(${ORIGINAL_PROJECT_ROOT}/include/common)
+# set(ORIGINAL_PROJECT_ROOT "/home/scavenger/DSG/DynamicSegmentGraph")
+# include_directories(${ORIGINAL_PROJECT_ROOT}/src)
+# include_directories(${ORIGINAL_PROJECT_ROOT}/include)
+# include_directories(${ORIGINAL_PROJECT_ROOT}/include/common)
 
 # mydsg 项目的头文件（仅在需要时包含）
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -31,10 +31,10 @@ add_subdirectory(src)
 add_subdirectory(benchmark)
 
 # 创建简单的测试可执行文件
-add_executable(test_build test_build.cpp)
-target_link_libraries(test_build ${Boost_LIBRARIES})
+# add_executable(test_build test_build.cpp)
+# target_link_libraries(test_build ${Boost_LIBRARIES})
 
 # 创建测试可执行文件（如果需要的话）
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../DynamicSegmentGraph/benchmark")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../mydsg/benchmark")
     message(STATUS "发现 benchmark 目录，可以添加更多测试...")
 endif()

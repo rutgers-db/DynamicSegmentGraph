@@ -8,9 +8,12 @@
 #include <string>
 #include <vector>
 
-#include "base_hnsw/space_l2.h"
-#include "data_wrapper.h"
-#include "utils.h"
+#include "baselines/hnswalg.h"
+#include "baselines/hnswlib.h"
+#include "infrastructure/io/data_loader.h"
+#include "infrastructure/io/index_serializer.h"
+#include "infrastructure/utils/utils.h"
+#include "infrastructure/utils/distance.h"
 
 using std::cout;
 using std::endl;

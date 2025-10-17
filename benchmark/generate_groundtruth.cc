@@ -14,12 +14,9 @@
 #include <sstream>
 #include <vector>
 
-#include "data_processing.h"
-#include "data_wrapper.h"
-#include "logger.h"
-#include "index_base.h"
-#include "reader.h"
-#include "utils.h"
+#include "infrastructure/io/data_loader.h"
+#include "infrastructure/utils/utils.h"
+#include "interfaces/search_interface.h"
 
 #ifdef __linux__
 #include "sys/sysinfo.h"

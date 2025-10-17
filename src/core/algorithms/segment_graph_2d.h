@@ -20,14 +20,16 @@
 // 确保在包含 base_hnsw 之前已经定义了 vector
 using std::vector;
 
-#include "base_hnsw/hnswalg.h"
-#include "base_hnsw/hnswlib.h"
- #include "data_wrapper.h"
- #include "index_base.h"
- #include "utils.h"
- 
- using namespace base_hnsw;
- 
+#include "baselines/hnswalg.h"
+#include "baselines/hnswlib.h"
+#include "baselines/space_l2.h"
+#include "infrastructure/io/data_loader.h"
+#include "infrastructure/io/index_serializer.h"
+#include "infrastructure/utils/utils.h"
+#include "infrastructure/utils/distance.h"
+
+using namespace hnswlib_incre;
+
  namespace SeRF {
  
  struct OneSegmentNeighbors {
@@ -55,7 +57,7 @@ using std::vector;
  };
  
  template <typename dist_t>
- class SegmentGraph2DHNSW : public HierarchicalNSW<float> {
+ class SegmentGraph2DHNSW : public base_hnsw::HierarchicalNSW<float> {
  public:
      /**
       * 构造一个二维段图层次邻近搜索树（Hierarchical Navigable Small World graph）实例.
@@ -68,7 +70,7 @@ using std::vector;
       * @param random_seed 随机种子，用于初始化随机数生成器.
       */
      SegmentGraph2DHNSW(const BaseIndex::IndexParams &index_params,
-                        SpaceInterface<float> *s,
+                        base_hnsw::SpaceInterface<float> *s,
                         size_t max_elements,
                         size_t M = 16,
                         size_t ef_construction = 200,
@@ -77,11 +79,15 @@ using std::vector;
      // 指向BaseIndex::IndexParams类型的常量指针，存储索引参数
      const BaseIndex::IndexParams *params;
  
-     // 存储指向段图邻居列表的指针，表示图结构中的边信息
-     vector<DirectedSegNeighbors> *segment_graph;
- 
-     /**
-      * 在构建HNSW图时优化搜索过程，保留更多邻居节点信息。
+    // 存储指向段图邻居列表的指针，表示图结构中的边信息
+    vector<DirectedSegNeighbors> *segment_graph;
+
+    // Search parameters
+    size_t ef_max_ = 400;                    // Maximum expansion factor
+    size_t ef_basic_construction_ = 200;     // Basic construction expansion factor
+
+    /**
+     * 在构建HNSW图时优化搜索过程，保留更多邻居节点信息。
       * 这个是基本就是原本的search 就是在整个图里当前层搜最近的
       * 或许可以结合（RNN-descent）以提升效率。
       *
@@ -90,10 +96,10 @@ using std::vector;
       * @param layer 当前层级
       * @return 返回一个优先队列，其中包含距离和节点ID对，按距离排序。
       */
-     virtual std::priority_queue<std::pair<dist_t, tableint>,
-                                 std::vector<std::pair<dist_t, tableint>>,
-                                 CompareByFirst>
-     searchBaseLayerLevel0(tableint ep_id, const void *data_point, int layer);
+     virtual std::priority_queue<std::pair<dist_t, base_hnsw::tableint>,
+                                 std::vector<std::pair<dist_t, base_hnsw::tableint>>,
+                                 base_hnsw::HierarchicalNSW<float>::CompareByFirst>
+     searchBaseLayerLevel0(base_hnsw::tableint ep_id, const void *data_point, int layer);
  
      /**
       * @file src/segment_graph_2d.h
@@ -103,12 +109,12 @@ using std::vector;
       * 并通过优先队列处理候选邻居以优化连接过程。
       */
  
-     virtual tableint mutuallyConnectNewElementLevel0(
+     virtual base_hnsw::tableint mutuallyConnectNewElementLevel0(
          const void *data_point, /**< 当前数据点 */
-         tableint cur_c,         /**< 当前节点的内部标识符 */
-         std::priority_queue<std::pair<dist_t, tableint>,
-                             std::vector<std::pair<dist_t, tableint>>,
-                             CompareByFirst> &top_candidates, /**< 候选邻居列表 */
+         base_hnsw::tableint cur_c,         /**< 当前节点的内部标识符 */
+         std::priority_queue<std::pair<dist_t, base_hnsw::tableint>,
+                             std::vector<std::pair<dist_t, base_hnsw::tableint>>,
+                             base_hnsw::HierarchicalNSW<float>::CompareByFirst> &top_candidates, /**< 候选邻居列表 */
          int level,                                           /**< 连接级别 */
          bool isUpdate);                                       /**< 是否更新已存在的链接 */
 
@@ -148,6 +154,11 @@ using std::vector;
      void buildIndex(const IndexParams *index_params);
  
      void initForScabilityExp(const IndexParams *index_params, L2Space *space);
+
+     SearchResult searchKnn(
+         const SearchParams *search_params,
+         SearchInfo *search_info,
+         const vector<float> &query) override;
  
      void insert_batch(vector<unsigned> &nodes_ids);
  

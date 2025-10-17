@@ -4,3 +4,5 @@ build/
 
 index/compact_16_500_100.bin
 *.bin
+
+src/core/algorithms/segment_graph_2d.cpp.backup

@@ -16,13 +16,10 @@
 #include <vector>
 #include <tuple>
 // #include "baselines/knn_first_hnsw.h"
-#include "data_processing.h"
-#include "data_wrapper.h"
-#include "index_base.h"
-#include "logger.h"
-#include "reader.h"
+#include "infrastructure/io/data_loader.h"
+#include "interfaces/search_interface.h"
+#include "infrastructure/utils/utils.h"
 #include "index_recursion_batch.h"
-#include "utils.h"
 #include <iomanip>
 
 #ifdef __linux__

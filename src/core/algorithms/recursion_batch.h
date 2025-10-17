@@ -19,14 +19,14 @@
  #include <queue>
  #include <vector>
  
- #include "base_hnsw/hnswalg.h"
- #include "base_hnsw/hnswlib.h"
- #include "base_struct.h"
- #include "data_wrapper.h"
- #include "index_base.h"
- #include "utils.h"
+ #include "baselines/hnswalg.h"
+ #include "baselines/hnswlib.h"
+ #include "infrastructure/io/data_loader.h"
+ #include "infrastructure/io/index_serializer.h"
+ #include "infrastructure/utils/utils.h"
+ #include "infrastructure/utils/distance.h"
  
- using namespace base_hnsw;
+ using namespace hnswlib_incre;
  #define INT_MAX __INT_MAX__
  
  namespace rangeindex

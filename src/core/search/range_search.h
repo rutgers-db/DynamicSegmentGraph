@@ -17,17 +17,18 @@
 #include <functional>
 #include <sys/time.h>
 
-#include "base_search.h"
-#include "base_hnsw/visited_list_pool.h"
-#include "base_hnsw/space_interface.h"
-#include "data_wrapper.h"
-#include "base_struct.h"
+#include "baselines/hnswalg.h"
+#include "baselines/hnswlib.h"
+#include "infrastructure/io/data_loader.h"
+#include "infrastructure/io/index_serializer.h"
+#include "infrastructure/utils/utils.h"
+#include "infrastructure/utils/distance.h"
 
 using std::vector;
 using std::pair;
 using std::priority_queue;
 using std::function;
-using namespace base_hnsw;
+using namespace hnswlib_incre;
 
 namespace rangeindex {
 

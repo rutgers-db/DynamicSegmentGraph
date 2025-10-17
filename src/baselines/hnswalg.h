@@ -11,9 +11,10 @@
 #include <random>
 #include <unordered_map>
 #include <unordered_set>
+#include <mutex>
 
 #include "hnswlib.h"
-#include "index_base.h"
+#include "interfaces/search_interface.h"
 #include "visited_list_pool.h"
 
 using std::string;
@@ -21,7 +22,7 @@ using std::vector;
 
 // #define LOG_DEBUG_MODE
 
-namespace hnswlib_incre {
+namespace base_hnsw {
 typedef unsigned int tableint;
 typedef unsigned int linklistsizeint;
 
@@ -299,6 +300,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         candidate_set;
 
     dist_t lowerBound;
+
     if (!has_deletions || !isMarkedDeleted(ep_id)) {
       dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id),
                                  dist_func_param_);
@@ -1590,4 +1592,4 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
   }
 };
 
-}  // namespace hnswlib_incre
+}  // namespace hnswlib_hnsw

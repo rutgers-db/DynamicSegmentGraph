@@ -15,9 +15,9 @@
 #include <string>
 #include <vector>
 
-#include "base_hnsw/space_l2.h"
-#include "data_wrapper.h"
-#include "utils.h"
+#include "infrastructure/utils/distance.h"
+#include "infrastructure/io/data_loader.h"
+#include "infrastructure/utils/utils.h"
  
  #include "data_vecs.h"
  

@@ -15,12 +15,9 @@
 #include <vector>
 
 #include "baselines/knn_first_hnsw.h"
-#include "data_processing.h"
-#include "data_wrapper.h"
-#include "index_base.h"
-#include "logger.h"
-#include "reader.h"
-#include "utils.h"
+#include "infrastructure/io/data_loader.h"
+#include "interfaces/search_interface.h"
+#include "infrastructure/utils/utils.h"
 
 // #define LOG_DEBUG_MODE 1
 

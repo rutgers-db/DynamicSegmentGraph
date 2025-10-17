@@ -1,41 +1,33 @@
-# 创建 UTIL 库（兼容原始项目）
-set(ORIGINAL_PROJECT_ROOT "/home/scavenger/DSG/DynamicSegmentGraph")
-file(GLOB UTIL_SOURCES 
-    "${ORIGINAL_PROJECT_ROOT}/src/common/*.cc"
-    "${ORIGINAL_PROJECT_ROOT}/src/common/*.cpp"
+# 收集实际存在的源码，覆盖 core / infrastructure / baselines
+file(GLOB_RECURSE MYDSG_CORE_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/**/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/core/**/*.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infrastructure/**/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/infrastructure/**/*.cc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/baselines/**/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/baselines/**/*.cc"
 )
 
-# 调试：显示找到的源文件
-message(STATUS "UTIL_SOURCES: ${UTIL_SOURCES}")
+# 排除示例/演示源码，避免被链接进库
+list(FILTER MYDSG_CORE_SOURCES EXCLUDE REGEX ".*/memory_pool_example\\.cpp$")
 
-# 确保找到了源文件
-if(NOT UTIL_SOURCES)
-    message(FATAL_ERROR "未找到 UTIL 源文件，请检查路径: ${ORIGINAL_PROJECT_ROOT}/src/common/")
+# 确保找到源码
+if(NOT MYDSG_CORE_SOURCES)
+    message(FATAL_ERROR "未找到任何源码，请检查: ${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
-add_library(UTIL STATIC ${UTIL_SOURCES})
-target_include_directories(UTIL PUBLIC
-    ${ORIGINAL_PROJECT_ROOT}/include/common
-    ${ORIGINAL_PROJECT_ROOT}/include
-    ${ORIGINAL_PROJECT_ROOT}/src
-)
-target_compile_options(UTIL PRIVATE -Wall ${OpenMP_CXX_FLAGS})
-target_link_libraries(UTIL ${OpenMP_CXX_FLAGS})
-target_link_libraries(UTIL OpenMP::OpenMP_CXX)
+# 创建核心静态库
+add_library(mydsg_core STATIC ${MYDSG_CORE_SOURCES})
 
-# 创建 mydsg_core 库（暂时为空）
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp "// 空的源文件用于创建库\n")
-add_library(mydsg_core STATIC
-    ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp
-)
-
-# 设置头文件包含路径
+# 头文件包含路径
 target_include_directories(mydsg_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/core
     ${CMAKE_CURRENT_SOURCE_DIR}/infrastructure
     ${CMAKE_CURRENT_SOURCE_DIR}/interfaces
+    ${CMAKE_CURRENT_SOURCE_DIR}/baselines
 )
 
-# 链接依赖
-target_link_libraries(mydsg_core ${Boost_LIBRARIES})
+# 编译与链接选项
+target_compile_options(mydsg_core PRIVATE -Wall)
+target_link_libraries(mydsg_core PUBLIC OpenMP::OpenMP_CXX ${Boost_LIBRARIES})

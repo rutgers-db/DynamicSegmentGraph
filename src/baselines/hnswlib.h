@@ -39,7 +39,7 @@
 
 using std::vector;
 
-namespace hnswlib_incre
+namespace base_hnsw
 {
 
     /**
@@ -169,9 +169,5 @@ namespace hnswlib_incre
     }
 
 } // namespace hnswlib_incre
-
-#include "space_ip.h"
-#include "space_l2.h"
-#include "hnswalg.h"
 
 #endif

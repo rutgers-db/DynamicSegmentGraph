@@ -29,7 +29,7 @@ OneSegmentNeighbors::OneSegmentNeighbors(unsigned num) : batch(num) {}
 OneSegmentNeighbors::OneSegmentNeighbors(unsigned num, int start, int end) 
     : batch(num), start(start), end(end) {}
 
-const unsigned OneSegmentNeighbors::size() {
+unsigned OneSegmentNeighbors::size() const {
     return nns_id.size();
 }
 

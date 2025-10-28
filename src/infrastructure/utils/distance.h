@@ -267,15 +267,4 @@ class L2SpaceI : public SpaceInterface<int> {
   ~L2SpaceI() {}
 };
 
-// 添加 writeBinaryPOD 和 readBinaryPOD 函数
-template<typename T>
-void writeBinaryPOD(std::ostream& out, const T& podRef) {
-    out.write((char*)&podRef, sizeof(T));
-}
-
-template<typename T>
-void readBinaryPOD(std::istream& in, T& podRef) {
-    in.read((char*)&podRef, sizeof(T));
-}
-
 }  // namespace base_hnsw

@@ -21,6 +21,7 @@
  #include "baselines/hnswlib.h"
  #include "interfaces/search_interface.h"
  #include "infrastructure/utils/utils.h"
+ #include "baselines/hnswalg.h"
  
  using std::cout;
  using std::endl;
@@ -28,7 +29,7 @@
  using std::vector;
  
  void buildKNNFirstGraph(const vector<vector<float>> &nodes,
-                         hnswlib_incre::HierarchicalNSW<float> &alg_hnsw) {
+                         base_hnsw::HierarchicalNSW<float> &alg_hnsw) {
  #pragma omp parallel for
      for (size_t i = 0; i < nodes.size(); ++i) {
          alg_hnsw.addPoint(nodes[i].data(), i);
@@ -36,7 +37,7 @@
  }
  
  void addHNSWPointsSubgraph(const vector<vector<float>> &nodes,
-                            hnswlib_incre::HierarchicalNSW<float> *alg_hnsw,
+                            base_hnsw::HierarchicalNSW<float> *alg_hnsw,
                             const int start,
                             const int end) {
  #pragma omp parallel for
@@ -47,7 +48,7 @@
  
  void buildKNNFirstGraphSingleThread(
      const vector<vector<float>> &nodes,
-     hnswlib_incre::HierarchicalNSW<float> &alg_hnsw) {
+     base_hnsw::HierarchicalNSW<float> &alg_hnsw) {
      for (size_t i = 0; i < nodes.size(); ++i) {
          alg_hnsw.addPoint(nodes[i].data(), i);
      }
@@ -55,14 +56,14 @@
  
  void buildKNNFirstGraphSingleThread(
      const vector<vector<float>> &nodes,
-     hnswlib_incre::HierarchicalNSW<float> *alg_hnsw) {
+     base_hnsw::HierarchicalNSW<float> *alg_hnsw) {
      for (size_t i = 0; i < nodes.size(); ++i) {
          alg_hnsw->addPoint(nodes[i].data(), i);
      }
  }
  
  vector<int> KNNFirstRangeSearch(
-     const hnswlib_incre::HierarchicalNSW<float> &alg_hnsw,
+     const base_hnsw::HierarchicalNSW<float> &alg_hnsw,
      const vector<float> &query,
      const int l_bound,
      const int r_bound,
@@ -80,7 +81,7 @@
  }
  
  vector<int> KNNFirstRangeSearchFixedEF(
-     hnswlib_incre::HierarchicalNSW<float> &alg_hnsw,
+     base_hnsw::HierarchicalNSW<float> &alg_hnsw,
      const vector<float> &query,
      const int l_bound,
      const int r_bound,
@@ -105,7 +106,7 @@
  }
  
  vector<int> KNNFirstRangeSearchFixedEF(
-     hnswlib_incre::HierarchicalNSW<float> *alg_hnsw,
+     base_hnsw::HierarchicalNSW<float> *alg_hnsw,
      const vector<float> &query,
      const int l_bound,
      const int r_bound,
@@ -135,14 +136,14 @@
  
      IndexInfo *index_info;
  
-     hnswlib_incre::HierarchicalNSW<float> *hnsw_index;
-     hnswlib_incre::L2Space *space;
+     base_hnsw::HierarchicalNSW<float> *hnsw_index;
+     base_hnsw::L2Space *space;
  
      void countNeighbrs() {
          int node_amount = 0;
  
          for (unsigned idx = 0; idx < data_wrapper->data_size; idx++) {
-             hnswlib_incre::linklistsizeint *linklist;
+             base_hnsw::linklistsizeint *linklist;
              linklist = hnsw_index->get_linklist0(idx);
              size_t linklist_count = hnsw_index->getListCount(linklist);
              node_amount += linklist_count;
@@ -158,9 +159,9 @@
  
          timeval tt1, tt2;
          gettimeofday(&tt1, NULL);
-         space = new hnswlib_incre::L2Space(data_wrapper->data_dim);
+         space = new base_hnsw::L2Space(data_wrapper->data_dim);
  
-         hnsw_index = new hnswlib_incre::HierarchicalNSW<float>(
+         hnsw_index = new base_hnsw::HierarchicalNSW<float>(
              space, 2 * data_wrapper->data_size, index_params->K,
              index_params->ef_construction);
          for (size_t i = 0; i < data_wrapper->data_size; ++i) {
@@ -171,8 +172,8 @@
          countNeighbrs();
      }
  
-     void initForBuilding(const IndexParams *index_params, hnswlib_incre::L2Space *space) {
-         hnsw_index = new hnswlib_incre::HierarchicalNSW<float>(
+     void initForBuilding(const IndexParams *index_params, base_hnsw::L2Space *space) {
+         hnsw_index = new base_hnsw::HierarchicalNSW<float>(
              space, 2 * data_wrapper->data_size, index_params->K,
              index_params->ef_construction);
      }
@@ -236,18 +237,34 @@
      }
  
      ~KnnFirstWrapper() {
-         delete hnsw_index;
-         delete index_info;
-         delete space;
-     }
- 
-     void save(const string &file_path) {
-         return;
-     }
- 
-     void load(const string &file_path) {
-         return;
-     }
+        delete hnsw_index;
+        delete index_info;
+        delete space;
+    }
+
+    /**
+     * @brief 实现 searchKnn 纯虚函数
+     * 
+     * K近邻搜索接口实现（占位实现）
+     * 注意：KnnFirstWrapper 主要用于范围查询，如需 KNN 搜索请使用其他索引
+     */
+    SearchResult searchKnn(
+        const SearchParams *search_params,
+        SearchInfo *search_info,
+        const vector<float> &query) override
+    {
+        // 简单实现：返回空结果
+        // KnnFirstWrapper 专注于范围查询，不实现标准 KNN 搜索
+        return SearchResult();
+    }
+
+    void save(const string &file_path) {
+        return;
+    }
+
+    void load(const string &file_path) {
+        return;
+    }
  };
  
  void execute_knn_first_search(KnnFirstWrapper &index,

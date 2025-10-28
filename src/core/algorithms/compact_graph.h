@@ -15,7 +15,6 @@ using std::vector;
 
 #include "baselines/hnswalg.h"
 #include "baselines/hnswlib.h"
-#include "baselines/space_l2.h"
 #include "infrastructure/io/data_loader.h"
 #include "infrastructure/io/index_serializer.h"
 #include "infrastructure/utils/utils.h"

@@ -130,7 +130,7 @@ int exp(string dataset, int data_size, string dataset_path, string query_path, c
         cout << endl;
 
         KnnFirstWrapper index(&data_wrapper);
-        auto * ss = new hnswlib_incre::L2Space(data_wrapper.data_dim);
+        auto * ss = new base_hnsw::L2Space(data_wrapper.data_dim);
         index.initForBuilding(&i_params, ss);
 
         for (int i = 0; i < insert_batches.size(); i++) {

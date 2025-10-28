@@ -39,6 +39,49 @@
      nodes.clear();
      querys.clear();
      nodes_keys.clear();
+
+     if (!dataset_path.empty()) {
+        std::ifstream input(dataset_path, std::ios::binary);
+        if (!input.is_open()) {
+            std::cerr << "Error: Cannot open dataset file: " << dataset_path << std::endl;
+            return;
+        }
+        
+        int count = 0;
+        while (input && count < data_size) {
+            int dim;
+            input.read(reinterpret_cast<char*>(&dim), sizeof(int));
+            if (!input) break;
+            
+            vector<float> vec(dim);
+            input.read(reinterpret_cast<char*>(vec.data()), dim * sizeof(float));
+            if (!input) break;
+            
+            nodes.push_back(std::move(vec));
+            nodes_keys.push_back(count);
+            count++;
+        }
+        input.close();
+     }
+     if (!query_path.empty()) {
+        std::ifstream input(query_path, std::ios::binary);
+        if (input.is_open()) {
+            int count = 0;
+            while (input && count < query_num) {
+                int dim;
+                input.read(reinterpret_cast<char*>(&dim), sizeof(int));
+                if (!input) break;
+                
+                vector<float> vec(dim);
+                input.read(reinterpret_cast<char*>(vec.data()), dim * sizeof(float));
+                if (!input) break;
+                
+                querys.push_back(std::move(vec));
+                count++;
+            }
+            input.close();
+        }
+    }
  }
 
  inline void ReadGroundtruthQuery(vector<vector<int>>& groundtruth,

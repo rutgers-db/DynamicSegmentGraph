@@ -22,7 +22,6 @@ using std::vector;
 
 #include "baselines/hnswalg.h"
 #include "baselines/hnswlib.h"
-#include "baselines/space_l2.h"
 #include "infrastructure/io/data_loader.h"
 #include "infrastructure/io/index_serializer.h"
 #include "infrastructure/utils/utils.h"
@@ -42,7 +41,7 @@ using namespace hnswlib_incre;
      unsigned batch; // batch id
      int start = -1; // left position
      int end = -2;   // right position
-     const unsigned size();
+     unsigned size() const;
  };
  
  // struct OneTupleNeighbor {
@@ -153,7 +152,7 @@ using namespace hnswlib_incre;
  
      void buildIndex(const IndexParams *index_params);
  
-     void initForScabilityExp(const IndexParams *index_params, L2Space *space);
+     void initForScabilityExp(const IndexParams *index_params, base_hnsw::L2Space *space);
 
      SearchResult searchKnn(
          const SearchParams *search_params,

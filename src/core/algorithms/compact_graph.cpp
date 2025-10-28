@@ -271,13 +271,13 @@ vector<int> IndexCompactGraph::rangeFilteringSearchInRange(
         fetched_nns.clear();
         
         // 处理前向邻居（正向边）
-        for (auto i = 0; i < pos_edges.size(); i++) {
+        for (size_t i = 0; i < pos_edges.size(); i++) {
             const unsigned &candidate_id = pos_edges[i].external_id;
             
             // 基本范围检查
-            if (candidate_id < query_bound.first)
+            if ((int)candidate_id < query_bound.first)
                 continue;
-            if (candidate_id > query_bound.second) 
+            if ((int)candidate_id > query_bound.second) 
                 break;  // 由于邻居已排序，可以提前退出
                 
             // 压缩范围检查：利用压缩点的ll,lr,rl,rr边界信息
@@ -439,4 +439,49 @@ IndexCompactGraph::~IndexCompactGraph() {
     directed_indexed_arr.clear();
     delete visited_list_pool_;
 }
+
+
+SearchResult Compact::IndexCompactGraph::searchKnn(
+    const SearchParams *search_params,
+    SearchInfo *search_info,
+    const vector<float> &query) {
+    timeval t1, t2;
+    gettimeofday(&t1, NULL);
+
+    const int K = static_cast<int>(search_params ? search_params->query_K : 10);
+    std::priority_queue<std::pair<float,int>> topk; // 最大堆，堆顶是当前最差（最大）距离
+
+    for (int i = 0; i < data_wrapper->data_size; ++i) {
+        float dist = EuclideanDistance(data_wrapper->nodes[i], query);
+        if ((int)topk.size() < K) {
+            topk.emplace(dist, i);
+        } else if (dist < topk.top().first) {
+            topk.pop();
+            topk.emplace(dist, i);
+        }
+    }
+
+    vector<int> neighbors;
+    vector<float> distances;
+    neighbors.reserve(topk.size());
+    distances.reserve(topk.size());
+    while (!topk.empty()) {
+        neighbors.emplace_back(topk.top().second);
+        distances.emplace_back(topk.top().first);
+        topk.pop();
+    }
+    std::reverse(neighbors.begin(), neighbors.end());
+    std::reverse(distances.begin(), distances.end());
+
+    gettimeofday(&t2, NULL);
+    SearchResult res(std::move(neighbors), std::move(distances));
+    res.comparisons_made = static_cast<size_t>(data_wrapper->data_size);
+    res.search_time = CountTime(t1, t2);
+    if (search_info) {
+        search_info->internal_search_time = res.search_time;
+        search_info->total_comparison = res.comparisons_made;
+    }
+    return res;
+}
+
 } // namespace Compact

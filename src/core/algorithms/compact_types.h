@@ -14,7 +14,7 @@ struct CompressedPoint {
     CompressedPoint(unsigned _external_id, unsigned _ll, unsigned _lr, unsigned _rl, unsigned _rr)
         : external_id(_external_id), ll(_ll), lr(_lr), rl(_rl), rr(_rr) {}
 
-    inline bool const if_in_compressed_range(const unsigned &query_L, const unsigned &query_R) const {
+    inline bool if_in_compressed_range(const unsigned &query_L, const unsigned &query_R) const {
         return ((ll <= query_L && query_L <= lr) && (rl <= query_R && query_R <= rr));
     }
 

@@ -19,14 +19,15 @@
  #include <queue>
  #include <vector>
  
- #include "baselines/hnswalg.h"
- #include "baselines/hnswlib.h"
- #include "infrastructure/io/data_loader.h"
- #include "infrastructure/io/index_serializer.h"
- #include "infrastructure/utils/utils.h"
- #include "infrastructure/utils/distance.h"
- 
- using namespace hnswlib_incre;
+#include "baselines/hnswalg.h"
+#include "baselines/hnswlib.h"
+#include "infrastructure/io/data_loader.h"
+#include "infrastructure/io/index_serializer.h"
+#include "infrastructure/utils/utils.h"
+#include "infrastructure/utils/distance.h"
+#include "core/data_structures/neighbor_storage.h"
+
+using namespace base_hnsw;
  #define INT_MAX __INT_MAX__
  
  namespace rangeindex
@@ -61,7 +62,7 @@
                               random_seed)
         {
             params = &index_params;
-            ef_max_ = index_params.ef_max;
+            // ef_max_ = index_params.ef_max;  // 注释掉：基类中不存在此成员
         }
 
         const BaseIndex::IndexParams *params;              // 索引参数配置
@@ -1024,6 +1025,68 @@
              CountTime(tt3, tt4, search_info->internal_search_time);
  
              return res;
+         }
+
+         /**
+          * @brief 实现 searchKnn 纯虚函数
+          * 
+          * K近邻搜索接口实现（占位实现）
+          * 注意：RecursionIndex 主要用于范围查询，如需 KNN 搜索请使用其他索引
+          */
+         SearchResult searchKnn(
+             const SearchParams *search_params,
+             SearchInfo *search_info,
+             const vector<float> &query) override
+         {
+             // 简单实现：返回空结果
+             // RecursionIndex 专注于范围查询，不实现标准 KNN 搜索
+             return SearchResult();
+         }
+
+         /**
+          * @brief 保存索引到文件
+          * @param file_path 文件路径
+          */
+         void save(const string &file_path) override
+         {
+             std::ofstream out(file_path, std::ios::binary);
+             if (!out) {
+                 throw std::runtime_error("Failed to open file for saving index.");
+             }
+             
+             // 保存 directed_indexed_arr 的大小
+             size_t arr_size = directed_indexed_arr.size();
+             out.write(reinterpret_cast<const char*>(&arr_size), sizeof(arr_size));
+             
+             // TODO: 实现完整的索引保存功能
+             // 可以参考 compact_graph.cpp 中的实现
+             
+             out.close();
+         }
+
+         /**
+          * @brief 从文件加载索引
+          * @param file_path 文件路径  
+          */
+         void load(const string &file_path) override
+         {
+             std::ifstream in(file_path, std::ios::binary);
+             if (!in) {
+                 throw std::runtime_error("Failed to open file for loading index.");
+             }
+             
+             // 初始化访问列表池
+             visited_list_pool_ = new base_hnsw::VisitedListPool(1, data_wrapper->data_size);
+             
+             // 读取 directed_indexed_arr 的大小
+             size_t arr_size;
+             in.read(reinterpret_cast<char*>(&arr_size), sizeof(arr_size));
+             directed_indexed_arr.resize(arr_size);
+             
+             // TODO: 实现完整的索引加载功能
+             // 可以参考 compact_graph.cpp 中的实现
+             
+             in.close();
          }
  
          ~RecursionIndex()

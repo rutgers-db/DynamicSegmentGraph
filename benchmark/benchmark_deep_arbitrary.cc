@@ -19,7 +19,7 @@
 #include "infrastructure/io/data_loader.h"
 #include "interfaces/search_interface.h"
 #include "infrastructure/utils/utils.h"
-#include "index_recursion_batch.h"
+#include "core/algorithms/recursion_batch.h"
 #include <iomanip>
 
 #ifdef __linux__

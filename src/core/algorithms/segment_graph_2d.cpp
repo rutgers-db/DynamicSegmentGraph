@@ -155,7 +155,7 @@ base_hnsw::tableint SegmentGraph2DHNSW<dist_t>::mutuallyConnectNewElementLevel0(
     base_hnsw::tableint cur_c,
     std::priority_queue<std::pair<dist_t, base_hnsw::tableint>,
                         std::vector<std::pair<dist_t, base_hnsw::tableint>>,
-                        base_hnsw::HierarchicalNSW<float>::CompareByFirst> &top_candidates,
+                        typename base_hnsw::HierarchicalNSW<dist_t>::CompareByFirst> &top_candidates,
     int level,
     bool isUpdate) {
     

@@ -171,10 +171,13 @@ int main(int argc, char **argv) {
                 std::get<0>(comparison_recorder[s_params.query_range]) += search_info.total_comparison;
                 std::get<1>(comparison_recorder[s_params.query_range]) += search_info.path_counter;
             }
+            gettimeofday(&tt4, NULL);
 
             cout << endl
                  << "Search ef: " << one_searchef << endl
                  << "========================" << endl;
+
+
             log_result_recorder(result_recorder, comparison_recorder,
                                 data_wrapper.query_ids.size());
             cout << "========================" << endl;

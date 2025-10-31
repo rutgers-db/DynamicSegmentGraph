@@ -178,6 +178,8 @@ int main(int argc, char **argv) {
                             cout << endl
                                  << "Search ef: " << one_searchef << endl
                                  << "========================" << endl;
+
+
                             log_result_recorder(result_recorder, comparison_recorder,
                                                 data_wrapper.query_ids.size());
                             cout << "========================" << endl;

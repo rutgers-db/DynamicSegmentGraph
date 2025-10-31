@@ -23,78 +23,329 @@
  #include "infrastructure/utils/utils.h"
  
  // 使用标准库中的pair、string和vector类型
- using std::pair;
- using std::string;
- using std::vector;
- using std::cout;
- using std::endl;
+using std::pair;
+using std::string;
+using std::vector;
+using std::cout;
+using std::endl;
 
- // 前向声明数据读取函数
- inline void ReadDataWrapper(const string& dataset, const string& dataset_path, 
-                      vector<vector<float>>& nodes, int data_size,
-                      const string& query_path, vector<vector<float>>& querys,
-                      int query_num, vector<int>& nodes_keys) {
-     // TODO: 实现数据读取逻辑
-     // 这是一个占位符实现
-     nodes.clear();
-     querys.clear();
-     nodes_keys.clear();
+/* ====================== 迭代读取器类 ====================== */
 
-     if (!dataset_path.empty()) {
-        std::ifstream input(dataset_path, std::ios::binary);
-        if (!input.is_open()) {
-            std::cerr << "Error: Cannot open dataset file: " << dataset_path << std::endl;
+/**
+ * @brief 迭代读取器抽象基类接口
+ */
+class I_ItrReader {
+public:
+    virtual ~I_ItrReader() {}
+    virtual bool IsEnd() = 0;
+    virtual std::vector<float> Next() = 0;
+};
+
+/**
+ * @brief Fvecs文件迭代读取器
+ */
+class FvecsItrReader : public I_ItrReader {
+public:
+    FvecsItrReader(std::string filename) {
+        ifs.open(filename, std::ios::binary);
+        if (!ifs.is_open()) {
+            std::cerr << "Error: Cannot open file: " << filename << std::endl;
+            eof_flag = true;
             return;
         }
-        
-        int count = 0;
-        while (input && count < data_size) {
-            int dim;
-            input.read(reinterpret_cast<char*>(&dim), sizeof(int));
-            if (!input) break;
-            
-            vector<float> vec(dim);
-            input.read(reinterpret_cast<char*>(vec.data()), dim * sizeof(float));
-            if (!input) break;
-            
-            nodes.push_back(std::move(vec));
-            nodes_keys.push_back(count);
-            count++;
+        eof_flag = false;
+        Next();
+    }
+    
+    bool IsEnd() { return eof_flag; }
+    
+    std::vector<float> Next() {
+        std::vector<float> prev_vec = vec;
+        int D;
+        if (ifs.read((char*)&D, sizeof(int))) {
+            vec.resize(D);
+            ifs.read((char*)vec.data(), sizeof(float) * D);
+            eof_flag = false;
+        } else {
+            vec.clear();
+            eof_flag = true;
         }
-        input.close();
-     }
-     if (!query_path.empty()) {
-        std::ifstream input(query_path, std::ios::binary);
-        if (input.is_open()) {
-            int count = 0;
-            while (input && count < query_num) {
-                int dim;
-                input.read(reinterpret_cast<char*>(&dim), sizeof(int));
-                if (!input) break;
-                
-                vector<float> vec(dim);
-                input.read(reinterpret_cast<char*>(vec.data()), dim * sizeof(float));
-                if (!input) break;
-                
-                querys.push_back(std::move(vec));
-                count++;
+        return prev_vec;
+    }
+    
+private:
+    FvecsItrReader() = delete;
+    std::ifstream ifs;
+    std::vector<float> vec;
+    bool eof_flag;
+};
+
+/**
+ * @brief Bvecs文件迭代读取器（读取unsigned char，返回float）
+ */
+class BvecsItrReader : public I_ItrReader {
+public:
+    BvecsItrReader(std::string filename) {
+        ifs.open(filename, std::ios::binary);
+        if (!ifs.is_open()) {
+            std::cerr << "Error: Cannot open file: " << filename << std::endl;
+            eof_flag = true;
+            return;
+        }
+        eof_flag = false;
+        Next();
+    }
+    
+    bool IsEnd() { return eof_flag; }
+    
+    std::vector<float> Next() {
+        std::vector<float> prev_vec = vec;
+        int D;
+        if (ifs.read((char*)&D, sizeof(int))) {
+            vec.resize(D);
+            std::vector<unsigned char> buff(D);
+            ifs.read((char*)buff.data(), sizeof(unsigned char) * D);
+            
+            for (int d = 0; d < D; ++d) {
+                vec[d] = static_cast<float>(buff[d]);
             }
-            input.close();
+            eof_flag = false;
+        } else {
+            vec.clear();
+            eof_flag = true;
+        }
+        return prev_vec;
+    }
+    
+private:
+    BvecsItrReader() = delete;
+    std::ifstream ifs;
+    std::vector<float> vec;
+    bool eof_flag;
+};
+
+/**
+ * @brief 代理类，根据文件扩展名选择合适的读取器
+ */
+class ItrReader {
+public:
+    ItrReader(std::string filename, std::string ext) {
+        if (ext == "fvecs") {
+            m_reader = new FvecsItrReader(filename);
+        } else if (ext == "bvecs") {
+            m_reader = new BvecsItrReader(filename);
+        } else {
+            std::cerr << "Error: Unsupported file extension: " << ext << std::endl;
+            m_reader = nullptr;
         }
     }
- }
+    
+    ~ItrReader() {
+        if (m_reader) delete m_reader;
+    }
+    
+    bool IsEnd() { return m_reader ? m_reader->IsEnd() : true; }
+    std::vector<float> Next() { return m_reader ? m_reader->Next() : std::vector<float>(); }
+    
+private:
+    ItrReader() = delete;
+    I_ItrReader* m_reader;
+};
+
+/* ====================== 辅助函数 ====================== */
+
+/**
+ * @brief 字符串分割函数
+ */
+inline void Split(std::string& s, std::string& delim, std::vector<std::string>* ret) {
+    size_t last = 0;
+    size_t index = s.find_first_of(delim, last);
+    while (index != std::string::npos) {
+        ret->push_back(s.substr(last, index - last));
+        last = index + 1;
+        index = s.find_first_of(delim, last);
+    }
+    if (index - last > 0) {
+        ret->push_back(s.substr(last, index - last));
+    }
+}
+
+/**
+ * @brief 读取前N个向量（如果top_n=-1则读取全部）
+ */
+inline std::vector<std::vector<float>> ReadTopN(std::string filename, std::string ext, int top_n = -1) {
+    std::vector<std::vector<float>> vecs;
+    if (top_n != -1) {
+        vecs.reserve(top_n);
+    }
+    ItrReader reader(filename, ext);
+    while (!reader.IsEnd()) {
+        if (top_n != -1 && top_n <= (int)vecs.size()) {
+            break;
+        }
+        vecs.emplace_back(reader.Next());
+    }
+    return vecs;
+}
+
+/* ====================== 数据读取包装函数 ====================== */
+
+/**
+ * @brief 数据读取包装函数（支持多种数据集格式）
+ * @param dataset 数据集名称
+ * @param dataset_path 数据集文件路径
+ * @param nodes 输出的节点向量数据
+ * @param data_size 需要读取的数据大小
+ * @param query_path 查询文件路径
+ * @param querys 输出的查询向量数据
+ * @param query_num 需要读取的查询数量
+ * @param nodes_keys 节点键值（可选）
+ */
+inline void ReadDataWrapper(const string& dataset, const string& dataset_path, 
+                     vector<vector<float>>& nodes, int data_size,
+                     const string& query_path, vector<vector<float>>& querys,
+                     int query_num, vector<int>& nodes_keys) {
+    nodes.clear();
+    querys.clear();
+    nodes_keys.clear();
+    
+    // 根据数据集类型选择读取方法
+    if (dataset == "deep" || dataset == "deep10m") {
+        nodes = ReadTopN(dataset_path, "fvecs", data_size);
+        if (!query_path.empty()) {
+            querys = ReadTopN(query_path, "fvecs", query_num);
+        }
+    } 
+    else if (dataset == "sift") {
+        nodes = ReadTopN(dataset_path, "bvecs", data_size);
+        if (!query_path.empty()) {
+            querys = ReadTopN(query_path, "bvecs", query_num);
+        }
+    }
+    else if (dataset == "local") {
+        cout << "Reading local dataset from: " << dataset_path << endl;
+        nodes = ReadTopN(dataset_path, "fvecs", data_size);
+        if (!query_path.empty()) {
+            querys = ReadTopN(query_path, "fvecs", query_num);
+        }
+    }
+    else {
+        // 对于其他数据集，使用通用的二进制读取方式
+        if (!dataset_path.empty()) {
+           std::ifstream input(dataset_path, std::ios::binary);
+           if (!input.is_open()) {
+               std::cerr << "Error: Cannot open dataset file: " << dataset_path << std::endl;
+               return;
+           }
+           
+           int count = 0;
+           while (input && count < data_size) {
+               int dim;
+               input.read(reinterpret_cast<char*>(&dim), sizeof(int));
+               if (!input) break;
+               
+               vector<float> vec(dim);
+               input.read(reinterpret_cast<char*>(vec.data()), dim * sizeof(float));
+               if (!input) break;
+               
+               nodes.push_back(std::move(vec));
+               count++;
+           }
+           input.close();
+        }
+        
+        if (!query_path.empty()) {
+           std::ifstream input(query_path, std::ios::binary);
+           if (input.is_open()) {
+               int count = 0;
+               while (input && count < query_num) {
+                   int dim;
+                   input.read(reinterpret_cast<char*>(&dim), sizeof(int));
+                   if (!input) break;
+                   
+                   vector<float> vec(dim);
+                   input.read(reinterpret_cast<char*>(vec.data()), dim * sizeof(float));
+                   if (!input) break;
+                   
+                   querys.push_back(std::move(vec));
+                   count++;
+               }
+               input.close();
+           }
+       }
+    }
+    
+    // 如果没有提供nodes_keys，则使用默认索引
+    if (nodes_keys.empty()) {
+        nodes_keys.resize(nodes.size());
+        for (int i = 0; i < nodes.size(); i++) {
+            nodes_keys[i] = i;
+        }
+    }
+}
 
  inline void ReadGroundtruthQuery(vector<vector<int>>& groundtruth,
-                           vector<pair<int, int>>& query_ranges,
-                           vector<int>& query_ids,
-                           const string& gt_path) {
-     // TODO: 实现groundtruth读取逻辑
-     // 这是一个占位符实现
-     groundtruth.clear();
-     query_ranges.clear();
-     query_ids.clear();
- }
+    vector<pair<int, int>>& query_ranges,
+    vector<int>& query_ids,
+    const string& gt_path) {
+groundtruth.clear();
+query_ranges.clear();
+query_ids.clear();
+
+std::ifstream infile;
+string bline;
+string delim = ",";
+string space_delim = " ";
+
+infile.open(gt_path, std::ios::in);
+if (!infile.is_open()) {
+std::cerr << "Error: Cannot open groundtruth file: " << gt_path << std::endl;
+return;
+}
+
+int counter = 0;
+while (getline(infile, bline, '\n')) {
+if (bline.empty()) continue;
+counter++;
  
+
+vector<int> one_gt;
+std::pair<int, int> one_range;
+int one_id;
+vector<string> ret;
+Split(bline, delim, &ret);
+
+if (ret.size() < 8) {
+    std::cerr << "Warning: Invalid line format at line " << counter << std::endl;
+    continue;
+}
+
+one_id = std::stoi(ret[0]);
+one_range.first = std::stoi(ret[1]);
+one_range.second = std::stoi(ret[2]);
+
+vector<string> str_gt;
+Split(ret[7], space_delim, &str_gt);
+if (!str_gt.empty() && str_gt.back().empty()) {
+    str_gt.pop_back();
+}
+
+for (auto& ele : str_gt) {
+    if (!ele.empty()) {
+        one_gt.emplace_back(std::stoi(ele));
+    }
+}
+
+        
+groundtruth.emplace_back(one_gt);
+query_ranges.emplace_back(one_range);
+query_ids.emplace_back(one_id);
+}
+
+infile.close();
+cout << "Loaded " << groundtruth.size() << " groundtruth queries from " << gt_path << endl;
+}
+
  class DataWrapper {
  public:
      /**

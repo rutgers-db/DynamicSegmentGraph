@@ -277,6 +277,8 @@
               << "Search ef: " << one_searchef << endl
               << "========================" << endl;
          std::map<int, std::pair<double, double>> result_recorder;
+
+        //  cout << "test" << endl;
  
          for (int idx = 0; idx < data_wrapper.query_ids.size(); idx++) {
              int one_id = data_wrapper.query_ids.at(idx);

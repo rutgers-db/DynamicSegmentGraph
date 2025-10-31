@@ -484,9 +484,9 @@ public:
         base_hnsw::tableint cur_c,        
         std::priority_queue<std::pair<dist_t, base_hnsw::tableint>,
                             std::vector<std::pair<dist_t, base_hnsw::tableint>>,
-                            base_hnsw::HierarchicalNSW<float>::CompareByFirst> &top_candidates, 
+                            typename base_hnsw::HierarchicalNSW<dist_t>::CompareByFirst> &top_candidates,  // ← 修改这里
         int level,                                           
-        bool isUpdate);
+        bool isUpdate) override; 
 };
 
 // Template member function implementation outside the class
@@ -496,10 +496,11 @@ base_hnsw::tableint CompactHNSW<dist_t>::mutuallyConnectNewElementLevel0(
     base_hnsw::tableint cur_c,        
     std::priority_queue<std::pair<dist_t, base_hnsw::tableint>,
                         std::vector<std::pair<dist_t, base_hnsw::tableint>>,
-                        base_hnsw::HierarchicalNSW<float>::CompareByFirst> &top_candidates, 
+                        typename base_hnsw::HierarchicalNSW<dist_t>::CompareByFirst> &top_candidates,  // ← 修改这里
     int level,                                           
-    bool isUpdate)                                       
+    bool isUpdate)                                      
 {
+    // std::cout << "mutuallyConnectNewElementLevel0" << std::endl;
     Mcurmax = this->maxM0_; 
 
     unsigned external_id = this->getExternalLabel(cur_c);

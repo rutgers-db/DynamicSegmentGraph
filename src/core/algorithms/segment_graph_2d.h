@@ -108,14 +108,14 @@ using namespace hnswlib_incre;
       * 并通过优先队列处理候选邻居以优化连接过程。
       */
  
-     virtual base_hnsw::tableint mutuallyConnectNewElementLevel0(
-         const void *data_point, /**< 当前数据点 */
-         base_hnsw::tableint cur_c,         /**< 当前节点的内部标识符 */
-         std::priority_queue<std::pair<dist_t, base_hnsw::tableint>,
-                             std::vector<std::pair<dist_t, base_hnsw::tableint>>,
-                             base_hnsw::HierarchicalNSW<float>::CompareByFirst> &top_candidates, /**< 候选邻居列表 */
-         int level,                                           /**< 连接级别 */
-         bool isUpdate);                                       /**< 是否更新已存在的链接 */
+    virtual base_hnsw::tableint mutuallyConnectNewElementLevel0(
+        const void *data_point, /**< 当前数据点 */
+        base_hnsw::tableint cur_c,         /**< 当前节点的内部标识符 */
+        std::priority_queue<std::pair<dist_t, base_hnsw::tableint>,
+                            std::vector<std::pair<dist_t, base_hnsw::tableint>>,
+                            typename base_hnsw::HierarchicalNSW<dist_t>::CompareByFirst> &top_candidates, /**< 候选邻居列表 */
+        int level,                                           /**< 连接级别 */
+        bool isUpdate) override;                             /**< 是否更新已存在的链接 */
 
  };
  

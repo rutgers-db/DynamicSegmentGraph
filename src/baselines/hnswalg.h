@@ -279,6 +279,22 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     return top_candidates;
   }
 
+  // Added: Level-0 specific hooks to align with DynamicSegmentGraph behavior
+  // Default fallback delegates to generic implementations to preserve compatibility
+  virtual std::priority_queue<std::pair<dist_t, tableint>,
+                              std::vector<std::pair<dist_t, tableint>>, CompareByFirst>
+  searchBaseLayerLevel0(tableint ep_id, const void *data_point, int layer) {
+    return searchBaseLayer(ep_id, data_point, layer);
+  }
+
+  virtual tableint mutuallyConnectNewElementLevel0(
+      const void *data_point, tableint cur_c,
+      std::priority_queue<std::pair<dist_t, tableint>,
+                          std::vector<std::pair<dist_t, tableint>>, CompareByFirst> &top_candidates,
+      int level, bool isUpdate) {
+    return mutuallyConnectNewElement(data_point, cur_c, top_candidates, level, isUpdate);
+  }
+
   mutable std::atomic<long> metric_distance_computations;
   mutable std::atomic<long> metric_hops;
 
@@ -1228,8 +1244,13 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
             filteredTopCandidates.pop();
         }
 
-        currObj = mutuallyConnectNewElement(dataPoint, dataPointInternalId,
-                                            filteredTopCandidates, level, true);
+        if (level == 0) {
+          currObj = mutuallyConnectNewElementLevel0(dataPoint, dataPointInternalId,
+                                                    filteredTopCandidates, level, true);
+        } else {
+          currObj = mutuallyConnectNewElement(dataPoint, dataPointInternalId,
+                                              filteredTopCandidates, level, true);
+        }
       }
     }
   }
@@ -1272,8 +1293,13 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
       dist_t dist = fstdistfunc_(data_point, getDataByInternalId(currObj),
                                  dist_func_param_);
       top_candidates.emplace(dist, currObj);
-      currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates,
-                                          level, false);
+      if (level == 0) {
+        currObj = mutuallyConnectNewElementLevel0(data_point, cur_c, top_candidates,
+                                                  level, false);
+      } else {
+        currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates,
+                                            level, false);
+      }
     }
   }
 
@@ -1341,7 +1367,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         std::priority_queue<std::pair<dist_t, tableint>,
                             std::vector<std::pair<dist_t, tableint>>,
                             CompareByFirst>
-            top_candidates = searchBaseLayer(currObj, data_point, level);
+            top_candidates = (level == 0)
+                                 ? searchBaseLayerLevel0(currObj, data_point, level)
+                                 : searchBaseLayer(currObj, data_point, level);
         if (epDeleted) {
           top_candidates.emplace(
               fstdistfunc_(data_point, getDataByInternalId(enterpoint_copy),
@@ -1349,8 +1377,13 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
               enterpoint_copy);
           if (top_candidates.size() > ef_construction_) top_candidates.pop();
         }
-        currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates,
-                                            level, false);
+        if (level == 0) {
+          currObj = mutuallyConnectNewElementLevel0(data_point, cur_c, top_candidates,
+                                                    level, false);
+        } else {
+          currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates,
+                                              level, false);
+        }
       }
 
     } else {
@@ -1469,7 +1502,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         std::priority_queue<std::pair<dist_t, tableint>,
                             std::vector<std::pair<dist_t, tableint>>,
                             CompareByFirst>
-            top_candidates = searchBaseLayer(currObj, data_point, level);
+            top_candidates = (level == 0) 
+                ? searchBaseLayerLevel0(currObj, data_point, level)
+                : searchBaseLayer(currObj, data_point, level);
         if (epDeleted) {
           top_candidates.emplace(
               fstdistfunc_(data_point, getDataByInternalId(enterpoint_copy),
@@ -1477,8 +1512,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
               enterpoint_copy);
           if (top_candidates.size() > ef_construction_) top_candidates.pop();
         }
-        currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates,
-                                            level, false);
+        currObj = (level == 0)
+            ? mutuallyConnectNewElementLevel0(data_point, cur_c, top_candidates, level, false)
+            : mutuallyConnectNewElement(data_point, cur_c, top_candidates, level, false);
       }
 
     } else {

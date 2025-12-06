@@ -219,14 +219,15 @@ int main(int argc, char **argv) {
     }
     BaseIndex::IndexParams i_params(index_k, ef_construction, ef_max, alpha);
 
-    // Compact::IndexCompactGraph *index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
-    SeRF::IndexSegmentGraph2D *index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
+    Compact::IndexCompactGraph *index = new Compact::IndexCompactGraph(&ss, &data_wrapper);
+    // SeRF::IndexSegmentGraph2D *index = new SeRF::IndexSegmentGraph2D(&ss, &data_wrapper);
     cout << " parameters: ef_construction ( " + to_string(i_params.ef_construction) + " )  index-k( "
          << i_params.K << ")  ef_max (" << i_params.ef_max << ") "
          << endl;
     index->initForScabilityExp(&i_params, &ss);
 
-    for (int i = 0; i < insert_batches.size(); i++) {
+    // for (int i = 0; i < insert_batches.size(); i++) {
+    for (int i = 0; i < 1; i++) {
         auto &insert_batch = insert_batches[i];
         auto &gt_path = gt_paths[i];
         {
@@ -235,7 +236,7 @@ int main(int argc, char **argv) {
             index->insert_batch(insert_batch);
             index->save(index_paths[i]);
         }
-        // index->initLabelSet();
+        index->initLabelSet();
         data_wrapper.LoadGroundtruth(gt_path);
         BaseIndex::SearchInfo search_info(&data_wrapper, &i_params, "SeRF_2D",
                                           "benchmark");

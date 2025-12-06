@@ -95,6 +95,22 @@ static float* flatten_subset(const vector<vector<float>> &nodes, const vector<un
     return buf;
 }
 
+// Read current process resident set size (RSS) in KB from /proc/self/status
+static long getProcessVmRSSKB() {
+    std::ifstream status_file("/proc/self/status");
+    std::string line;
+    while (std::getline(status_file, line)) {
+        if (line.rfind("VmRSS:", 0) == 0) {
+            std::istringstream iss(line);
+            std::string key, unit;
+            long value_kb = 0;
+            iss >> key >> value_kb >> unit; // e.g., "VmRSS:" 123456 "kB"
+            return value_kb;
+        }
+    }
+    return -1;
+}
+
 int main(int argc, char **argv) {
     // Parameters (defaults mirror incremental_stream.cc where applicable)
     int data_size = 1000000; // may be overridden by -N
@@ -151,98 +167,87 @@ int main(int argc, char **argv) {
     cout << "search ef:" << endl;
     print_set(searchef_para_range_list);
 
-    // Initialize DIGRA with the first batch
-    const auto &first_batch = insert_batches[0];
-    vector<unsigned> init_ids = first_batch; // copy
+    // Initialize DIGRA with all points, measure time and memory usage
+    // Adjust data_size to the actual number of loaded points
+    int total_points = (int)data_wrapper.nodes.size();
+    if (data_size > total_points) data_size = total_points;
+    vector<unsigned> init_ids((size_t)data_size);
+    for (int i = 0; i < data_size; ++i) init_ids[(size_t)i] = (unsigned)i;
     float *baseData = flatten_subset(data_wrapper.nodes, init_ids, dim);
     int *keyList = new int[(size_t)data_size];
     int *valueList = new int[(size_t)data_size];
-    for (size_t i = 0; i < init_ids.size(); i++) {
-        keyList[i] = (int)init_ids[i];
-        valueList[i] = (int)init_ids[i];
+    for (int i = 0; i < data_size; i++) {
+        keyList[(size_t)i] = i;
+        valueList[(size_t)i] = i;
     }
 
-    RangeHNSW rangeHnsw(dim, init_ids.size(), (size_t)data_size, baseData, keyList, valueList, (int)index_k, (int)ef_construction);
+    long rss_before_kb = getProcessVmRSSKB();
+    auto t_init_start = std::chrono::high_resolution_clock::now();
+    RangeHNSW rangeHnsw(dim, data_size, (size_t)data_size, baseData, keyList, valueList, (int)index_k, (int)ef_construction);
+    auto t_init_end = std::chrono::high_resolution_clock::now();
+    long rss_after_kb = getProcessVmRSSKB();
+    double init_seconds = std::chrono::duration<double>(t_init_end - t_init_start).count();
+    long index_rss_kb = (rss_after_kb >= 0 && rss_before_kb >= 0) ? (rss_after_kb - rss_before_kb) : -1;
 
-    // Evaluate part 0 then insert subsequent batches and evaluate each part
-    for (int i = 0; i < part_num; i++) {
-        // Measure and report the insertion time for each incremental batch (i > 0)
-        double batch_insert_seconds = 0.0;
-        size_t batch_insert_count = 0;
-        if (i > 0) {
-            const auto &batch = insert_batches[i];
-            auto t_insert_start = std::chrono::high_resolution_clock::now();
-            for (unsigned id : batch) {
-                rangeHnsw.addPoint((int)id, (int)id, (char*)data_wrapper.nodes[id].data());
-            }
-            auto t_insert_end = std::chrono::high_resolution_clock::now();
-            batch_insert_seconds = std::chrono::duration<double>(t_insert_end - t_insert_start).count();
-            batch_insert_count = batch.size();
-            const double batch_insert_ips = batch_insert_seconds > 0.0 ? (double)batch_insert_count / batch_insert_seconds : 0.0;
-            cout << std::setiosflags(std::ios::fixed) << std::setprecision(4)
-                 << "Batch " << i << " insertion: " << batch_insert_count
-                 << " points in " << batch_insert_seconds << " s"
-                 << ", IPS: " << batch_insert_ips << endl;
-        }
+    // Evaluate queries using ONLY the last part's groundtruth
+    const int last_part = part_num - 1;
+    data_wrapper.LoadGroundtruth(gt_paths[last_part]);
 
-        data_wrapper.LoadGroundtruth(gt_paths[i]);
+    std::map<int, std::tuple<double, double, double, double>> result_recorder; // recall, calDist, internal_search, fetch_nn
+    std::map<int, std::tuple<float, float>> comparison_recorder; // comps, hops (DIGRA does not expose, keep zeros)
 
-        std::map<int, std::tuple<double, double, double, double>> result_recorder; // recall, calDist, internal_search, fetch_nn
-        std::map<int, std::tuple<float, float>> comparison_recorder; // comps, hops (DIGRA does not expose, keep zeros)
-
-        cout << "Evaluating part " << i << endl;
-        std::ofstream logfile;
-        string log_dir = root_path + "/log/incremental_stream/digra/" + dataset + "/";
-        struct stat st = {};
-        if (stat(log_dir.c_str(), &st) != 0) {
-            mkdir(log_dir.c_str(), 0777);
-        }
-        string log_path = log_dir + "part_" + to_string(i) + ".log";
-        logfile.open(log_path);
-        if (i > 0) {
-            const double batch_insert_ips = batch_insert_seconds > 0.0 ? (double)batch_insert_count / batch_insert_seconds : 0.0;
-            logfile << std::setiosflags(std::ios::fixed) << std::setprecision(4)
-                    << "Batch " << i << " insertion: " << batch_insert_count
-                    << " points, " << batch_insert_seconds << " s"
-                    << ", IPS: " << batch_insert_ips << std::endl;
-        }
-
-        for (auto one_searchef : searchef_para_range_list) {
-            // Reset accumulators
-            result_recorder.clear();
-            comparison_recorder.clear();
-
-            for (int idx = 0; idx < (int)data_wrapper.query_ids.size(); idx++) {
-                int one_id = data_wrapper.query_ids.at(idx);
-                auto ql = data_wrapper.query_ranges.at(idx).first;
-                auto qr = data_wrapper.query_ranges.at(idx).second;
-                int query_range = qr - ql + 1;
-
-                auto t1 = std::chrono::high_resolution_clock::now();
-                auto pq = rangeHnsw.queryRange((float*)data_wrapper.querys.at(one_id).data(), ql, qr, data_wrapper.query_k, one_searchef);
-                auto t2 = std::chrono::high_resolution_clock::now();
-                double elapsed = std::chrono::duration<double>(t2 - t1).count();
-                vector<int> res;
-                while (!pq.empty()) { res.push_back((int)pq.top().second); pq.pop(); }
-
-                double prec = countPrecision(data_wrapper.groundtruth.at(idx), res);
-                std::get<0>(result_recorder[query_range]) += prec;
-                // Accumulate actual internal (query) time in seconds to enable correct QPS
-                std::get<2>(result_recorder[query_range]) += elapsed;
-                std::get<1>(result_recorder[query_range]) += 0.0;
-                std::get<3>(result_recorder[query_range]) += 0.0;
-                std::get<0>(comparison_recorder[query_range]) += 0.0f;
-                std::get<1>(comparison_recorder[query_range]) += 0.0f;
-            }
-
-            logfile << std::endl
-                    << "Search ef: " << one_searchef << std::endl
-                    << "========================" << std::endl;
-            log_result_recorder(result_recorder, comparison_recorder, (int)data_wrapper.query_ids.size(), logfile);
-            logfile << "========================" << std::endl;
-        }
-        logfile.close();
+    cout << "Evaluating part " << last_part << endl;
+    std::ofstream logfile;
+    string log_dir = root_path + "/log/incremental_stream/digra/" + dataset + "/";
+    struct stat st_buf = {};
+    if (stat(log_dir.c_str(), &st_buf) != 0) {
+        mkdir(log_dir.c_str(), 0777);
     }
+    string log_path = log_dir + "part_" + to_string(last_part) + ".log";
+    logfile.open(log_path);
+    logfile << std::setiosflags(std::ios::fixed) << std::setprecision(4)
+            << "Init index: points=" << data_size
+            << ", time(s)=" << init_seconds;
+    if (index_rss_kb >= 0) {
+        logfile << ", index_RSS_delta(MB)=" << std::setprecision(2) << (index_rss_kb / 1024.0);
+    }
+    logfile << std::endl;
+
+    for (auto one_searchef : searchef_para_range_list) {
+        // Reset accumulators
+        result_recorder.clear();
+        comparison_recorder.clear();
+
+        for (int idx = 0; idx < (int)data_wrapper.query_ids.size(); idx++) {
+            int one_id = data_wrapper.query_ids.at(idx);
+            auto ql = data_wrapper.query_ranges.at(idx).first;
+            auto qr = data_wrapper.query_ranges.at(idx).second;
+            int query_range = qr - ql + 1;
+
+            auto t1 = std::chrono::high_resolution_clock::now();
+            auto pq = rangeHnsw.queryRange((float*)data_wrapper.querys.at(one_id).data(), ql, qr, data_wrapper.query_k, one_searchef);
+            auto t2 = std::chrono::high_resolution_clock::now();
+            double elapsed = std::chrono::duration<double>(t2 - t1).count();
+            vector<int> res;
+            while (!pq.empty()) { res.push_back((int)pq.top().second); pq.pop(); }
+
+            double prec = countPrecision(data_wrapper.groundtruth.at(idx), res);
+            std::get<0>(result_recorder[query_range]) += prec;
+            // Accumulate actual internal (query) time in seconds to enable correct QPS
+            std::get<2>(result_recorder[query_range]) += elapsed;
+            std::get<1>(result_recorder[query_range]) += 0.0;
+            std::get<3>(result_recorder[query_range]) += 0.0;
+            std::get<0>(comparison_recorder[query_range]) += 0.0f;
+            std::get<1>(comparison_recorder[query_range]) += 0.0f;
+        }
+
+        logfile << std::endl
+                << "Search ef: " << one_searchef << std::endl
+                << "========================" << std::endl;
+        log_result_recorder(result_recorder, comparison_recorder, (int)data_wrapper.query_ids.size(), logfile);
+        logfile << "========================" << std::endl;
+    }
+    logfile.close();
 
     delete[] baseData;
     delete[] keyList;

@@ -1,0 +1,19 @@
+PERFORMANCE COMPARISON SUMMARY
+==================================================
+
+Key Performance Metrics Comparison:
+----------------------------------------
+ef=100, range=159999:
+  Filtered:   Recall=0.9799, QPS=1243
+  Unfiltered: Recall=0.8698, QPS=4659
+  Difference: Recall=+0.1101, QPS ratio=0.27x
+
+ef=200, range=319999:
+  Filtered:   Recall=0.9867, QPS=1172
+  Unfiltered: Recall=0.9563, QPS=2872
+  Difference: Recall=+0.0304, QPS ratio=0.41x
+
+ef=400, range=639999:
+  Filtered:   Recall=0.9911, QPS=1185
+  Unfiltered: Recall=0.9846, QPS=1617
+  Difference: Recall=+0.0065, QPS ratio=0.73x

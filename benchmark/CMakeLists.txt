@@ -78,3 +78,17 @@ target_link_libraries(digra_stream UTIL)
 target_compile_options(digra_stream PRIVATE -Wall ${OpenMP_CXX_FLAGS})
 target_link_libraries(digra_stream ${OpenMP_CXX_FLAGS})
 target_link_libraries(digra_stream OpenMP::OpenMP_CXX)
+
+# Ordered DSG vs DIGRA (200k total, 180k build + 20k inserts)
+add_executable(ordered_dsg_vs_digra ordered_dsg_vs_digra.cc)
+target_link_libraries(ordered_dsg_vs_digra UTIL)
+target_compile_options(ordered_dsg_vs_digra PRIVATE -Wall ${OpenMP_CXX_FLAGS})
+target_link_libraries(ordered_dsg_vs_digra ${OpenMP_CXX_FLAGS})
+target_link_libraries(ordered_dsg_vs_digra OpenMP::OpenMP_CXX)
+
+# DIGRA adapter TU to isolate symbols
+add_library(digra_adapter STATIC digra_adapter.cc)
+target_compile_options(digra_adapter PRIVATE -Wall ${OpenMP_CXX_FLAGS})
+target_link_libraries(digra_adapter ${OpenMP_CXX_FLAGS})
+
+target_link_libraries(ordered_dsg_vs_digra digra_adapter)

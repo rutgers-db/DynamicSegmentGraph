@@ -774,6 +774,7 @@ public:
      */
     void countNeighbrs() {
         size_t max_nns_len = 0;
+        index_info->nodes_amount = 0;
         
         // 如果有向图索引不为空，则开始处理
         if (!directed_indexed_arr.empty()) {
@@ -863,6 +864,14 @@ public:
         directed_indexed_arr.clear();
         directed_indexed_arr.resize(data_wrapper->data_size);
         hnsw->compact_graph = &directed_indexed_arr;
+    }
+
+    // Generate compressed neighbors for all currently inserted labels
+    void generateNeighborsAll() {
+        for (size_t i = 0; i < data_wrapper->data_size; i++) {
+            auto cur_c = hnsw->getInnerIdByLabel((int)i);
+            hnsw->gen_tmp_nn_list(data_wrapper->nodes.at(i).data(), cur_c);
+        }
     }
 
     std::set<int> label_set;

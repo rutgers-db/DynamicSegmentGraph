@@ -1,3 +1,7 @@
-# ./benchmark/knn_first -k 16 -dataset deep -N 1000000 -dataset_path ../data/deep_sorted_10M.fvecs -query_path ../data/deep1B_queries.fvecs >> ../log/static_knnfirst/Deep_KNNFirst.log
-# ./benchmark/knn_first -k 32 -dataset yt8m-video -N 1000000 -dataset_path ../data/exp2_used_data/yt8m_video_1_2m.fvecs -query_path ../data/yt8m_video_querys_10k.fvecs >> ../log/static_knnfirst/yt8m_KNNFirst.log 
-./benchmark/knn_first -k 32 -dataset wiki-image -N 1000000 -dataset_path ../data/wiki_image_embedding.fvecs -query_path ../data/wiki_image_querys.fvecs  >> ../log/static_knnfirst/Wiki_KNNFirst.log
+#!/bin/bash
+
+# Iterate over M values 16, 32, and 64
+for M in 16 32 64; do
+    echo "Running knn_first with -k $M"
+    ./benchmark/knn_first -k $M -dataset deep -N 1000000 -dataset_path ../data/deep_sorted_10M.fvecs -query_path ../data/deep1B_queries.fvecs >> ../log/static_knnfirst/Deep_KNNFirst_M${M}.log
+done

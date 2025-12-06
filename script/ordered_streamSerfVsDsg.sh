@@ -8,7 +8,8 @@ root_path="/research/projects/zp128/RangeIndexWithRandomInsertion/" # Define the
 
 # List of datasets
 DATASETS=("deep" "yt8m-video" "wiki-image")
-Ks=(16 32 32)  #16 32 32 #32 32 64
+Ks=(16 32 32)  #16 32 32 
+# Ks=(32 32 64)
 ef_maxs=(500 1000 1000) 
 
 # List of dataset paths with root_path appended
@@ -23,7 +24,8 @@ QUERY_PATHS=(
 ) #
 
 # Iterate over datasets and their paths using proper indexing
-for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
+# for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
+for i in 0; do
     dataset="${DATASETS[$i]}"
     dataset_path="${DATASET_PATHS[$i]}"
     query_path="${QUERY_PATHS[$i]}"
@@ -38,8 +40,8 @@ for i in $(seq 0 $((${#DATASETS[@]} - 1))); do
     fi
 
     # Define index path and log file
-    LOG_PATH="${root_path}log/ordered_stream/dsg/${dataset}_${INDEX_SIZE}_${index_k}_${ef_max}_${ef_construction}.log"
-    # LOG_PATH="${root_path}log/ordered_stream/serf/${dataset}_${INDEX_SIZE}_${index_k}_${ef_max}_${ef_construction}.log"
+    LOG_PATH="${root_path}log/ordered_stream/dsg_new/${dataset}_${INDEX_SIZE}_${index_k}_${ef_max}_${ef_construction}.log"
+    # LOG_PATH="${root_path}log/ordered_stream/serf_new/${dataset}_${INDEX_SIZE}_${index_k}_${ef_max}_${ef_construction}.log"
     # Iterate over methods and run the benchmark
 
     echo "Running benchmark for dataset: $dataset"

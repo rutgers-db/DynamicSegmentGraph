@@ -82,7 +82,7 @@ int main(int argc, char **argv)
     string method = ""; 
     string query_path = "";
     string groundtruth_path = "";
-    vector<int> index_k_list = {8};
+    vector<int> index_k_list = {16};
     vector<int> ef_construction_list = {100};
     int query_num = 1000;
     int query_k = 10;
@@ -160,6 +160,7 @@ int main(int argc, char **argv)
                          << endl;
                     gettimeofday(&t1, NULL);
                     index.buildIndex(&i_params);
+                    index.initLabelSet();
                     // index.printOnebatch();
                     gettimeofday(&t2, NULL);
                     logTime(t1, t2, "Build Index Time");

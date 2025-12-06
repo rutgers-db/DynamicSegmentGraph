@@ -73,6 +73,9 @@ public:
     // 查询标识符
     vector<int> query_ids;
 
+    // Version tag for experiments/outputs
+    std::string version;
+
     /**
      * 读取数据文件
      */

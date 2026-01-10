@@ -43,3 +43,7 @@ The following settings are the current recommended defaults for a 1M dataset bui
 - Targets C++17; uses STL and SIMD where helpful.
 - Datasets are not bundled—point the CLI to your own data files.
 - Expect rapid changes while insertion and densification land.
+
+## TradeOff between Index and Query
+The index time/size and query performance trade off.
+half the size and time of index can just degrade a little bit(10~20%) of query performance. How to trade off it is still a open question.

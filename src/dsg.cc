@@ -13,10 +13,12 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <limits>
+#include <type_traits>
 #include <unordered_set>
 #include <stdexcept>
 #include <iostream>
@@ -29,42 +31,6 @@ namespace dsg {
 namespace {
 using Clock = std::chrono::steady_clock;
 using Candidate = std::pair<DynamicSegmentGraph::DistType, unsigned>;
-
-static inline bool EnvVarEnabled(const char *name, bool default_value) noexcept {
-    const char *val = std::getenv(name);
-    if (val == nullptr) {
-        return default_value;
-    }
-    while (*val == ' ' || *val == '\t' || *val == '\n' || *val == '\r') {
-        ++val;
-    }
-    if (*val == '\0') {
-        return default_value;
-    }
-    // Keep parsing cheap. Prefer numeric toggles: 0/1.
-    const char c = *val;
-    if (c == '0' || c == 'f' || c == 'F' || c == 'n' || c == 'N') {
-        return false;
-    }
-    if (c == '1' || c == 't' || c == 'T' || c == 'y' || c == 'Y') {
-        return true;
-    }
-    return default_value;
-}
-
-// Temporary structure used only during build process for sorting/merging.
-struct TempEdge {
-    unsigned external_id;
-    unsigned left_lower;
-    unsigned left_upper;
-    unsigned right_lower;
-    unsigned right_upper;
-
-    bool coversRange(unsigned query_left, unsigned query_right) const noexcept {
-        return (left_lower <= query_left && query_left <= left_upper) &&
-               (right_lower <= query_right && query_right <= right_upper);
-    }
-};
 
 // Support heuristic for an edge (center -> v) under the full space of query ranges.
 // A query range [L, R] can use this edge only if:
@@ -103,6 +69,10 @@ DynamicSegmentGraph::DynamicSegmentGraph(hnswlib::SpaceInterface<DistType> *spac
     }
     visited_list_pool_ = new hnswlib::VisitedListPool(1, data_wrapper->data_size);
     returned_nns.resize(query_topK);
+
+    // Dense label <-> row mapping (random insertion support).
+    label_to_row_.assign(static_cast<size_t>(data_wrapper->data_size), -1);
+    row_to_label_.clear();
 }
 
 DynamicSegmentGraph::~DynamicSegmentGraph() {
@@ -113,29 +83,169 @@ DynamicSegmentGraph::~DynamicSegmentGraph() {
     }
 }
 
-void DynamicSegmentGraph::build() {
+void DynamicSegmentGraph::reserveGraphStorage(std::size_t total_rows_capacity,
+                                             std::size_t total_edge_capacity) {
+    // Per-row metadata
+    row_to_label_.reserve(total_rows_capacity);
+    node_degrees_.reserve(total_rows_capacity);
+    row_offset_.reserve(total_rows_capacity + 1);
+
+    // Global SoA edge buffers (capacity across all rows, including slack)
+    neighbors_.reserve(total_edge_capacity);
+    left_lower_.reserve(total_edge_capacity);
+    left_upper_.reserve(total_edge_capacity);
+    right_lower_.reserve(total_edge_capacity);
+    right_upper_.reserve(total_edge_capacity);
+}
+
+/**
+ * @brief Select a subset of segment edges by support-weighted score.
+ *
+ * @details This helper centralizes the pruning policy shared by build()/insert()/recompress().
+ *
+ * Scoring rule:
+ * - For an edge (center_label -> v) with envelope [ll,lu] x [rl,ru], define
+ *   support(v) = (lu - ll + 1) * (ru - rl + 1).
+ * - We further down-weight edges that are far in label space:
+ *
+ *   score = support(v) / (|v - center_label| + 1)
+ *
+ * Protected edges:
+ * - If |v - center_label| + 1 <= protect_span, the edge is treated as "protected" and
+ *   assigned score = UINT64_MAX, so it is preferentially kept. This is used to avoid
+ *   harming very small query ranges where near-label connections are important.
+ *
+ * Selection policy:
+ * - Among prunable edges (non-protected), keep the Top `keep_prunable` by score (nth_element).
+ * - Then merge protected + selected-prunable edges.
+ * - If `keep_total_limit > 0`, additionally cap the total number of returned edges to
+ *   `keep_total_limit` by score (again using nth_element). This is used by recompress()
+ *   to keep the stored forward list within the per-row budget (deg.fwd).
+ *
+ * Output invariant:
+ * - Returned edges are sorted by `external_id` so the forward region remains sorted and
+ *   supports binary-search scans in `rangeSearch()`.
+ *
+ */
+void DynamicSegmentGraph::selectEdgesBySupport(
+    std::vector<TempEdge> &edges,
+    unsigned center_label,
+    std::size_t protect_span,
+    std::size_t keep_total_limit) const {
+
+    if (edges.empty()) {
+        return;
+    }
+
+    const std::size_t center = static_cast<std::size_t>(center_label);
+    // Store (score, index) so we don't copy TempEdge during ranking.
+    std::vector<std::pair<std::uint64_t, std::uint32_t>> scored;
+    scored.reserve(edges.size());
+    for (std::uint32_t i = 0; i < static_cast<std::uint32_t>(edges.size()); ++i) {
+        const auto &e = edges[i];
+        const std::size_t neighbor = static_cast<std::size_t>(e.external_id);
+        const std::size_t diff =
+            neighbor > center ? (neighbor - center + 1) : (center - neighbor + 1);
+
+        std::uint64_t score = 0;
+        if (diff <= protect_span) {
+            score = std::numeric_limits<std::uint64_t>::max();
+        } else {
+            score = EdgeSupport(e.external_id,
+                                e.left_lower,
+                                e.left_upper,
+                                e.right_lower,
+                                e.right_upper);
+            score /= static_cast<std::uint64_t>(diff);
+        }
+        scored.emplace_back(score, i);
+    }
+
+    // Keep top-K by score using nth_element (descending).
+    // If keep_total_limit == 0, keep all.
+    std::size_t k = keep_total_limit;
+    if (k == 0 || k > scored.size()) {
+        k = scored.size();
+    }
+    const auto score_desc = [](const auto &a, const auto &b) {
+        return a.first > b.first;
+    };
+    if (k < scored.size()) {
+        std::nth_element(scored.begin(), scored.begin() + k, scored.end(), score_desc);
+        scored.resize(k);
+    }
+
+    std::vector<TempEdge> out;
+    out.reserve(scored.size());
+    for (const auto &[score, idx] : scored) {
+        (void)score;
+        out.push_back(edges[static_cast<std::size_t>(idx)]);
+    }
+    std::sort(out.begin(), out.end(),
+              [](const TempEdge &a, const TempEdge &b) {
+                  return a.external_id < b.external_id;
+              });
+    edges.swap(out);
+}
+
+/**
+ * @brief Build the DSG index over a selected label set.
+ *
+ * @details Pipeline:
+ *  - Build a temporary HNSW containing only the provided labels.
+ *  - Run ef_max candidate search for every label in the build set.
+ *  - Apply DFS-based dominance compression + support pruning to select segment edges.
+ *  - Add reverse edges, merge duplicates, then flatten into CSR-style SoA arrays.
+ *
+ * @param labels External labels in [0, data_size) to include in the index.
+ *
+ */
+void DynamicSegmentGraph::build(const std::vector<unsigned> &labels) {
 
     const auto build_start = Clock::now();
 
-    // Trigger: control whether to add reverse KNN candidates before compression.
-    // Default is OFF (enable by exporting: DSG_ADD_REVERSE_KNN_EDGES=1).
-    const bool add_reverse_knn_edges =
-        EnvVarEnabled("DSG_ADD_REVERSE_KNN_EDGES", false);
-    std::cout << "[DSG] Add reverse KNN edges: "
-              << (add_reverse_knn_edges ? "ON" : "OFF")
-              << " (env: DSG_ADD_REVERSE_KNN_EDGES)"
-              << std::endl;
+    if (data_wrapper == nullptr) {
+        throw std::runtime_error("DynamicSegmentGraph::build missing DataWrapper.");
+    }
 
-    const std::size_t node_count = static_cast<std::size_t>(data_wrapper->data_size);
+    const std::size_t data_size = static_cast<std::size_t>(data_wrapper->data_size);
+
+    // The caller must provide a sorted, unique build set.
+    // This keeps build() simple and avoids hidden reordering costs.
+    if (!std::is_sorted(labels.begin(), labels.end())) {
+        throw std::runtime_error("DynamicSegmentGraph::build labels must be sorted.");
+    }
+    for (std::size_t i = 0; i < labels.size(); ++i) {
+        const unsigned label = labels[i];
+        if (static_cast<std::size_t>(label) >= data_size) {
+            throw std::runtime_error("DynamicSegmentGraph::build label out of range: " +
+                                     std::to_string(label));
+        }
+        if (i > 0 && labels[i - 1] == label) {
+            throw std::runtime_error("DynamicSegmentGraph::build labels must be unique (duplicate=" +
+                                     std::to_string(label) + ").");
+        }
+    }
+
+    // Reset and initialize dense mapping for random insertion/search.
+    label_to_row_.assign(data_size, -1);
+    row_to_label_ = labels;
+    for (std::size_t row = 0; row < row_to_label_.size(); ++row) {
+        label_to_row_[row_to_label_[row]] = static_cast<int32_t>(row);
+    }
+
+    const std::size_t num_rows = row_to_label_.size();
+    num_indexed_nodes_ = static_cast<unsigned>(num_rows);
+
     // Use a temporary vector of vectors for building, merging, and sorting edges.
-    std::vector<std::vector<TempEdge>> temp_adj(node_count);
-    
-    std::vector<std::vector<std::pair<unsigned, DistType>>> all_candidates(node_count);
+    std::vector<std::vector<TempEdge>> temp_adj(num_rows);
+
+    std::vector<std::vector<std::pair<unsigned, DistType>>> all_candidates(num_rows);
     
     // build temporary HNSW and time it
     auto hnsw_build_start = Clock::now();
     initializeTemporaryHnsw(ef_max);
-    for (int label = 0; label < data_wrapper->data_size; ++label) {
+    for (unsigned label : row_to_label_) {
         temp_hnsw_->addPoint(static_cast<const void *>(data_wrapper->nodes.at(label)),
                              static_cast<hnswlib::labeltype>(label));
     }
@@ -146,40 +256,29 @@ void DynamicSegmentGraph::build() {
 
     // run KNN for each label
     double total_knn_time = 0.0;
-    double total_merge_time = 0.0;
     double total_dfs_time = 0.0;
     double total_store_time = 0.0;
 
-    for (int label = 0; label < data_wrapper->data_size; ++label) {
-        auto t1 = Clock::now();
-        runKnnForLabel(static_cast<unsigned>(label), ef_max, all_candidates.at(static_cast<std::size_t>(label)));
-        auto t2 = Clock::now();
-        total_knn_time += std::chrono::duration<double>(t2 - t1).count();
+    auto t1 = Clock::now();
+    for (std::size_t row = 0; row < num_rows; ++row) {
+        const unsigned label = row_to_label_[row];
+        runKnnForLabel(label, ef_max, all_candidates.at(row));
     }
-
-    // add reverse edges so each point sees incoming sources
-    if (add_reverse_knn_edges) {
-        for (std::size_t label = 0; label < node_count; ++label) {
-            const auto &forward = all_candidates[label];
-            for (const auto &entry : forward) {
-                const unsigned neighbor = entry.first;
-                if (neighbor >= node_count) {
-                    continue;
-                }
-                all_candidates[neighbor].emplace_back(static_cast<unsigned>(label), entry.second);
-            }
-        }
-    }
+    auto t2 = Clock::now();
+    total_knn_time += std::chrono::duration<double>(t2 - t1).count();
 
     // Local lambda to store forward edges into temp_adj from dfs_scratch_
-    auto store_edges_locally = [&](unsigned center_label) {
-        auto &edges = temp_adj.at(center_label);
+    auto store_edges_locally = [&](std::size_t center_row) {
+        auto &edges = temp_adj.at(center_row);
         const std::size_t candidate_count = dfs_scratch_.ordered_candidates.size();
         for (std::size_t idx = 0; idx < candidate_count; ++idx) {
             if (!dfs_scratch_.is_neighbor[idx]) {
                 continue;
             }
             const unsigned neighbor_label = dfs_scratch_.ordered_candidates[idx].first;
+            if (neighbor_label >= label_to_row_.size() || label_to_row_[neighbor_label] < 0) {
+                continue;
+            }
             const unsigned ll = dfs_scratch_.left_lower[idx];
             const unsigned lu = dfs_scratch_.left_upper[idx];
             const unsigned rl = dfs_scratch_.right_lower[idx];
@@ -189,63 +288,47 @@ void DynamicSegmentGraph::build() {
         }
     };
 
-    // Local lambda to normalize candidate ordering before DFS compression.
-    // - With reverse-KNN augmentation enabled, we may introduce duplicate ids, so we
-    //   must sort by id + unique first, then sort by distance (nearest-first).
-    // - Without reverse-KNN augmentation, `runKnnForLabel()` already emits unique
-    //   candidates in nearest-first order (after heap extraction). No extra work needed.
-    auto prepare_candidates_for_dfs = [&](std::vector<std::pair<unsigned, DistType>> &candidates) {
-        if (add_reverse_knn_edges) {
-            std::sort(candidates.begin(), candidates.end(),
-                      [](const auto &lhs, const auto &rhs) {
-                          return lhs.first < rhs.first;
-                      });
-
-            candidates.erase(std::unique(candidates.begin(), candidates.end(),
-                                         [](const auto &lhs, const auto &rhs) {
-                                             return lhs.first == rhs.first;
-                                         }),
-                             candidates.end());
-
-            // Primary: Distance (asc), Secondary: ID (asc).
-            std::sort(candidates.begin(), candidates.end(),
-                      [](const auto &lhs, const auto &rhs) {
-                          if (std::abs(lhs.second - rhs.second) > 1e-6f) {
-                              return lhs.second < rhs.second;
-                          }
-                          return lhs.first < rhs.first;
-                      });
-            return;
-        }
-    };
-
-    for (std::size_t label = 0; label < node_count; ++label) {
-        auto &candidates = all_candidates[label];
-
-        const auto t_prepare_start = Clock::now();
-        prepare_candidates_for_dfs(candidates);
-        const auto t_prepare_end = Clock::now();
+    for (std::size_t row = 0; row < num_rows; ++row) {
+        const unsigned center_label = row_to_label_[row];
+        auto &candidates = all_candidates[row];
 
         const auto t_dfs_start = Clock::now();
-        applyDfsCompression(static_cast<unsigned>(label), candidates);
+        applyDfsCompression(center_label, candidates);
         const auto t_dfs_end = Clock::now();
-        store_edges_locally(static_cast<unsigned>(label));
+        store_edges_locally(row);
         const auto t_store_end = Clock::now();
 
-        total_merge_time += std::chrono::duration<double>(t_prepare_end - t_prepare_start).count();
         total_dfs_time += std::chrono::duration<double>(t_dfs_end - t_dfs_start).count();
         total_store_time += std::chrono::duration<double>(t_store_end - t_dfs_end).count();
     }
 
-    // After all forward edges are stored, append reverse edges and merge duplicates.
-    std::vector<std::vector<TempEdge>> reverse_edges(node_count);
-    for (std::size_t src = 0; src < node_count; ++src) {
-        for (const auto &edge : temp_adj[src]) {
+    // After all forward edges are stored, we *materialize* the symmetric counterpart
+    // for each edge (dst <- src) and merge it into the same adjacency list.
+    //
+    // Important distinction:
+    // - These "reverse edges" exist only as a build-time construction step to make the
+    //   final graph more connected (effectively bidirectional).
+    // - They are NOT the "future reverse edges" used by dynamic insertion.
+    //   Dynamic reverse edges are appended later into a per-row unsorted slack tail
+    //   (`node_degrees_[row].rev`) and may trigger `recompress()` when the slack is full.
+    //
+    // Here, we explicitly MERGE (deduplicate + union of envelopes) and then FLATTEN;
+    // after flattening, all stored edges are treated as forward edges (deg.fwd) and
+    // `deg.rev` starts at 0.
+    std::vector<std::vector<TempEdge>> reverse_edges(num_rows);
+    for (std::size_t src_row = 0; src_row < num_rows; ++src_row) {
+        const unsigned src_label = row_to_label_[src_row];
+        for (const auto &edge : temp_adj[src_row]) {
             const unsigned dst = edge.external_id;
-            if (dst >= node_count) {
+            if (dst >= label_to_row_.size()) {
                 continue;
             }
-            reverse_edges[dst].push_back(TempEdge{static_cast<unsigned>(src),
+            const int32_t dst_row_i = label_to_row_[dst];
+            if (dst_row_i < 0) {
+                continue;
+            }
+            const std::size_t dst_row = static_cast<std::size_t>(dst_row_i);
+            reverse_edges[dst_row].push_back(TempEdge{src_label,
                                             edge.left_lower,
                                             edge.left_upper,
                                             edge.right_lower,
@@ -283,9 +366,9 @@ void DynamicSegmentGraph::build() {
         edges.swap(merged);
     };
 
-    for (std::size_t label = 0; label < node_count; ++label) {
-        auto &edges = temp_adj[label];
-        auto &rev = reverse_edges[label];
+    for (std::size_t row = 0; row < num_rows; ++row) {
+        auto &edges = temp_adj[row];
+        auto &rev = reverse_edges[row];
         edges.insert(edges.end(), rev.begin(), rev.end());
         merge_edges_func(edges);
     }
@@ -304,7 +387,7 @@ void DynamicSegmentGraph::build() {
     //   edges whose neighbor label lies within +/- ceil(0.02 * N) around center_label.
     // ---------------------------------------------------------------------
     const auto prune_start = Clock::now();
-    const std::size_t protect_span = (node_count + 49) / 50; // ceil(0.02 * N) = ceil(N / 50)
+    const std::size_t protect_span = (data_size + 49) / 50; // ceil(0.02 * N) = ceil(N / 50)
     // Distance-weighted pruning score to discourage far-in-label edges:
     // score = support / |center_label - neighbor_label|.
     std::cout << "[DSG] Build-time support prune: using distance-weighted score support/|nbr-center|"
@@ -314,76 +397,30 @@ void DynamicSegmentGraph::build() {
     std::size_t pruned_edges = 0;
     std::size_t protected_edges = 0;
 
-    std::vector<std::uint64_t> supports_all;
-    std::vector<std::uint64_t> prunable_supports;
-    std::vector<TempEdge> kept_edges;
-
-    const std::uint64_t kProtectedSentinel =
-        std::numeric_limits<std::uint64_t>::max();
-
-    for (std::size_t center_label = 0; center_label < node_count; ++center_label) {
-        auto &edges = temp_adj[center_label];
+    for (std::size_t row = 0; row < num_rows; ++row) {
+        const std::size_t center_label = static_cast<std::size_t>(row_to_label_[row]);
+        auto &edges = temp_adj[row];
         edges_before_prune += edges.size();
-        if (edges.empty()) {
-            continue;
-        }
 
-        supports_all.resize(edges.size());
-        prunable_supports.clear();
-        prunable_supports.reserve(edges.size());
-
-        for (std::size_t i = 0; i < edges.size(); ++i) {
-            const auto &edge = edges[i];
+        // Count protected edges for logging only.
+        for (const auto &edge : edges) {
             const std::size_t neighbor = static_cast<std::size_t>(edge.external_id);
             const std::size_t diff =
                 neighbor > center_label ? (neighbor - center_label + 1)
                                         : (center_label - neighbor + 1);
             if (diff <= protect_span) {
-                supports_all[i] = kProtectedSentinel;
                 ++protected_edges;
-                continue;
             }
-
-            std::uint64_t support = EdgeSupport(edge.external_id,
-                                                edge.left_lower,
-                                                edge.left_upper,
-                                                edge.right_lower,
-                                                edge.right_upper);
-            support /= static_cast<std::uint64_t>(diff);
-            supports_all[i] = support;
-            prunable_supports.push_back(support);
         }
 
-        const std::size_t prunable_count = prunable_supports.size();
-        const std::size_t prune_count = prunable_count / 10;
-        if (prune_count == 0) {
-            edges_after_prune += edges.size();
-            continue;
-        }
-
-        const std::size_t kth = prune_count - 1;
-        std::nth_element(prunable_supports.begin(),
-                         prunable_supports.begin() + kth,
-                         prunable_supports.end());
-        const std::uint64_t cutoff = prunable_supports[kth];
-
-        kept_edges.clear();
-        kept_edges.reserve(edges.size());
-        for (std::size_t i = 0; i < edges.size(); ++i) {
-            const auto &edge = edges[i];
-            const std::uint64_t support = supports_all[i];
-            if (support == kProtectedSentinel) {
-                kept_edges.push_back(edge);
-                continue;
-            }
-            if (support <= cutoff) {
-                ++pruned_edges;
-                continue;
-            }
-            kept_edges.push_back(edge);
-        }
-        edges.swap(kept_edges);
+        const std::size_t before = edges.size();
+        const std::size_t keep_total_limit = before - (before / 11); // keep top 10/11
+        selectEdgesBySupport(edges,
+                             static_cast<unsigned>(center_label),
+                             protect_span,
+                             /*keep_total_limit=*/keep_total_limit);
         edges_after_prune += edges.size();
+        pruned_edges += (before - edges.size());
     }
 
     // If we skipped pruning for some nodes (e.g. prune_count==0), edges_after_prune
@@ -412,7 +449,7 @@ void DynamicSegmentGraph::build() {
               << "time=" << prune_time_s << " s" << std::endl;
 
     // Now flatten temp_adj into SoA members
-    row_offset_.resize(node_count + 1);
+    row_offset_.resize(num_rows + 1);
     std::size_t total_edges = 0;
     for (const auto &edges : temp_adj) {
         total_edges += edges.size();
@@ -424,7 +461,7 @@ void DynamicSegmentGraph::build() {
     right_upper_.resize(total_edges);
 
     std::size_t current_offset = 0;
-    for (std::size_t i = 0; i < node_count; ++i) {
+    for (std::size_t i = 0; i < num_rows; ++i) {
         row_offset_[i] = current_offset;
         for (const auto &edge : temp_adj[i]) {
             neighbors_[current_offset] = edge.external_id;
@@ -435,14 +472,36 @@ void DynamicSegmentGraph::build() {
             current_offset++;
         }
     }
-    row_offset_[node_count] = current_offset;
+    row_offset_[num_rows] = current_offset;
+
+    // Initialize per-row degrees:
+    // - After the explicit merge above, the adjacency stored in SoA is a single list.
+    // - We treat the entire list as "forward" (sorted by neighbor id within each row).
+    // - We do NOT reserve slack capacity here, so `rev` starts at 0 and capacity == degree.
+    //
+    // Rationale (build -> save workflow):
+    // - The typical workflow is to build a static index and save it immediately.
+    // - To minimize memory footprint and disk size, we flatten into a tight CSR layout
+    //   with no per-row padding (i.e., no extra space for dynamic reverse neighbors).
+    //
+    // Dynamic insertion workflow (load-time slack control):
+    // - The dynamic mode relies on a per-row "slack" tail for reverse edges (deg.rev),
+    //   where capacity = row_offset_[row+1] - row_offset_[row].
+    // - If you want insertion support, you can explicitly choose how much slack to
+    //   reserve when loading a saved index (e.g., by expanding row capacities and
+    //   updating row_offset_ accordingly before setting deg.fwd/deg.rev).
+    node_degrees_.resize(num_rows);
+    for (std::size_t row = 0; row < num_rows; ++row) {
+        const std::size_t deg = row_offset_[row + 1] - row_offset_[row];
+        node_degrees_[row].fwd = static_cast<uint16_t>(deg);
+        node_degrees_[row].rev = 0;
+    }
 
     const auto build_end = Clock::now();
     index_time = std::chrono::duration<double>(build_end - build_start).count();
     
     std::cout << "[DSG] Detailed breakdown:" << std::endl;
     std::cout << "  KNN Search: " << total_knn_time << " s" << std::endl;
-    std::cout << "  Merge/Dedup: " << total_merge_time << " s" << std::endl;
     std::cout << "  DFS Compress: " << total_dfs_time << " s" << std::endl;
     std::cout << "  Store Edges: " << total_store_time << " s" << std::endl;
 
@@ -478,14 +537,19 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
     std::vector<unsigned> fetched_nns;
     fetched_nns.reserve(search_ef);
 
-    auto enqueue_seed = [&](unsigned label) {
+    // Try to enqueue an inserted label as a new seed.
+    // Returns true if we actually pushed a new element into candidate_set.
+    auto try_enqueue_seed = [&](unsigned label) -> bool {
+        if (!isInsertedLabel(label)) {
+            return false;
+        }
         if (visited_array[label] == visited_array_tag) {
-            return;
+            return false;
         }
         visited_array[label] = visited_array_tag;
         const DistType dist = timed_distance(label);
         candidate_set.emplace(dist, label);
-        
+        return true;
     };
 
     const unsigned range_span = right_u - left_u + 1;
@@ -494,12 +558,53 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
     // admit neighbors inside [left_u, right_u] to avoid over-pruning sparse ranges.
     const bool skip_range_envelope =
         static_cast<double>(range_span) < kSmallRangeFrac * static_cast<double>(data_wrapper->data_size);
-    enqueue_seed(left_u);
-    enqueue_seed(left_u + range_span / 2);
-    enqueue_seed(left_u + range_span / 4);
-    enqueue_seed(left_u + 3 * range_span / 4);
 
-    DistType lower_bound = std::numeric_limits<DistType>::max();
+    // Seeding strategy (important after label<->row decoupling):
+    // - In the dynamic setting, only a subset of labels are inserted (label_to_row_[label] != -1).
+    // - Naively seeding with fixed anchors (left/mid/quarters) can pick uninserted labels, leaving
+    //   the frontier empty and causing the search to return nothing even when valid nodes exist.
+    // - To keep search robust with small overhead, we probe a small +/- radius window around each
+    //   anchor until we find an inserted label. This is O(kProbeRadius) per anchor in the worst case.
+    constexpr unsigned kProbeRadius = 64;
+    auto enqueue_nearby_seed = [&](unsigned anchor) {
+        if (try_enqueue_seed(anchor)) {
+            return;
+        }
+        auto maxD = std::min(kProbeRadius, right_u - anchor);
+        for (unsigned d = 1; d <= maxD; ++d) {
+            if (try_enqueue_seed(anchor + d)) {
+                return;
+            }
+        }
+    };
+
+    enqueue_nearby_seed(left_u);
+    enqueue_nearby_seed(left_u + range_span / 2);
+    enqueue_nearby_seed(left_u + range_span / 4);
+    enqueue_nearby_seed(left_u + 3 * range_span / 4);
+
+    // If we still cannot find any inserted seed inside the query range, return empty.
+    if (candidate_set.empty()) {
+        constexpr unsigned kFallbackScan = 4096;
+        unsigned scanned = 0;
+        for (unsigned probe = left_u; probe <= right_u && scanned < kFallbackScan; ++probe, ++scanned) {
+            if (try_enqueue_seed(probe)) {
+                break;
+            }
+        }
+    }
+    if (candidate_set.empty()) {
+        returned_nns.clear();
+        returned_nns_with_dist_.clear();
+        last_hop_count_ = 0;
+        last_distance_eval_count_ = 0;
+        visited_list_pool_->releaseVisitedList(vl);
+        std::cout << "[DSG] No inserted seed found in the query range" << std::endl;
+        return;
+    }
+
+    // Current worst (largest) distance among the kept top candidates.
+    DistType worst_top_dist = std::numeric_limits<DistType>::max();
 
     // Prepare SIMD constants
     // Note: using signed comparison because standard _mm_cmple_epi32 is signed. 
@@ -523,49 +628,61 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
         candidate_set.pop();
         ++hop_counter;
 
-        if (dist > lower_bound) {
+        if (dist > worst_top_dist) {
             break;
         }
 
-        // SoA access
-        const size_t start_idx = row_offset_[current];
-        const size_t end_idx = row_offset_[current + 1];
+        const unsigned current_label = current;
+        if (current_label >= label_to_row_.size()) {
+            continue;
+        }
+        const int32_t row_i = label_to_row_[current_label];
+        if (row_i < 0) {
+            continue;
+        }
+        const size_t row = static_cast<size_t>(row_i);
+
+        // SoA access by row-id.
+        const size_t start_idx = row_offset_[row];
+
+        const auto &deg = node_degrees_[row];
+        const size_t sorted_count = static_cast<size_t>(deg.fwd);
+        const size_t reverse_count = static_cast<size_t>(deg.rev);
+        const size_t sorted_end_idx = start_idx + sorted_count;
+        // Dynamic adjacency layout:
+        // - [start_idx, sorted_end_idx): forward edges (sorted by neighbor label)
+        // - [sorted_end_idx, sorted_end_idx + reverse_count): reverse-edge slack (unsorted)
 
         fetched_nns.clear();
 
-        // Binary search in neighbors_ array for the range
+        // 1. Binary search in SORTED portion
         auto start_it = neighbors_.begin() + start_idx;
-        auto end_it = neighbors_.begin() + end_idx;
-
-        auto it = std::lower_bound(start_it, end_it, left_u);
+        auto sorted_end_it = neighbors_.begin() + sorted_end_idx;
+        auto it = std::lower_bound(start_it, sorted_end_it, left_u);
         
-        // Calculate new start index based on lower_bound result
         size_t current_scan_idx = std::distance(neighbors_.begin(), it);
 
-        // SIMD Loop: process 4 elements at a time
-        // Adjust loop start to current_scan_idx instead of start_idx
+        // Scan sorted portion
         if (!skip_range_envelope) {
-            for (; current_scan_idx + 4 <= end_idx; current_scan_idx += 4) {
-                // Prefetch ahead (16 elements ahead = 64 bytes)
+             // SIMD Loop for sorted part
+            for (; current_scan_idx + 4 <= sorted_end_idx; current_scan_idx += 4) {
+                 // Prefetch ahead (16 elements ahead = 64 bytes)
                 _mm_prefetch(reinterpret_cast<const char*>(neighbors_ptr + current_scan_idx + 16), _MM_HINT_T0);
                 
-                    _mm_prefetch(reinterpret_cast<const char*>(ll_ptr + current_scan_idx + 16), _MM_HINT_T0);
-                    _mm_prefetch(reinterpret_cast<const char*>(lu_ptr + current_scan_idx + 16), _MM_HINT_T0);
-                    _mm_prefetch(reinterpret_cast<const char*>(rl_ptr + current_scan_idx + 16), _MM_HINT_T0);
-                    _mm_prefetch(reinterpret_cast<const char*>(ru_ptr + current_scan_idx + 16), _MM_HINT_T0);
-                
+                _mm_prefetch(reinterpret_cast<const char*>(ll_ptr + current_scan_idx + 16), _MM_HINT_T0);
+                _mm_prefetch(reinterpret_cast<const char*>(lu_ptr + current_scan_idx + 16), _MM_HINT_T0);
+                _mm_prefetch(reinterpret_cast<const char*>(rl_ptr + current_scan_idx + 16), _MM_HINT_T0);
+                _mm_prefetch(reinterpret_cast<const char*>(ru_ptr + current_scan_idx + 16), _MM_HINT_T0);
 
                 // Load neighbors
                 __m128i v_nbr = _mm_loadu_si128(reinterpret_cast<const __m128i*>(neighbors_ptr + current_scan_idx));
 
-                // Check if any neighbor > right_u (break condition)
-                // Unsigned comparison trick: (a ^ sign) > (b ^ sign)
+                // Check if any neighbor > right_u (break condition for SORTED part)
                 __m128i v_nbr_adj = _mm_xor_si128(v_nbr, sign_bit);
                 __m128i v_break_cmp = _mm_cmpgt_epi32(v_nbr_adj, v_right_u_adj);
                 
-                // If any bit is set in v_break_cmp, it means at least one neighbor > right_u
                 if (_mm_movemask_ps(_mm_castsi128_ps(v_break_cmp)) != 0) {
-                    break; // Fallback to scalar to handle the break point accurately
+                    break; 
                 }
 
                 // Load range attributes
@@ -574,30 +691,30 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
                 __m128i v_rl = _mm_loadu_si128(reinterpret_cast<const __m128i*>(rl_ptr + current_scan_idx));
                 __m128i v_ru = _mm_loadu_si128(reinterpret_cast<const __m128i*>(ru_ptr + current_scan_idx));
 
-                    // Adjust for unsigned comparison
-                    v_ll = _mm_xor_si128(v_ll, sign_bit);
-                    v_lu = _mm_xor_si128(v_lu, sign_bit);
-                    v_rl = _mm_xor_si128(v_rl, sign_bit);
-                    v_ru = _mm_xor_si128(v_ru, sign_bit);
+                // Adjust for unsigned comparison
+                v_ll = _mm_xor_si128(v_ll, sign_bit);
+                v_lu = _mm_xor_si128(v_lu, sign_bit);
+                v_rl = _mm_xor_si128(v_rl, sign_bit);
+                v_ru = _mm_xor_si128(v_ru, sign_bit);
 
-                    // Check conditions:
-                    // 1. neighbor >= left_u is guaranteed by lower_bound
+                // Check conditions:
+                // 1. neighbor >= left_u is guaranteed by lower_bound
 
-                    // 2. left_lower <= left_u  => !(left_lower > left_u) => !(v_ll > v_left_u_adj)
-                    __m128i c1_fail = _mm_cmpgt_epi32(v_ll, v_left_u_adj);
+                // 2. left_lower <= left_u  => !(left_lower > left_u) => !(v_ll > v_left_u_adj)
+                __m128i c1_fail = _mm_cmpgt_epi32(v_ll, v_left_u_adj);
 
-                    // 3. left_u <= left_upper  => !(left_u > left_upper) => !(v_left_u_adj > v_lu)
-                    __m128i c2_fail = _mm_cmpgt_epi32(v_left_u_adj, v_lu);
+                // 3. left_u <= left_upper  => !(left_u > left_upper) => !(v_left_u_adj > v_lu)
+                __m128i c2_fail = _mm_cmpgt_epi32(v_left_u_adj, v_lu);
 
-                    // 4. right_lower <= right_u => !(right_lower > right_u) => !(v_rl > v_right_u_adj)
-                    __m128i c3_fail = _mm_cmpgt_epi32(v_rl, v_right_u_adj);
+                // 4. right_lower <= right_u => !(right_lower > right_u) => !(v_rl > v_right_u_adj)
+                __m128i c3_fail = _mm_cmpgt_epi32(v_rl, v_right_u_adj);
 
-                    // 5. right_u <= right_upper => !(right_u > right_upper) => !(v_right_u_adj > v_ru)
-                    __m128i c4_fail = _mm_cmpgt_epi32(v_right_u_adj, v_ru);
+                // 5. right_u <= right_upper => !(right_u > right_upper) => !(v_right_u_adj > v_ru)
+                __m128i c4_fail = _mm_cmpgt_epi32(v_right_u_adj, v_ru);
 
-                    // Combine failures
-                    __m128i any_fail = _mm_or_si128(c1_fail, c2_fail);
-                    any_fail = _mm_or_si128(any_fail, _mm_or_si128(c3_fail, c4_fail));
+                // Combine failures
+                __m128i any_fail = _mm_or_si128(c1_fail, c2_fail);
+                any_fail = _mm_or_si128(any_fail, _mm_or_si128(c3_fail, c4_fail));
 
                 // mask = 1 where valid (any_fail is 0)
                 int fail_mask = _mm_movemask_ps(_mm_castsi128_ps(any_fail));
@@ -612,17 +729,15 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
                         fetched_nns.push_back(neighbor);
                         _mm_prefetch(reinterpret_cast<const char*>(data_wrapper->nodes[neighbor]), _MM_HINT_T0);
                     }
-                    
                     valid_mask &= (valid_mask - 1);
                 }
             }
-
         }
-        // Scalar Loop for remaining items or after break
-        for (; current_scan_idx < end_idx; ++current_scan_idx) {
-            const unsigned neighbor = neighbors_ptr[current_scan_idx];
 
-            // neighbor > right_u: break
+        // Scalar Loop for remaining sorted items or after break
+        for (; current_scan_idx < sorted_end_idx; ++current_scan_idx) {
+            const unsigned neighbor = neighbors_ptr[current_scan_idx];
+            
             if (neighbor > right_u) {
                 break;
             }
@@ -641,6 +756,32 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
             _mm_prefetch(reinterpret_cast<const char*>(data_wrapper->nodes[neighbor]), _MM_HINT_T0);
         }
 
+        // 2. Linear Scan in UNSORTED reverse edges (dynamic mode)
+        if (is_dynamic_ && reverse_count > 0) {
+            const size_t slack_end_idx = sorted_end_idx + reverse_count;
+            for (size_t slack_idx = sorted_end_idx; slack_idx < slack_end_idx; ++slack_idx) {
+                const unsigned neighbor = neighbors_ptr[slack_idx];
+
+                // Range filter (id check)
+                if (neighbor < left_u || neighbor > right_u) {
+                    continue;
+                }
+
+                if (!skip_range_envelope) {
+                    if (!((ll_ptr[slack_idx] <= left_u && left_u <= lu_ptr[slack_idx]) &&
+                          (rl_ptr[slack_idx] <= right_u && right_u <= ru_ptr[slack_idx]))) {
+                        continue;
+                    }
+                }
+
+                if (visited_array[neighbor] == visited_array_tag) {
+                    continue;
+                }
+                fetched_nns.push_back(neighbor);
+                _mm_prefetch(reinterpret_cast<const char*>(data_wrapper->nodes[neighbor]), _MM_HINT_T0);
+            }
+        }
+
         for (const auto neighbor : fetched_nns) {
             visited_array[neighbor] = visited_array_tag;
             const DistType nbr_dist = timed_distance(neighbor);
@@ -648,12 +789,12 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
             if (top_candidates.size() < search_ef) {
                 candidate_set.emplace(nbr_dist, neighbor);
                 top_candidates.emplace(nbr_dist, neighbor);
-                lower_bound = top_candidates.top().first;
-            } else if (nbr_dist < lower_bound) {
+                worst_top_dist = top_candidates.top().first;
+            } else if (nbr_dist < worst_top_dist) {
                 candidate_set.emplace(nbr_dist, neighbor);
                 top_candidates.emplace(nbr_dist, neighbor);
                 top_candidates.pop();
-                lower_bound = top_candidates.top().first;
+                worst_top_dist = top_candidates.top().first;
             }
         }
     }
@@ -665,8 +806,11 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
     }
 
     returned_nns.clear();
+    returned_nns_with_dist_.clear();
     while (!top_candidates.empty()) {
-        returned_nns.emplace_back(top_candidates.top().second);
+        const auto [dist, lbl] = top_candidates.top();
+        returned_nns.emplace_back(lbl);
+        returned_nns_with_dist_.emplace_back(lbl, dist);
         top_candidates.pop();
     }
 
@@ -679,87 +823,510 @@ void DynamicSegmentGraph::save(const std::string &file_path) {
     if (!out) {
         throw std::runtime_error("DynamicSegmentGraph::save failed to open file: " + file_path);
     }
-    
-    // Save flattened SoA arrays
-    size_t node_count = row_offset_.size() - 1;
-    out.write(reinterpret_cast<const char *>(&node_count), sizeof(node_count));
-    
-    // Write row_offset
-    out.write(reinterpret_cast<const char *>(row_offset_.data()), row_offset_.size() * sizeof(std::size_t));
-    
-    size_t num_edges = neighbors_.size();
-    // Write total edges just in case (though implicit)
-    out.write(reinterpret_cast<const char *>(&num_edges), sizeof(num_edges));
-    
-    // Write arrays
-    if (num_edges > 0) {
-        out.write(reinterpret_cast<const char *>(neighbors_.data()), num_edges * sizeof(unsigned));
-        out.write(reinterpret_cast<const char *>(left_lower_.data()), num_edges * sizeof(unsigned));
-        out.write(reinterpret_cast<const char *>(left_upper_.data()), num_edges * sizeof(unsigned));
-        out.write(reinterpret_cast<const char *>(right_lower_.data()), num_edges * sizeof(unsigned));
-        out.write(reinterpret_cast<const char *>(right_upper_.data()), num_edges * sizeof(unsigned));
+
+    static_assert(sizeof(unsigned) == 4, "DSG save/load assumes 32-bit unsigned.");
+
+    // WARNING: The v3 format below writes several std::vector<T> buffers directly
+    // (row_to_label_, node_degrees_, row_offset_) using their in-memory layout.
+    // This is NOT portable across architectures/compilers/ABIs. We assume save/load
+    // happen on the same machine with the same build configuration.
+    constexpr char kMagic[8] = {'D', 'S', 'G', 'I', 'D', 'X', '3', '\0'};
+    constexpr std::uint32_t kVersion = 3;
+
+    const std::uint64_t data_size =
+        data_wrapper == nullptr ? 0ULL : static_cast<std::uint64_t>(data_wrapper->data_size);
+    const std::uint64_t num_rows = static_cast<std::uint64_t>(row_to_label_.size());
+
+    if (row_offset_.size() != static_cast<std::size_t>(num_rows + 1)) {
+        throw std::runtime_error("DynamicSegmentGraph::save row_offset_ size mismatch.");
     }
+    if (node_degrees_.size() != static_cast<std::size_t>(num_rows)) {
+        throw std::runtime_error("DynamicSegmentGraph::save node_degrees_ size mismatch.");
+    }
+
+    const std::uint64_t num_edges_total = static_cast<std::uint64_t>(neighbors_.size());
+
+    out.write(kMagic, sizeof(kMagic));
+    out.write(reinterpret_cast<const char *>(&kVersion), sizeof(kVersion));
+    out.write(reinterpret_cast<const char *>(&data_size), sizeof(data_size));
+    out.write(reinterpret_cast<const char *>(&num_rows), sizeof(num_rows));
+
+    // row_to_label_ (direct dump; same-machine assumption)
+    out.write(reinterpret_cast<const char *>(row_to_label_.data()),
+              row_to_label_.size() * sizeof(unsigned));
+
+    // node_degrees_ (direct dump; same-machine assumption)
+    static_assert(std::is_trivially_copyable<NodeDegree>::value,
+                  "NodeDegree must be trivially copyable for direct dump.");
+    out.write(reinterpret_cast<const char *>(node_degrees_.data()),
+              node_degrees_.size() * sizeof(NodeDegree));
+
+    // row_offset_ (direct dump; same-machine assumption)
+    out.write(reinterpret_cast<const char *>(row_offset_.data()),
+              row_offset_.size() * sizeof(std::size_t));
+
+    out.write(reinterpret_cast<const char *>(&num_edges_total), sizeof(num_edges_total));
+
+    out.write(reinterpret_cast<const char *>(neighbors_.data()), neighbors_.size() * sizeof(unsigned));
+    out.write(reinterpret_cast<const char *>(left_lower_.data()), left_lower_.size() * sizeof(unsigned));
+    out.write(reinterpret_cast<const char *>(left_upper_.data()), left_upper_.size() * sizeof(unsigned));
+    out.write(reinterpret_cast<const char *>(right_lower_.data()), right_lower_.size() * sizeof(unsigned));
+    out.write(reinterpret_cast<const char *>(right_upper_.data()), right_upper_.size() * sizeof(unsigned));
 }
 
+/**
+ * @brief Load a previously saved Dynamic Segment Graph index from a binary file.
+ * 
+ * @details File format (v3, see save()):
+ *  - magic[8], version(u32)
+ *  - data_size(u64), num_rows(u64)
+ *  - row_to_label_[num_rows] (u32)
+ *  - node_degrees_[num_rows] (NodeDegree, direct dump)
+ *  - row_offset_[num_rows + 1] (size_t, direct dump)
+ *  - num_edges_total(u64)
+ *  - neighbors_ + (left_lower_, left_upper_, right_lower_, right_upper_) arrays (u32),
+ *    each with length num_edges_total
+ *
+ * After loading we rebuild `label_to_row_` (dense label -> internal row id), validate
+ * CSR invariants, and compute forward/reverse edge statistics from `node_degrees_`.
+ * 
+ * @param file_path Path to the binary file containing the saved DSG index
+ * 
+ * @throws std::runtime_error If the file cannot be opened or if the loaded node count
+ *                            does not match the dataset size in data_wrapper
+ * 
+ */
 void DynamicSegmentGraph::load(const std::string &file_path) {
     std::ifstream in(file_path, std::ios::binary);
     if (!in) {
         throw std::runtime_error("DynamicSegmentGraph::load failed to open file: " + file_path);
     }
-    std::size_t node_count = 0;
-    in.read(reinterpret_cast<char *>(&node_count), sizeof(node_count));
-    if (data_wrapper == nullptr || node_count != static_cast<std::size_t>(data_wrapper->data_size)) {
-        throw std::runtime_error("DynamicSegmentGraph::load mismatched dataset size.");
+
+    static_assert(sizeof(unsigned) == 4, "DSG save/load assumes 32-bit unsigned.");
+
+    constexpr char kMagic[8] = {'D', 'S', 'G', 'I', 'D', 'X', '3', '\0'};
+    char magic[8]{};
+    in.read(magic, sizeof(magic));
+    if (std::memcmp(magic, kMagic, sizeof(kMagic)) != 0) {
+        throw std::runtime_error("DynamicSegmentGraph::load invalid magic header.");
     }
 
-    row_offset_.resize(node_count + 1);
-    in.read(reinterpret_cast<char *>(row_offset_.data()), row_offset_.size() * sizeof(std::size_t));
-
-    size_t num_edges = 0;
-    in.read(reinterpret_cast<char *>(&num_edges), sizeof(num_edges));
-
-    neighbors_.resize(num_edges);
-    left_lower_.resize(num_edges);
-    left_upper_.resize(num_edges);
-    right_lower_.resize(num_edges);
-    right_upper_.resize(num_edges);
-
-    if (num_edges > 0) {
-        in.read(reinterpret_cast<char *>(neighbors_.data()), num_edges * sizeof(unsigned));
-        in.read(reinterpret_cast<char *>(left_lower_.data()), num_edges * sizeof(unsigned));
-        in.read(reinterpret_cast<char *>(left_upper_.data()), num_edges * sizeof(unsigned));
-        in.read(reinterpret_cast<char *>(right_lower_.data()), num_edges * sizeof(unsigned));
-        in.read(reinterpret_cast<char *>(right_upper_.data()), num_edges * sizeof(unsigned));
+    std::uint32_t version = 0;
+    in.read(reinterpret_cast<char *>(&version), sizeof(version));
+    if (version != 3) {
+        throw std::runtime_error("DynamicSegmentGraph::load unsupported version: " + std::to_string(version));
     }
 
-    // Report index-only memory footprint (exclude raw vector storage).
-    const std::size_t offset_bytes = row_offset_.capacity() * sizeof(std::size_t);
-    const std::size_t neighbor_arrays_bytes =
-        neighbors_.capacity() * sizeof(unsigned) +
-        left_lower_.capacity() * sizeof(unsigned) +
-        left_upper_.capacity() * sizeof(unsigned) +
-        right_lower_.capacity() * sizeof(unsigned) +
-        right_upper_.capacity() * sizeof(unsigned);
-    const std::size_t index_bytes = offset_bytes + neighbor_arrays_bytes;
-    const double index_mib = static_cast<double>(index_bytes) / (1024.0 * 1024.0);
-    std::cout << "[DSG] Index memory footprint (excluding vectors): "
-              << index_mib << " MiB (" << index_bytes << " bytes)" << std::endl;
+    std::uint64_t data_size = 0;
+    std::uint64_t num_rows = 0;
+    in.read(reinterpret_cast<char *>(&data_size), sizeof(data_size));
+    in.read(reinterpret_cast<char *>(&num_rows), sizeof(num_rows));
 
-    edges_amount = num_edges;
-    avg_forward_nns = (row_offset_.empty() || node_count == 0)
-                          ? 0.0F
-                          : static_cast<float>(edges_amount) / static_cast<float>(node_count);
-    avg_reverse_nns = 0.0F;
+    if (data_wrapper == nullptr) {
+        throw std::runtime_error("DynamicSegmentGraph::load missing DataWrapper.");
+    }
+    if (data_size != static_cast<std::uint64_t>(data_wrapper->data_size)) {
+        throw std::runtime_error("DynamicSegmentGraph::load mismatched data_size.");
+    }
+
+    row_to_label_.resize(static_cast<std::size_t>(num_rows));
+    in.read(reinterpret_cast<char *>(row_to_label_.data()),
+            row_to_label_.size() * sizeof(unsigned));
+
+    node_degrees_.resize(static_cast<std::size_t>(num_rows));
+    in.read(reinterpret_cast<char *>(node_degrees_.data()),
+            node_degrees_.size() * sizeof(NodeDegree));
+    
+    row_offset_.resize(static_cast<std::size_t>(num_rows + 1));
+    in.read(reinterpret_cast<char *>(row_offset_.data()),
+            row_offset_.size() * sizeof(std::size_t));
+
+    std::uint64_t num_edges_total = 0;
+    in.read(reinterpret_cast<char *>(&num_edges_total), sizeof(num_edges_total));
+
+    neighbors_.resize(static_cast<std::size_t>(num_edges_total));
+    left_lower_.resize(static_cast<std::size_t>(num_edges_total));
+    left_upper_.resize(static_cast<std::size_t>(num_edges_total));
+    right_lower_.resize(static_cast<std::size_t>(num_edges_total));
+    right_upper_.resize(static_cast<std::size_t>(num_edges_total));
+
+    in.read(reinterpret_cast<char *>(neighbors_.data()), neighbors_.size() * sizeof(unsigned));
+    in.read(reinterpret_cast<char *>(left_lower_.data()), left_lower_.size() * sizeof(unsigned));
+    in.read(reinterpret_cast<char *>(left_upper_.data()), left_upper_.size() * sizeof(unsigned));
+    in.read(reinterpret_cast<char *>(right_lower_.data()), right_lower_.size() * sizeof(unsigned));
+    in.read(reinterpret_cast<char *>(right_upper_.data()), right_upper_.size() * sizeof(unsigned));
+
+    // Optional load-time CSR expansion to create per-row slack capacity for dynamic reverse edges.
+    // Enable by calling setLoadSlackFraction(frac) with frac > 0 before load().
+    if (load_slack_fraction_ > 0.0) {
+        std::vector<std::size_t> new_row_offset(static_cast<std::size_t>(num_rows + 1), 0);
+        for (std::size_t row = 0; row < static_cast<std::size_t>(num_rows); ++row) {
+            const std::size_t fwd = static_cast<std::size_t>(node_degrees_[row].fwd);
+            const std::size_t slack =
+                static_cast<std::size_t>(std::ceil(static_cast<double>(fwd) * load_slack_fraction_));
+            new_row_offset[row + 1] = new_row_offset[row] + fwd + slack;
+            node_degrees_[row].rev = 0;
+        }
+
+        std::vector<unsigned> new_neighbors(new_row_offset.back());
+        std::vector<unsigned> new_left_lower(new_row_offset.back());
+        std::vector<unsigned> new_left_upper(new_row_offset.back());
+        std::vector<unsigned> new_right_lower(new_row_offset.back());
+        std::vector<unsigned> new_right_upper(new_row_offset.back());
+
+        for (std::size_t row = 0; row < static_cast<std::size_t>(num_rows); ++row) {
+            const std::size_t fwd = static_cast<std::size_t>(node_degrees_[row].fwd);
+            const std::size_t old_start = row_offset_[row];
+            const std::size_t new_start = new_row_offset[row];
+
+            std::memcpy(new_neighbors.data() + new_start,
+                        neighbors_.data() + old_start,
+                        fwd * sizeof(unsigned));
+            std::memcpy(new_left_lower.data() + new_start,
+                        left_lower_.data() + old_start,
+                        fwd * sizeof(unsigned));
+            std::memcpy(new_left_upper.data() + new_start,
+                        left_upper_.data() + old_start,
+                        fwd * sizeof(unsigned));
+            std::memcpy(new_right_lower.data() + new_start,
+                        right_lower_.data() + old_start,
+                        fwd * sizeof(unsigned));
+            std::memcpy(new_right_upper.data() + new_start,
+                        right_upper_.data() + old_start,
+                        fwd * sizeof(unsigned));
+        }
+
+        row_offset_.swap(new_row_offset);
+        neighbors_.swap(new_neighbors);
+        left_lower_.swap(new_left_lower);
+        left_upper_.swap(new_left_upper);
+        right_lower_.swap(new_right_lower);
+        right_upper_.swap(new_right_upper);
+    }
+
+    // Rebuild dense mapping.
+    label_to_row_.assign(static_cast<std::size_t>(data_size), -1);
+    for (std::uint64_t row = 0; row < num_rows; ++row) {
+        const unsigned lbl = row_to_label_[static_cast<std::size_t>(row)];
+        if (lbl >= data_size) {
+            throw std::runtime_error("DynamicSegmentGraph::load row_to_label out of range.");
+        }
+        label_to_row_[lbl] = static_cast<int32_t>(row);
+    }
+
+    if (row_offset_.back() != neighbors_.size()) {
+        throw std::runtime_error("DynamicSegmentGraph::load row_offset tail mismatch.");
+    }
+
+    num_indexed_nodes_ = static_cast<unsigned>(num_rows);
+    is_dynamic_ = (load_slack_fraction_ > 0.0);
+
+    // Stats (counts only valid edges, not slack capacity).
+    std::uint64_t sum_fwd = 0;
+    std::uint64_t sum_rev = 0;
+    for (const auto &deg : node_degrees_) {
+        sum_fwd += deg.fwd;
+        sum_rev += deg.rev;
+    }
+    edges_amount = static_cast<std::size_t>(sum_fwd + sum_rev);
+    avg_forward_nns = num_rows == 0 ? 0.0F : static_cast<float>(sum_fwd) / static_cast<float>(num_rows);
+    avg_reverse_nns = num_rows == 0 ? 0.0F : static_cast<float>(sum_rev) / static_cast<float>(num_rows);
+}
+
+/**
+ * @brief Insert a new label into a *dynamic* DSG
+ *
+ * @details High-level steps:
+ *  - Run a full-range `rangeSearch()` on the current graph to collect candidate labels.
+ *  - Apply DFS dominance compression (`applyDfsCompression`) to compute segment envelopes.
+ *  - Prune low-support edges (similar heuristic as build()) and keep edges sorted by label id.
+ *  - Append a new CSR row with slack capacity (~1.1x of forward degree) for future reverse edges.
+ *  - Add reverse edges into neighbors' slack regions (unsorted), triggering per-row recompression
+ *    when slack becomes full.
+ *
+ * Layout invariants (CSR + slack):
+ *  - For row r: [row_offset_[r], row_offset_[r+1]) is the allocated capacity.
+ *  - The first `node_degrees_[r].fwd` entries are forward edges and kept sorted by neighbor id.
+ *  - The next `node_degrees_[r].rev` entries are reverse edges stored in an unsorted "slack" tail.
+ *
+ * Complexity (rough):
+ *  - Candidate search: similar to HNSW best-first traversal, bounded by `search_ef`.
+ *  - DFS compression: O(ef^2 * dist_cost) worst-case due to domination checks.
+ */
+void DynamicSegmentGraph::insert(unsigned label) {
+    if (!is_dynamic_) {
+        throw std::runtime_error("Cannot insert into static DSG. Call load() first.");
+    }
+    const unsigned data_size = static_cast<unsigned>(data_wrapper->data_size);
+    if (label >= data_size) {
+        throw std::runtime_error("Insert label out of range: " + std::to_string(label));
+    }
+    if (label_to_row_[label] >= 0) {
+        throw std::runtime_error("Insert label already exists: " + std::to_string(label));
+    }
+    
+    // 1. Search for candidates in EXISTING graph
+    // We use a simplified range search with infinite bounds to get candidates.
+    // rangeSearch() already computes distances internally; we reuse them via
+    // returned_nns_with_dist_ to avoid recalculating dist_func_.
+    
+    // Temporarily set ef large enough for quality
+    size_t old_ef = search_ef;
+    search_ef = ef_max; 
+    
+    const float* query_vec = data_wrapper->nodes[label];
+    
+    // Range search over the full label space; expansion naturally skips uninserted labels.
+    rangeSearch(query_vec, {0, static_cast<int>(data_size - 1)});
+    
+    search_ef = old_ef; // Restore
+    
+    // 2. Prepare candidates
+    std::vector<std::pair<unsigned, DistType>> candidates;
+    candidates.reserve(returned_nns_with_dist_.size());
+    for (const auto &[nbr, dist] : returned_nns_with_dist_) {
+        candidates.push_back({nbr, dist});
+    }
+    
+    // Nearest first
+    std::sort(candidates.begin(), candidates.end(), [](const auto& a, const auto& b) {
+        return a.second < b.second;
+    });
+    
+    // 3. DFS Compression
+    applyDfsCompression(label, candidates);
+    
+    // 4. Support Pruning & Store Forward Edges
+    // Reuse the same support-weighted pruning as build().
+    auto &scratch = dfs_scratch_;
+    const size_t cand_count = scratch.ordered_candidates.size();
+
+    const size_t protect_span = (static_cast<size_t>(data_size) + 49) / 50;
+
+    std::vector<TempEdge> edges;
+    edges.reserve(cand_count);
+    for (size_t i = 0; i < cand_count; ++i) {
+        if (!scratch.is_neighbor[i]) {
+            continue;
+        }
+        edges.push_back(TempEdge{
+            scratch.ordered_candidates[i].first,
+            scratch.left_lower[i],
+            scratch.left_upper[i],
+            scratch.right_lower[i],
+            scratch.right_upper[i],
+        });
+    }
+
+    const std::size_t before = edges.size();
+    const std::size_t keep_total_limit = before - (before / 11); // keep top 10/11
+    selectEdgesBySupport(edges, label, protect_span, keep_total_limit);
+    std::vector<TempEdge> &kept_edges = edges;
+    
+    // 5. Append new row
+    size_t count = kept_edges.size();
+    // Note: selectEdgesBySupport() already returns edges sorted by external_id.
+    size_t capacity = static_cast<size_t>(std::ceil(count * 1.1));
+    
+    if (row_offset_.empty()) {
+        row_offset_.push_back(0);
+    }
+    // New row id is the current number of rows. row_offset_ always stores one extra
+    // tail entry, so its size is (num_rows + 1).
+    const size_t row_id = row_offset_.size() - 1;
+    size_t start_offset = neighbors_.size();
+    size_t new_total_size = start_offset + capacity;
+    
+    // Resize arrays
+    // Performance note:
+    // - These SoA vectors are global flat buffers. If `new_total_size` exceeds current capacity,
+    //   std::vector will reallocate and move/copy the entire buffer (amortized, but still costly).
+    // - If you expect to insert many nodes, consider calling reserve() upfront with an estimated
+    //   final edge capacity to reduce reallocations during repeated insertions.
+    neighbors_.resize(new_total_size);
+    left_lower_.resize(new_total_size);
+    left_upper_.resize(new_total_size);
+    right_lower_.resize(new_total_size);
+    right_upper_.resize(new_total_size);
+    
+    // Write edges
+    for (size_t i = 0; i < count; ++i) {
+        neighbors_[start_offset + i] = kept_edges[i].external_id;
+        left_lower_[start_offset + i] = kept_edges[i].left_lower;
+        left_upper_[start_offset + i] = kept_edges[i].left_upper;
+        right_lower_[start_offset + i] = kept_edges[i].right_lower;
+        right_upper_[start_offset + i] = kept_edges[i].right_upper;
+    }
+    
+    // Update metadata
+    row_to_label_.push_back(label);
+    label_to_row_[label] = static_cast<int32_t>(row_id);
+    node_degrees_.push_back({static_cast<uint16_t>(count), 0});
+    // row_offset_[row_id] was already the old tail; append the new tail end offset.
+    row_offset_.push_back(new_total_size);
+    num_indexed_nodes_ = static_cast<unsigned>(row_id + 1);
+    edges_amount += count;
+    
+    // 6. Add reverse edges
+    for (const auto& edge : kept_edges) {
+        addReverseEdge(edge.external_id, label, edge.left_lower, edge.left_upper, edge.right_lower, edge.right_upper);
+    }
+}
+
+/**
+ * @brief Add (src -> dst) as a reverse edge into src's slack region.
+ *
+ * The "forward region" is sorted and deduplicated via binary search.
+ * The "reverse region" is an unsorted tail used as a write-optimized buffer.
+ * When slack is full we call `recompress(src)` to rebuild a compact sorted forward region.
+ */
+void DynamicSegmentGraph::addReverseEdge(unsigned src, unsigned dst, unsigned ll, unsigned lu, unsigned rl, unsigned ru) {
+    // Map external label -> internal row-id.
+    if (src >= label_to_row_.size()) {
+        return;
+    }
+    const int32_t src_row_i = label_to_row_[src];
+    if (src_row_i < 0) {
+        return;
+    }
+    const size_t src_row = static_cast<size_t>(src_row_i);
+
+    const size_t start = row_offset_[src_row];
+    const size_t end = row_offset_[src_row + 1];
+    const size_t capacity = end - start;
+    auto &deg = node_degrees_[src_row];
+
+    size_t fwd = static_cast<size_t>(deg.fwd);
+    size_t rev = static_cast<size_t>(deg.rev);
+
+    if (fwd + rev >= capacity) {
+        recompress(src);
+        fwd = static_cast<size_t>(deg.fwd);
+        rev = static_cast<size_t>(deg.rev);
+        if (fwd + rev >= capacity) {
+            return;
+        }
+    }
+
+    // Append into slack (unsorted).
+    // We assume `dst` is a newly inserted label, so it does not already exist in src's adjacency.
+    const size_t insert_idx = start + fwd + rev;
+    neighbors_[insert_idx] = dst;
+    left_lower_[insert_idx] = ll;
+    left_upper_[insert_idx] = lu;
+    right_lower_[insert_idx] = rl;
+    right_upper_[insert_idx] = ru;
+    deg.rev = static_cast<uint16_t>(rev + 1);
+}
+
+/**
+ * @brief Recompress a single node's adjacency list to regain slack.
+ *
+ * @details We rebuild a new forward neighbor list by:
+ *  - taking all currently stored edges in the row (fwd + rev),
+ *  - re-running DFS dominance compression,
+ *  - then keeping Top-K edges by support-weighted score, where K is the original forward
+ *    degree (deg.fwd) loaded from disk.
+ *
+ * After recompression, we rewrite the first `deg.fwd` entries in-place and clear `deg.rev`.
+ * The allocated capacity (row_offset_[row+1] - row_offset_[row]) does not change.
+ */
+void DynamicSegmentGraph::recompress(unsigned label) {
+    // recompress() is only called for already-inserted labels (see addReverseEdge()).
+    const size_t row = static_cast<size_t>(label_to_row_[label]);
+
+    const size_t start = row_offset_[row];
+    const size_t capacity = row_offset_[row + 1] - start;
+    auto &deg = node_degrees_[row];
+    const size_t fwd = static_cast<size_t>(deg.fwd);
+    const size_t rev = static_cast<size_t>(deg.rev);
+    const size_t total = fwd + rev;
+
+    // 1. Collect candidates
+    std::vector<std::pair<unsigned, DistType>> candidates;
+    candidates.reserve(total);
+    
+    const float* query_vec = data_wrapper->nodes[label];
+    
+    for (size_t i = 0; i < total; ++i) {
+        unsigned nbr = neighbors_[start + i];
+        float dist = dist_func_(query_vec, data_wrapper->nodes[nbr], dist_func_param_);
+        candidates.push_back({nbr, dist});
+    }
+    
+    // Sort
+    std::sort(candidates.begin(), candidates.end(), [](const auto& a, const auto& b) {
+        return a.second < b.second;
+    });
+    
+    // 2. DFS
+    applyDfsCompression(label, candidates);
+    
+    // 3. Prune (Strict Top-K by support weight)
+    //
+    // Important: `M` is the theoretical max branching factor *per query range*.
+    // The stored adjacency per node (deg.fwd) can be much larger because DSG
+    // stores edges with different (L, R) envelopes. During recompression we
+    // should not clamp the stored list to `M`, otherwise we lose coverage.
+    //
+    // Strategy:
+    // - Use the original forward degree as the target budget. In the dynamic setting,
+    //   `deg.fwd` is treated as a fixed per-row budget loaded from disk.
+    
+    auto &scratch = dfs_scratch_;
+    const size_t cand_count = scratch.ordered_candidates.size();
+
+    const size_t protect_span = (num_indexed_nodes_ + 49) / 50;
+
+    std::vector<TempEdge> edges;
+    edges.reserve(cand_count);
+    for (size_t i = 0; i < cand_count; ++i) {
+        if (!scratch.is_neighbor[i]) {
+            continue;
+        }
+        edges.push_back(TempEdge{
+            scratch.ordered_candidates[i].first,
+            scratch.left_lower[i],
+            scratch.left_upper[i],
+            scratch.right_lower[i],
+            scratch.right_upper[i],
+        });
+    }
+
+    // Just fix as the original fwd.
+    // TODO: Maybe we can use a better policy to determine the keep_total_limit.
+    
+    const std::size_t keep_total_limit = fwd;
+    selectEdgesBySupport(edges, label, protect_span, keep_total_limit);
+    const std::vector<TempEdge> &final_edges = edges;
+    
+    // 4. Rewrite
+    size_t new_count = final_edges.size();
+    for (size_t i = 0; i < new_count; ++i) {
+        neighbors_[start + i] = final_edges[i].external_id;
+        left_lower_[start + i] = final_edges[i].left_lower;
+        left_upper_[start + i] = final_edges[i].left_upper;
+        right_lower_[start + i] = final_edges[i].right_lower;
+        right_upper_[start + i] = final_edges[i].right_upper;
+    }
+    
+    // Update counts: keep the recompressed edges as forward and clear accumulated reverse edges.
+    deg.fwd = static_cast<uint16_t>(new_count);
+    deg.rev = 0;
 }
 
 void DynamicSegmentGraph::getStats() {
-    // calculate the average number of forward neighbors
-    edges_amount = neighbors_.size();
-    size_t node_count = row_offset_.empty() ? 0 : row_offset_.size() - 1;
-    avg_forward_nns = (node_count == 0)
-                          ? 0.0F
-                          : static_cast<float>(edges_amount) / static_cast<float>(node_count);
-    avg_reverse_nns = 0.0F;
+    const std::size_t node_count = node_degrees_.size();
+    std::uint64_t sum_fwd = 0;
+    std::uint64_t sum_rev = 0;
+    for (const auto &deg : node_degrees_) {
+        sum_fwd += deg.fwd;
+        sum_rev += deg.rev;
+    }
+
+    edges_amount = static_cast<std::size_t>(sum_fwd + sum_rev);
+    avg_forward_nns = node_count == 0 ? 0.0F : static_cast<float>(sum_fwd) / static_cast<float>(node_count);
+    avg_reverse_nns = node_count == 0 ? 0.0F : static_cast<float>(sum_rev) / static_cast<float>(node_count);
 
     std::cout << "DynamicSegmentGraph Statistics:" << std::endl;
     std::cout << "  Build Time: " << index_time << " seconds" << std::endl;
@@ -965,6 +1532,21 @@ void DynamicSegmentGraph::runKnnForLabel(
     }
 }
 
+/**
+ * @brief DFS-based dominance compression for segment edges.
+ *
+ * @details We traverse candidates in increasing distance order and select up to M neighbors.
+ * A candidate u is dominated by an already-selected neighbor v if:
+ *   dist(u, v) < dist(center, u) / alpha
+ *
+ * For every selected neighbor we also maintain an eligibility envelope [L,R] x [ll,lu] x [rl,ru]
+ * encoded as (left_lower/upper, right_lower/upper) which is later used by `rangeSearch()` to
+ * filter edges for a specific query range.
+ *
+ * Implementation notes:
+ *  - `domination_grid` caches pairwise domination decisions to avoid repeated distance calls.
+ *  - Worst-case cache size is O(ef^2) bytes per call (uint8_t per pair).
+ */
 void DynamicSegmentGraph::applyDfsCompression(
     unsigned center_label,
     std::vector<std::pair<unsigned, DistType>> &candidates) {
@@ -1079,6 +1661,8 @@ void DynamicSegmentGraph::applyDfsCompression(
 
             prefix.pop_back();
 
+            // Shrink [L, R] to avoid exploring label subranges that have already been
+            // "covered" by the current candidate relative to the left/right caps.
             if (candidate_label < left_cap) {
                 L = candidate_label + 1;
             } else if (candidate_label > right_cap) {

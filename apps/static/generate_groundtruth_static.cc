@@ -1,6 +1,11 @@
 /**
- * @file generate_groundtruth.cc
- * @brief CLI utility to build static groundtruth shards for the RangeFilter benchmarks.
+ * @file generate_groundtruth_static.cc
+ * @brief Generate groundtruth for the static range-filter workload.
+ *
+ * This tool generates groundtruth files under `groundtruth/static/` for the
+ * standard static evaluation protocol (fixed dataset, fixed query set, fixed
+ * query ranges). Dynamic workload groundtruth (if needed) will be added later
+ * under apps/dynamic/.
  */
 
 #include <cstdlib>
@@ -82,7 +87,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    cout << "Generating groundtruth for dataset '" << dataset << "' "
+    cout << "Generating groundtruth (static workload) for dataset '" << dataset << "' "
          << "(N=" << data_size << ", queries=" << query_num
          << ", topK=" << query_k << ")\n";
     cout << "Dataset path: " << dataset_path << "\n"

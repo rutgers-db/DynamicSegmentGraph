@@ -11,6 +11,7 @@
 
 #include <cstddef>
 #include <string>
+#include <vector>
 
 #include "data_wrapper.h"
 
@@ -22,7 +23,10 @@ static const unsigned default_ef_construction = 400;
  */
 class BaseIndex {
 public:
-    // max out degree
+    // theoretical max out degree
+    // in dsg, it is the theoretical max out degree of the DSG given a range
+    // So in dsg, per-node's edge count is actually much larger than M
+
     unsigned M = default_M;
     // ef construction
     unsigned ef_construction = default_ef_construction;
@@ -44,7 +48,11 @@ public:
     explicit BaseIndex(const DataWrapper *data) : data_wrapper(data) {}
     virtual ~BaseIndex() = default;
 
-    virtual void build() = 0;
+    /**
+     * @brief Build an index over a selected subset of labels.
+     * @param labels External labels in [0, data_size) to include in the index.
+     */
+    virtual void build(const vector<unsigned> &labels) = 0;
     virtual void save(const std::string &file_path) = 0;
     virtual void load(const std::string &file_path) = 0;
 

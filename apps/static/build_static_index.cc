@@ -1,8 +1,15 @@
 /**
- * @author Zhencan Peng
- * @date 2025-03-17
+ * @file build_static_index.cc
+ * @brief Build a static DSG index for a fixed dataset (full label set 0..N-1).
  *
- * @copyright Copyright (c) 2025
+ * This CLI is intentionally scoped to the *static workload*:
+ * - Build an index for a fixed dataset snapshot.
+ * - Save the resulting index to disk (v2 magic-header format).
+ *
+ * Future dynamic workloads (mixed insert/query, replay traces, partial builds)
+ * will live under apps/dynamic/.
+ *
+ * Author: Zhencan Peng
  */
 
 #include <chrono>
@@ -78,7 +85,7 @@ BuildConfig parseArgs(int argc, char **argv) {
 }
 
 void printUsage() {
-    std::cout << "Usage: build_index "
+    std::cout << "Usage: build_static_index "
                  "-dataset_path <path> [-dataset name] [-N size] [-k out_degree] "
                  "[-ef_construction val] [-ef_max val] [-alpha val] "
                  "[-query_path path] [-index_path path] [-seed val]\n";
@@ -102,18 +109,20 @@ int main(int argc, char **argv) {
         index.alpha = cfg.alpha;
         index.random_seed = cfg.random_seed;
 
-        std::cout << "[DSG] dataset=" << cfg.dataset << " N=" << cfg.data_size << " M=" << cfg.index_k
+        std::cout << "[DSG][static] dataset=" << cfg.dataset << " N=" << cfg.data_size
+                  << " M=" << cfg.index_k
                   << " ef_construction=" << cfg.ef_construction << " ef_max=" << cfg.ef_max
                   << " alpha=" << cfg.alpha << "\n";
 
         const auto build_start = steady_clock::now();
-        index.build();
+        // Static workload: build full label set (0..N-1).
+        index.build(data_wrapper.labels);
         const auto build_end = steady_clock::now();
         const double seconds = duration<double>(build_end - build_start).count();
-        std::cout << "[DSG] Build finished in " << seconds << " seconds\n";
+        std::cout << "[DSG][static] Build finished in " << seconds << " seconds\n";
         index.getStats();
         index.save(cfg.index_path);
-        std::cout << "[DSG] Index saved to " << cfg.index_path << "\n";
+        std::cout << "[DSG][static] Index saved to " << cfg.index_path << "\n";
     } catch (const std::invalid_argument &ex) {
         printUsage();
         std::cerr << "Argument error: " << ex.what() << std::endl;

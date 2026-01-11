@@ -1,25 +1,28 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 2025-12-02 Zhencan Peng: convenience wrapper to build and run build_index with default parameters.
+# 2026-01-10 Zhencan Peng: static workload wrapper for building a static index.
+#
+# This script runs the *static workload* (build a fixed index for a fixed dataset).
+# Future dynamic workload scripts should live under scripts/dynamic/.
 
 ROOT_DIR="/common/users/zp128/DynamicSegmentGraph"
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
-BIN="${BUILD_DIR}/apps/build_index"
+BIN="${BUILD_DIR}/apps/build_static_index"
 
 configure_and_build() {
   cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}"
-  cmake --build "${BUILD_DIR}" --target build_index
+  cmake --build "${BUILD_DIR}" --target build_static_index
 }
 
 if [[ ! -x "${BIN}" ]]; then
-  echo "[DSG] build_index binary not found, building..."
+  echo "[DSG] build_static_index binary not found, building..."
   configure_and_build
 fi
 
-# DATASET="deep" 
-DATASET="wikipedia"
-DATA_SIZE="1000000"
+DATASET="deep"
+# DATASET="wikipedia"
+DATA_SIZE="100000"
 
 # Dataset-specific paths
 declare -A DEFAULT_DATASET_PATHS=(
@@ -45,18 +48,18 @@ fi
 case "${DATASET}" in
   "deep")
     INDEX_K="16"
-    EF_CONSTRUCTION="150"
+    EF_CONSTRUCTION="100"
     EF_MAX="300"
-    ALPHA="1.0"
+    ALPHA="1"
     ;;
   "wikipedia"|"yt8m-video")
     INDEX_K="32"
-    EF_CONSTRUCTION="150"
-    EF_MAX="500"
+    EF_CONSTRUCTION="160"
+    EF_MAX="600"
     if [[ "${DATASET}" == "yt8m-video" ]]; then
       ALPHA="1.3"
     else
-      ALPHA="1.0"
+      ALPHA="1.1"
     fi
     ;;
   *)
@@ -65,20 +68,19 @@ case "${DATASET}" in
     ;;
 esac
 
-INDEX_PATH="${ROOT_DIR}/index/${DATASET}/${DATASET}_N${DATA_SIZE}_k${INDEX_K}_efc${EF_CONSTRUCTION}_efm${EF_MAX}_alpha${ALPHA}.index"
-
+INDEX_PATH="${ROOT_DIR}/index/static/${DATASET}/${DATASET}_N${DATA_SIZE}_k${INDEX_K}_efc${EF_CONSTRUCTION}_efm${EF_MAX}_alpha${ALPHA}.index"
 mkdir -p "$(dirname "${INDEX_PATH}")"
 
 # Create log directory and file
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-LOG_DIR="${ROOT_DIR}/logs/${DATASET}/build"
+LOG_DIR="${ROOT_DIR}/logs/static/${DATASET}/build"
 mkdir -p "${LOG_DIR}"
 
 # Build log filename with parameters
 LOG_FILENAME="${DATASET}_N${DATA_SIZE}_k${INDEX_K}_efc${EF_CONSTRUCTION}_efm${EF_MAX}_alpha${ALPHA}_${TIMESTAMP}.log"
 LOG_PATH="${LOG_DIR}/${LOG_FILENAME}"
 
-echo "[DSG] Running build_index..."
+echo "[DSG] Running build_static_index..."
 echo "[DSG] Logging output to ${LOG_PATH}"
 /usr/bin/time -v "${BIN}" \
   -dataset "${DATASET}" \

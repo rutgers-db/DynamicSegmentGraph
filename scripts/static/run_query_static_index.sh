@@ -1,28 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# 2025-12-02 Zhencan Peng: convenience wrapper to run query_index with configurable dataset parameters.
+# 2026-01-10 Zhencan Peng: static workload wrapper for querying a static index.
+#
+# This script runs the *static workload* (query a fixed index built for a fixed dataset).
+# Future dynamic workload scripts should live under scripts/dynamic/.
 
 usage() {
   cat <<'EOF'
-Usage: run_query_index.sh [SEARCH_EF]
+Usage: run_query_static_index.sh [SEARCH_EF]
 
-Optional SEARCH_EF overrides the search ef passed to query_index.
+Optional SEARCH_EF overrides the search ef passed to query_static_index.
 EOF
   exit 1
 }
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
-BIN="${BUILD_DIR}/apps/query_index"
+BIN="${BUILD_DIR}/apps/query_static_index"
 
 configure_and_build() {
   cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}"
-  cmake --build "${BUILD_DIR}" --target query_index
+  cmake --build "${BUILD_DIR}" --target query_static_index
 }
 
 if [[ ! -x "${BIN}" ]]; then
-  echo "[DSG] query_index binary not found, building..."
+  echo "[DSG] query_static_index binary not found, building..."
   configure_and_build
 fi
 
@@ -33,9 +36,9 @@ elif [[ $# -eq 1 ]]; then
   SEARCH_EF="$1"
 fi
 
-# DATASET="deep"
-DATASET="wikipedia"
-DATA_SIZE="1000000"
+DATASET="deep"
+# DATASET="wikipedia"
+DATA_SIZE="100000"
 
 # Dataset-specific paths
 declare -A DEFAULT_DATASET_PATHS=(
@@ -61,18 +64,18 @@ fi
 case "${DATASET}" in
   "deep")
     INDEX_K="16"
-    EF_CONSTRUCTION="150"
+    EF_CONSTRUCTION="100"
     EF_MAX="300"
-    ALPHA="1.0"
+    ALPHA="1"
     ;;
   "wikipedia"|"yt8m-video")
     INDEX_K="32"
-    EF_CONSTRUCTION="150"
-    EF_MAX="500"
+    EF_CONSTRUCTION="160"
+    EF_MAX="600"
     if [[ "${DATASET}" == "yt8m-video" ]]; then
       ALPHA="1.3"
     else
-      ALPHA="1.0"
+      ALPHA="1.1"
     fi
     ;;
   *)
@@ -81,7 +84,7 @@ case "${DATASET}" in
     ;;
 esac
 
-INDEX_PATH="${ROOT_DIR}/index/${DATASET}/${DATASET}_N${DATA_SIZE}_k${INDEX_K}_efc${EF_CONSTRUCTION}_efm${EF_MAX}_alpha${ALPHA}.index"
+INDEX_PATH="${ROOT_DIR}/index/static/${DATASET}/${DATASET}_N${DATA_SIZE}_k${INDEX_K}_efc${EF_CONSTRUCTION}_efm${EF_MAX}_alpha${ALPHA}.index"
 GROUND_ROOT="${ROOT_DIR}/groundtruth/static"
 QUERY_NUM="1000"
 QUERY_K="10"
@@ -108,7 +111,7 @@ fi
 
 # Create log directory and file
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-LOG_DIR="${ROOT_DIR}/logs/${DATASET}/search"
+LOG_DIR="${ROOT_DIR}/logs/static/${DATASET}/search"
 mkdir -p "${LOG_DIR}"
 
 # Build log filename with parameters
@@ -121,6 +124,4 @@ LOG_PATH="${LOG_DIR}/${LOG_FILENAME}"
 
 echo "[DSG] Logging output to ${LOG_PATH}"
 "${BIN}" "${CMD_ARGS[@]}" | tee "${LOG_PATH}"
-
-
 

@@ -1,12 +1,12 @@
 /**
- * @file query_index.cc
- * @brief Evaluate the Dynamic Segment Graph index on range-filter queries.
+ * @file query_static_index.cc
+ * @brief Evaluate a static DSG index on range-filter queries (static workload).
  *
- * Usage:
- *   query_index -dataset_path <vectors.bin> -query_path <queries.bin>
- *               -index_path <index.dsg> -groundtruth_root <dir>
- *               [-dataset deep] [-N 100000] [-query_num 1000]
- *               [-query_k 10] [-search_ef 200]
+ * This CLI is intentionally scoped to the *static workload*:
+ * - Load a previously built static index.
+ * - Run the standard range-filter query benchmark against precomputed groundtruth.
+ *
+ * Future dynamic workloads (insert/query mixes, workload traces) will live under apps/dynamic/.
  */
 
 #include <algorithm>
@@ -83,7 +83,7 @@ QueryConfig parseArgs(int argc, char **argv) {
 
 void printUsage() {
     std::cout
-        << "Usage: query_index -dataset_path <vectors.bin> -query_path <queries.bin> "
+        << "Usage: query_static_index -dataset_path <vectors.bin> -query_path <queries.bin> "
            "-index_path <index.dsg> -groundtruth_root <dir> [options]\n"
         << "Options:\n"
         << "  -dataset <name>          Dataset label (default deep)\n"
@@ -97,9 +97,6 @@ std::vector<int> toVector(const std::vector<unsigned> &input, size_t limit) {
     std::vector<int> result;
     result.reserve(limit);
     for (unsigned id : input) {
-        if (id == std::numeric_limits<unsigned>::max()) {
-            continue;
-        }
         result.emplace_back(static_cast<int>(id));
         if (result.size() == limit) {
             break;
@@ -158,16 +155,16 @@ int main(int argc, char **argv) {
         dsg::DynamicSegmentGraph index(&space, &data_wrapper);
         index.setQueryTopK(static_cast<unsigned>(cfg.query_k));
         index.load(cfg.index_path);
-        std::cout << "[DSG] Loaded index from " << cfg.index_path << std::endl;
+        std::cout << "[DSG][static] Loaded index from " << cfg.index_path << std::endl;
         index.getStats();
         logSimdInfo();
         const auto search_ef_schedule = buildSearchEfSchedule(cfg);
-        std::cout << "[DSG] Evaluating " << search_ef_schedule.size()
+        std::cout << "[DSG][static] Evaluating " << search_ef_schedule.size()
                   << " search_ef value(s)." << std::endl;
 
         for (unsigned search_ef_value : search_ef_schedule) {
             index.setSearchEf(search_ef_value);
-            std::cout << "[DSG] ----- search_ef=" << search_ef_value << " -----" << std::endl;
+            std::cout << "[DSG][static] ----- search_ef=" << search_ef_value << " -----" << std::endl;
 
             for (size_t range_id = 0; range_id < data_wrapper.range_count(); ++range_id) {
                 const auto &range_bounds = data_wrapper.query_bounds_by_range(range_id);

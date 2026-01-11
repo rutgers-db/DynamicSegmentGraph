@@ -15,13 +15,26 @@ cmake ..
 make -j
 ```
 
-Entry points for indexing/querying live in `apps/` (`build_index.cc`, `query_index.cc`). Helper scripts in `scripts/` show typical arguments; adjust flags or code constants as needed.
+## Workloads
+
+### Static workload (current)
+- **CLIs**: `apps/static/` (`build_static_index.cc`, `query_static_index.cc`, `generate_groundtruth_static.cc`)
+- **Scripts**: `scripts/static/` (`run_build_static_index.sh`, `run_query_static_index.sh`, `run_generate_groundtruth_static.sh`, `test_sensitivity_static.sh`)
+- **Artifacts**:
+  - Index: `index/static/<dataset>/...`
+  - Logs: `logs/static/<dataset>/...`
+  - Groundtruth: `groundtruth/static/`
+
+### Dynamic workload (planned)
+- Placeholder directories exist for future work:
+  - `apps/dynamic/`
+  - `scripts/dynamic/`
 
 ## Code Structure (core)
 - `include/`: public headers. Core interface lives in `dsg.h`; supporting types (HNSW wrappers, utilities) reside under `include/base_hnsw/` and `include/utils/`.
 - `src/`: implementations. The main logic is in `src/dsg.cc`, with shared helpers under `src/utils/`.
-- `apps/`: small CLI entry points for building and querying indexes.
-- `scripts/`: helper scripts for common workflows (build, query, benchmarks).
+- `apps/`: CLI entry points for workloads.
+- `scripts/`: helper scripts for common workflows (static now; dynamic planned).
 
 ## Datasets
 | Dataset | Data type | Dimensions | Search Key |

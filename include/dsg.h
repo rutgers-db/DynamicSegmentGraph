@@ -60,6 +60,15 @@ public:
     using DistType = float;
     using HnswType = hnswlib::HierarchicalNSW<DistType>;
 
+    struct InsertionStats {
+        std::uint64_t inserted = 0;
+        std::uint64_t recompress_calls = 0;
+        double range_search_seconds = 0.0;
+        double dfs_seconds = 0.0;
+        double add_reverse_seconds = 0.0;
+        double recompress_seconds = 0.0;
+    };
+
     /**
      * @brief Construct an empty DSG with the given data wrapper and L2 space.
      */
@@ -121,22 +130,13 @@ public:
      */
     void insert(unsigned label);
 
+    void resetInsertionStats() noexcept { insertion_stats_ = InsertionStats{}; }
+    InsertionStats insertionStats() const noexcept { return insertion_stats_; }
+
     /**
      * @brief Report index statistics to stdout.
      */
     void getStats();
-
-    /**
-     * @brief Return last rangeSearch results with distances.
-     *
-     * @details `rangeSearch()` always fills `BaseIndex::returned_nns` (labels only).
-     *          For insertion we also reuse the already-computed distances from the
-     *          internal heaps to avoid recalculating `dist_func_`. This accessor
-     *          exposes those (label, distance) pairs from the last `rangeSearch()`.
-     */
-    const std::vector<std::pair<unsigned, DistType>> &returned_nns_with_dist() const noexcept {
-        return returned_nns_with_dist_;
-    }
     /// Last query hop count.
     std::size_t last_hop_count() const noexcept { return last_hop_count_; }
     /// Last query distance evaluation count.
@@ -161,6 +161,13 @@ private:
     /// Apply DFS-based dominance pruning and produce segment ranges.
     void applyDfsCompression(unsigned center_label,
                              std::vector<std::pair<unsigned, DistType>> &candidates);
+
+    /// Insertion-only candidate generator on the current DSG graph.
+    /// Returns candidates in nearest-first order with ReturnAll(top-candidates-ever) semantics.
+    void insertionInnerSearch(const float *query,
+                              const std::pair<int, int> query_bound,
+                              std::size_t ef_limit,
+                              std::vector<std::pair<unsigned, DistType>> &out);
     /// Move the compressed neighbors from scratch buffers into forward_edges_.
     // Note: The signature of storeForwardEdges might change in implementation to adapt to SoA,
     // or we might accumulate in a temporary buffer first.
@@ -250,13 +257,12 @@ private:
     // Load-time CSR expansion ratio for dynamic reverse-edge slack.
     // 0.0 means no expansion (tight/static load).
     double load_slack_fraction_ = 0.0;
-
-    // Cached (label, distance) results from the last rangeSearch().
-    std::vector<std::pair<unsigned, DistType>> returned_nns_with_dist_;
     /// Last query hop count.
     std::size_t last_hop_count_ = 0;
     /// Last query distance evaluation count.
     std::size_t last_distance_eval_count_ = 0;
+
+    InsertionStats insertion_stats_{};
 };
 
 } // namespace dsg

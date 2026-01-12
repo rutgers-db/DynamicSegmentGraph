@@ -595,7 +595,6 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
     }
     if (candidate_set.empty()) {
         returned_nns.clear();
-        returned_nns_with_dist_.clear();
         last_hop_count_ = 0;
         last_distance_eval_count_ = 0;
         visited_list_pool_->releaseVisitedList(vl);
@@ -806,16 +805,281 @@ void DynamicSegmentGraph::rangeSearch(const float *query,
     }
 
     returned_nns.clear();
-    returned_nns_with_dist_.clear();
     while (!top_candidates.empty()) {
         const auto [dist, lbl] = top_candidates.top();
         returned_nns.emplace_back(lbl);
-        returned_nns_with_dist_.emplace_back(lbl, dist);
         top_candidates.pop();
     }
 
     last_hop_count_ = hop_counter;
     last_distance_eval_count_ = distance_eval_count;
+}
+
+void DynamicSegmentGraph::insertionInnerSearch(const float *query,
+                                              const std::pair<int, int> query_bound,
+                                              std::size_t ef_limit,
+                                              std::vector<std::pair<unsigned, DistType>> &out) {
+    const int left = query_bound.first;
+    const int right = query_bound.second;
+
+    const unsigned left_u = static_cast<unsigned>(left);
+    const unsigned right_u = static_cast<unsigned>(right);
+
+    hnswlib::VisitedList *vl = visited_list_pool_->getFreeVisitedList();
+    hnswlib::vl_type *visited_array = vl->mass;
+    hnswlib::vl_type visited_array_tag = vl->curV;
+
+    std::size_t hop_counter = 0;
+    std::size_t distance_eval_count = 0;
+
+    auto timed_distance = [&](unsigned label) -> DistType {
+        ++distance_eval_count;
+        const DistType dist =
+            dist_func_(query, data_wrapper->nodes[label], dist_func_param_);
+        return dist;
+    };
+
+    auto cmp = [](const Candidate &lhs, const Candidate &rhs) {
+        return lhs.first > rhs.first;
+    };
+    std::priority_queue<Candidate, std::vector<Candidate>, decltype(cmp)> candidate_set(cmp);
+    std::priority_queue<Candidate> top_candidates;
+
+    std::vector<Candidate> removed_candidates;
+    removed_candidates.reserve(ef_limit);
+
+    std::vector<unsigned> fetched_nns;
+    fetched_nns.reserve(ef_limit);
+
+    // Try to enqueue an inserted label as a new seed.
+    // Returns true if we actually pushed a new element into candidate_set.
+    auto try_enqueue_seed = [&](unsigned label) -> bool {
+        if (!isInsertedLabel(label)) {
+            return false;
+        }
+        if (visited_array[label] == visited_array_tag) {
+            return false;
+        }
+        visited_array[label] = visited_array_tag;
+        const DistType dist = timed_distance(label);
+        candidate_set.emplace(dist, label);
+        return true;
+    };
+
+    const unsigned range_span = right_u - left_u + 1;
+    constexpr double kSmallRangeFrac = 0.02;
+    const bool skip_range_envelope =
+        static_cast<double>(range_span) < kSmallRangeFrac * static_cast<double>(data_wrapper->data_size);
+
+    // Same robust seeding strategy as rangeSearch().
+    constexpr unsigned kProbeRadius = 64;
+    auto enqueue_nearby_seed = [&](unsigned anchor) {
+        if (try_enqueue_seed(anchor)) {
+            return;
+        }
+        auto maxD = std::min(kProbeRadius, right_u - anchor);
+        for (unsigned d = 1; d <= maxD; ++d) {
+            if (try_enqueue_seed(anchor + d)) {
+                return;
+            }
+        }
+    };
+
+    enqueue_nearby_seed(left_u);
+    enqueue_nearby_seed(left_u + range_span / 2);
+    enqueue_nearby_seed(left_u + range_span / 4);
+    enqueue_nearby_seed(left_u + 3 * range_span / 4);
+
+    if (candidate_set.empty()) {
+        constexpr unsigned kFallbackScan = 4096;
+        unsigned scanned = 0;
+        for (unsigned probe = left_u; probe <= right_u && scanned < kFallbackScan; ++probe, ++scanned) {
+            if (try_enqueue_seed(probe)) {
+                break;
+            }
+        }
+    }
+
+    if (candidate_set.empty()) {
+        out.clear();
+        visited_list_pool_->releaseVisitedList(vl);
+        return;
+    }
+
+    DistType worst_top_dist = std::numeric_limits<DistType>::max();
+
+    // Prepare SIMD constants (same as rangeSearch()).
+    const __m128i sign_bit = _mm_set1_epi32(0x80000000);
+    const __m128i v_left_u = _mm_set1_epi32(static_cast<int>(left_u));
+    const __m128i v_right_u = _mm_set1_epi32(static_cast<int>(right_u));
+    const __m128i v_left_u_adj = _mm_xor_si128(v_left_u, sign_bit);
+    const __m128i v_right_u_adj = _mm_xor_si128(v_right_u, sign_bit);
+
+    const unsigned *neighbors_ptr = neighbors_.data();
+    const unsigned *ll_ptr = left_lower_.data();
+    const unsigned *lu_ptr = left_upper_.data();
+    const unsigned *rl_ptr = right_lower_.data();
+    const unsigned *ru_ptr = right_upper_.data();
+
+    while (!candidate_set.empty()) {
+        const auto [dist, current] = candidate_set.top();
+        candidate_set.pop();
+        ++hop_counter;
+
+        if (dist > worst_top_dist) {
+            break;
+        }
+
+        const unsigned current_label = current;
+        if (current_label >= label_to_row_.size()) {
+            continue;
+        }
+        const int32_t row_i = label_to_row_[current_label];
+        if (row_i < 0) {
+            continue;
+        }
+        const size_t row = static_cast<size_t>(row_i);
+
+        const size_t start_idx = row_offset_[row];
+        const auto &deg = node_degrees_[row];
+        const size_t sorted_count = static_cast<size_t>(deg.fwd);
+        const size_t reverse_count = static_cast<size_t>(deg.rev);
+        const size_t sorted_end_idx = start_idx + sorted_count;
+
+        fetched_nns.clear();
+
+        // 1) Binary search in SORTED portion
+        auto start_it = neighbors_.begin() + start_idx;
+        auto sorted_end_it = neighbors_.begin() + sorted_end_idx;
+        auto it = std::lower_bound(start_it, sorted_end_it, left_u);
+
+        size_t current_scan_idx = std::distance(neighbors_.begin(), it);
+
+        if (!skip_range_envelope) {
+            for (; current_scan_idx + 4 <= sorted_end_idx; current_scan_idx += 4) {
+                _mm_prefetch(reinterpret_cast<const char *>(neighbors_ptr + current_scan_idx + 16), _MM_HINT_T0);
+                _mm_prefetch(reinterpret_cast<const char *>(ll_ptr + current_scan_idx + 16), _MM_HINT_T0);
+                _mm_prefetch(reinterpret_cast<const char *>(lu_ptr + current_scan_idx + 16), _MM_HINT_T0);
+                _mm_prefetch(reinterpret_cast<const char *>(rl_ptr + current_scan_idx + 16), _MM_HINT_T0);
+                _mm_prefetch(reinterpret_cast<const char *>(ru_ptr + current_scan_idx + 16), _MM_HINT_T0);
+
+                __m128i v_nbr = _mm_loadu_si128(reinterpret_cast<const __m128i *>(neighbors_ptr + current_scan_idx));
+                __m128i v_nbr_adj = _mm_xor_si128(v_nbr, sign_bit);
+                __m128i v_break_cmp = _mm_cmpgt_epi32(v_nbr_adj, v_right_u_adj);
+                if (_mm_movemask_ps(_mm_castsi128_ps(v_break_cmp)) != 0) {
+                    break;
+                }
+
+                __m128i v_ll = _mm_loadu_si128(reinterpret_cast<const __m128i *>(ll_ptr + current_scan_idx));
+                __m128i v_lu = _mm_loadu_si128(reinterpret_cast<const __m128i *>(lu_ptr + current_scan_idx));
+                __m128i v_rl = _mm_loadu_si128(reinterpret_cast<const __m128i *>(rl_ptr + current_scan_idx));
+                __m128i v_ru = _mm_loadu_si128(reinterpret_cast<const __m128i *>(ru_ptr + current_scan_idx));
+
+                v_ll = _mm_xor_si128(v_ll, sign_bit);
+                v_lu = _mm_xor_si128(v_lu, sign_bit);
+                v_rl = _mm_xor_si128(v_rl, sign_bit);
+                v_ru = _mm_xor_si128(v_ru, sign_bit);
+
+                __m128i c1_fail = _mm_cmpgt_epi32(v_ll, v_left_u_adj);
+                __m128i c2_fail = _mm_cmpgt_epi32(v_left_u_adj, v_lu);
+                __m128i c3_fail = _mm_cmpgt_epi32(v_rl, v_right_u_adj);
+                __m128i c4_fail = _mm_cmpgt_epi32(v_right_u_adj, v_ru);
+
+                __m128i any_fail = _mm_or_si128(c1_fail, c2_fail);
+                any_fail = _mm_or_si128(any_fail, _mm_or_si128(c3_fail, c4_fail));
+
+                int fail_mask = _mm_movemask_ps(_mm_castsi128_ps(any_fail));
+                int valid_mask = (~fail_mask) & 0xF;
+                while (valid_mask) {
+                    int bit = __builtin_ctz(valid_mask);
+                    unsigned neighbor = neighbors_ptr[current_scan_idx + bit];
+                    if (visited_array[neighbor] != visited_array_tag) {
+                        fetched_nns.push_back(neighbor);
+                        _mm_prefetch(reinterpret_cast<const char *>(data_wrapper->nodes[neighbor]), _MM_HINT_T0);
+                    }
+                    valid_mask &= (valid_mask - 1);
+                }
+            }
+        }
+
+        for (; current_scan_idx < sorted_end_idx; ++current_scan_idx) {
+            const unsigned neighbor = neighbors_ptr[current_scan_idx];
+            if (neighbor > right_u) {
+                break;
+            }
+            if (!skip_range_envelope) {
+                if (!((ll_ptr[current_scan_idx] <= left_u && left_u <= lu_ptr[current_scan_idx]) &&
+                      (rl_ptr[current_scan_idx] <= right_u && right_u <= ru_ptr[current_scan_idx]))) {
+                    continue;
+                }
+            }
+            if (visited_array[neighbor] == visited_array_tag) {
+                continue;
+            }
+            fetched_nns.push_back(neighbor);
+            _mm_prefetch(reinterpret_cast<const char *>(data_wrapper->nodes[neighbor]), _MM_HINT_T0);
+        }
+
+        // 2) Linear scan in UNSORTED reverse edges (dynamic mode)
+        if (is_dynamic_ && reverse_count > 0) {
+            const size_t slack_end_idx = sorted_end_idx + reverse_count;
+            for (size_t slack_idx = sorted_end_idx; slack_idx < slack_end_idx; ++slack_idx) {
+                const unsigned neighbor = neighbors_ptr[slack_idx];
+                if (neighbor < left_u || neighbor > right_u) {
+                    continue;
+                }
+                if (!skip_range_envelope) {
+                    if (!((ll_ptr[slack_idx] <= left_u && left_u <= lu_ptr[slack_idx]) &&
+                          (rl_ptr[slack_idx] <= right_u && right_u <= ru_ptr[slack_idx]))) {
+                        continue;
+                    }
+                }
+                if (visited_array[neighbor] == visited_array_tag) {
+                    continue;
+                }
+                fetched_nns.push_back(neighbor);
+                _mm_prefetch(reinterpret_cast<const char *>(data_wrapper->nodes[neighbor]), _MM_HINT_T0);
+            }
+        }
+
+        for (const auto neighbor : fetched_nns) {
+            visited_array[neighbor] = visited_array_tag;
+            const DistType nbr_dist = timed_distance(neighbor);
+
+            if (top_candidates.size() < ef_limit) {
+                candidate_set.emplace(nbr_dist, neighbor);
+                top_candidates.emplace(nbr_dist, neighbor);
+                worst_top_dist = top_candidates.top().first;
+            } else if (nbr_dist < worst_top_dist) {
+                candidate_set.emplace(nbr_dist, neighbor);
+                top_candidates.emplace(nbr_dist, neighbor);
+
+                removed_candidates.push_back(top_candidates.top());
+                top_candidates.pop();
+
+                worst_top_dist = top_candidates.top().first;
+            }
+        }
+    }
+
+    visited_list_pool_->releaseVisitedList(vl);
+
+    // ReturnAll(top-candidates-ever) semantics: re-add trimmed candidates.
+    for (const auto &c : removed_candidates) {
+        top_candidates.push(c);
+    }
+
+    // Export nearest-first (applyDfsCompression expects increasing distance order).
+    out.resize(top_candidates.size());
+    std::size_t out_pos = out.size();
+    while (!top_candidates.empty()) {
+        const auto [dist, lbl] = top_candidates.top();
+        out[--out_pos] = {lbl, dist};
+        top_candidates.pop();
+    }
+
+    (void)hop_counter;
+    (void)distance_eval_count;
 }
 
 void DynamicSegmentGraph::save(const std::string &file_path) {
@@ -1066,37 +1330,27 @@ void DynamicSegmentGraph::insert(unsigned label) {
     }
     
     // 1. Search for candidates in EXISTING graph
-    // We use a simplified range search with infinite bounds to get candidates.
-    // rangeSearch() already computes distances internally; we reuse them via
-    // returned_nns_with_dist_ to avoid recalculating dist_func_.
-    
-    // Temporarily set ef large enough for quality
-    size_t old_ef = search_ef;
-    search_ef = ef_max; 
-    
+    // Use an insertion-only inner search that returns a large candidate pool
+    // (ReturnAll(top-candidates-ever) semantics), without being clamped by query_topK.
     const float* query_vec = data_wrapper->nodes[label];
     
     // Range search over the full label space; expansion naturally skips uninserted labels.
-    rangeSearch(query_vec, {0, static_cast<int>(data_size - 1)});
-    
-    search_ef = old_ef; // Restore
-    
-    // 2. Prepare candidates
+    auto t_rs_begin = Clock::now();
     std::vector<std::pair<unsigned, DistType>> candidates;
-    candidates.reserve(returned_nns_with_dist_.size());
-    for (const auto &[nbr, dist] : returned_nns_with_dist_) {
-        candidates.push_back({nbr, dist});
-    }
+    insertionInnerSearch(query_vec,
+                         {0, static_cast<int>(data_size - 1)},
+                         /*ef_limit=*/ef_max,
+                         candidates);
+    auto t_rs_end = Clock::now();
+    insertion_stats_.range_search_seconds += std::chrono::duration<double>(t_rs_end - t_rs_begin).count();
     
-    // Nearest first
-    std::sort(candidates.begin(), candidates.end(), [](const auto& a, const auto& b) {
-        return a.second < b.second;
-    });
-    
-    // 3. DFS Compression
+    // 2. DFS Compression
+    auto t_dfs_begin = Clock::now();
     applyDfsCompression(label, candidates);
+    auto t_dfs_end = Clock::now();
+    insertion_stats_.dfs_seconds += std::chrono::duration<double>(t_dfs_end - t_dfs_begin).count();
     
-    // 4. Support Pruning & Store Forward Edges
+    // 3. Support Pruning & Store Forward Edges
     // Reuse the same support-weighted pruning as build().
     auto &scratch = dfs_scratch_;
     const size_t cand_count = scratch.ordered_candidates.size();
@@ -1123,7 +1377,7 @@ void DynamicSegmentGraph::insert(unsigned label) {
     selectEdgesBySupport(edges, label, protect_span, keep_total_limit);
     std::vector<TempEdge> &kept_edges = edges;
     
-    // 5. Append new row
+    // 4. Append new row
     size_t count = kept_edges.size();
     // Note: selectEdgesBySupport() already returns edges sorted by external_id.
     size_t capacity = static_cast<size_t>(std::ceil(count * 1.1));
@@ -1167,10 +1421,19 @@ void DynamicSegmentGraph::insert(unsigned label) {
     num_indexed_nodes_ = static_cast<unsigned>(row_id + 1);
     edges_amount += count;
     
-    // 6. Add reverse edges
+    // 5. Add reverse edges
+    auto t_rev_begin = Clock::now();
     for (const auto& edge : kept_edges) {
         addReverseEdge(edge.external_id, label, edge.left_lower, edge.left_upper, edge.right_lower, edge.right_upper);
     }
+    auto t_rev_end = Clock::now();
+    // Note: addReverseEdge() separately accounts for recompress() time. Here we only track
+    // the wall time of reverse-edge insertion (inclusive), which is useful for cross-checking.
+    // The split breakdown (add_reverse_seconds vs recompress_seconds) is maintained inside addReverseEdge().
+    (void)t_rev_begin;
+    (void)t_rev_end;
+
+    insertion_stats_.inserted += 1;
 }
 
 /**
@@ -1181,6 +1444,9 @@ void DynamicSegmentGraph::insert(unsigned label) {
  * When slack is full we call `recompress(src)` to rebuild a compact sorted forward region.
  */
 void DynamicSegmentGraph::addReverseEdge(unsigned src, unsigned dst, unsigned ll, unsigned lu, unsigned rl, unsigned ru) {
+    auto t_total_begin = Clock::now();
+    double recompress_spent = 0.0;
+
     // Map external label -> internal row-id.
     if (src >= label_to_row_.size()) {
         return;
@@ -1200,7 +1466,13 @@ void DynamicSegmentGraph::addReverseEdge(unsigned src, unsigned dst, unsigned ll
     size_t rev = static_cast<size_t>(deg.rev);
 
     if (fwd + rev >= capacity) {
+        auto t_rc_begin = Clock::now();
         recompress(src);
+        auto t_rc_end = Clock::now();
+        const double rc_seconds = std::chrono::duration<double>(t_rc_end - t_rc_begin).count();
+        recompress_spent += rc_seconds;
+        insertion_stats_.recompress_seconds += rc_seconds;
+        insertion_stats_.recompress_calls += 1;
         fwd = static_cast<size_t>(deg.fwd);
         rev = static_cast<size_t>(deg.rev);
         if (fwd + rev >= capacity) {
@@ -1217,6 +1489,12 @@ void DynamicSegmentGraph::addReverseEdge(unsigned src, unsigned dst, unsigned ll
     right_lower_[insert_idx] = rl;
     right_upper_[insert_idx] = ru;
     deg.rev = static_cast<uint16_t>(rev + 1);
+
+    auto t_total_end = Clock::now();
+    const double total_seconds = std::chrono::duration<double>(t_total_end - t_total_begin).count();
+    // Split reverse-edge bookkeeping time from recompression time.
+    const double non_recompress = total_seconds - recompress_spent;
+    insertion_stats_.add_reverse_seconds += non_recompress;
 }
 
 /**

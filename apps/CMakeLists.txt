@@ -15,6 +15,9 @@ add_dsg_app(generate_groundtruth_static static/generate_groundtruth_static.cc)
 add_dsg_app(build_static_index static/build_static_index.cc)
 add_dsg_app(query_static_index static/query_static_index.cc)
 
+add_dsg_app(build_dynamic_index dynamic/build_dynamic_index.cc)
+add_dsg_app(insert_and_query_dynamic_index dynamic/insert_and_query_dynamic_index.cc)
+
 if(DSG_BUILD_INDEX_DEBUG)
     add_dsg_app(build_static_index_debug static/build_static_index.cc)
     target_compile_definitions(build_static_index_debug PRIVATE DSG_DEBUG_BUILD)

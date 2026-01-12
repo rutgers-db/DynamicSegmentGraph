@@ -4,7 +4,7 @@ This repository hosts a rebuilt implementation of **Dynamic Segment Graph (DSG)*
 
 ## Status & Roadmap
 - Static build + load: done (DFS compression, CSR storage).
-- Insertion of new points: in progress.
+- Insertion of new points: supported (requires load-time slack; see Dynamic workload).
 - Densification for small query ranges: planned / in progress.
 - Reducing the building time: done.
 
@@ -25,16 +25,41 @@ make -j
   - Logs: `logs/static/<dataset>/...`
   - Groundtruth: `groundtruth/static/`
 
-### Dynamic workload (planned)
-- Placeholder directories exist for future work:
-  - `apps/dynamic/`
-  - `scripts/dynamic/`
+### Dynamic workload (build + insert + query)
+- **CLIs**: `apps/dynamic/` (`build_dynamic_index.cc`, `insert_and_query_dynamic_index.cc`)
+- **Scripts**: `scripts/dynamic/` (`run_build_dynamic_index.sh`, `run_insert_and_query_dynamic_index.sh`)
+- **Pipeline**:
+  - **Step 1 (partial build)**: build an initial DSG on a random subset of labels and save the remaining labels to a file.
+  - **Step 2 (dynamic mode)**: load the partial index **with slack enabled**, insert the remaining labels, then run the same range-filter evaluation as the static workload.
+- **Quick run**:
+
+```bash
+# Step 1: build a partial index + remaining-label file
+bash scripts/dynamic/run_build_dynamic_index.sh
+
+# Step 2: load with slack, insert remaining labels, then query
+bash scripts/dynamic/run_insert_and_query_dynamic_index.sh [SEARCH_EF]
+```
+- **Artifacts**:
+  - Partial index: `index/dynamic/<dataset>/*.index`
+  - Remaining labels: `index/dynamic/<dataset>/*.remaining_labels.bin`
+  - Logs: `logs/dynamic/<dataset>/{build,insert_query}/...`
+
+#### Dynamic insertion knobs (important)
+- **Load-time slack (`setLoadSlackFraction(frac)`)**:
+  - Purpose: expands each CSR row capacity by `ceil(deg.fwd * frac)` to make room for **reverse edges** during insertion.
+  - Trade-off: larger `frac` = more memory, fewer `recompress()` calls; smaller `frac` = less memory, more recompression.
+  - In the current dynamic CLI we use a fixed value: see `kLoadSlackFraction` in `apps/dynamic/insert_and_query_dynamic_index.cc`.
+- **Pre-allocation (`reserveGraphStorage(rows, edges)`)**:
+  - Purpose: avoid repeated global-buffer reallocations when inserting many nodes.
+  - Usage: call it **after constructing the index and before bulk insertions** (e.g., right after `load()` in a custom driver).
+  - What to set: `rows` ≈ final number of nodes; `edges` ≈ expected total edge capacity (forward + slack + future inserts).
 
 ## Code Structure (core)
 - `include/`: public headers. Core interface lives in `dsg.h`; supporting types (HNSW wrappers, utilities) reside under `include/base_hnsw/` and `include/utils/`.
 - `src/`: implementations. The main logic is in `src/dsg.cc`, with shared helpers under `src/utils/`.
 - `apps/`: CLI entry points for workloads.
-- `scripts/`: helper scripts for common workflows (static now; dynamic planned).
+- `scripts/`: helper scripts for common workflows (static + dynamic).
 
 ## Datasets
 | Dataset | Data type | Dimensions | Search Key |

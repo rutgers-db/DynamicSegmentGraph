@@ -189,6 +189,11 @@ void DataWrapper::LoadGroundtruth(const string &gt_root) {
     const fs::path dataset_candidate = base / this->dataset;
     if (fs::exists(dataset_candidate) && fs::is_directory(dataset_candidate)) {
         dataset_dir = dataset_candidate;
+    } else if (this->dataset == "yt8m-video") {
+        const fs::path yt8m_candidate = base / "yt8m";
+        if (fs::exists(yt8m_candidate) && fs::is_directory(yt8m_candidate)) {
+            dataset_dir = yt8m_candidate;
+        }
     }
     if (!fs::exists(dataset_dir) || !fs::is_directory(dataset_dir)) {
         throw std::runtime_error("Groundtruth directory not found: " +

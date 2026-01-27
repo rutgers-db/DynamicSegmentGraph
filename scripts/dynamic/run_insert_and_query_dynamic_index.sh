@@ -17,13 +17,13 @@ EOF
   exit 1
 }
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT_DIR="/common/users/zp128/DynamicSegmentGraph"
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
 BIN="${BUILD_DIR}/apps/insert_and_query_dynamic_index"
 
 configure_and_build() {
-  cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}"
-  cmake --build "${BUILD_DIR}" --target insert_and_query_dynamic_index
+  "${CMAKE_BIN:-cmake}" -S "${ROOT_DIR}" -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
+  "${CMAKE_BIN:-cmake}" --build "${BUILD_DIR}" --target insert_and_query_dynamic_index
 }
 
 if [[ ! -x "${BIN}" ]]; then
@@ -40,7 +40,7 @@ fi
 
 DATASET="deep"
 # DATASET="wikipedia"
-DATA_SIZE="100000"
+DATA_SIZE="1000000"
 BUILD_RATIO="${BUILD_RATIO:-0.5}"
 
 # Dataset-specific paths

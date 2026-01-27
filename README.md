@@ -17,13 +17,67 @@ make -j
 
 ## Workloads
 
-### Static workload (current)
+### Static workload
 - **CLIs**: `apps/static/` (`build_static_index.cc`, `query_static_index.cc`, `generate_groundtruth_static.cc`)
 - **Scripts**: `scripts/static/` (`run_build_static_index.sh`, `run_query_static_index.sh`, `run_generate_groundtruth_static.sh`, `test_sensitivity_static.sh`)
 - **Artifacts**:
   - Index: `index/static/<dataset>/...`
   - Logs: `logs/static/<dataset>/...`
   - Groundtruth: `groundtruth/static/`
+
+#### Parameters and Usage
+
+1. **Build Index**:
+   ```bash
+   ./build/apps/build_static_index \
+     -dataset <dataset> \
+     -N <num_points> \
+     -dataset_path <path> \
+     -query_path <path> \
+     -index_path <path> \
+     -k <out_degree> \
+     -ef_construction <efc> \
+     -ef_max <efm> \
+     -alpha <alpha>
+   ```
+   - `-k`: Out-degree of the graph (higher value means more edges and better recall, but more memory).
+   - `-ef_construction`: Controls build quality vs speed (higher means better index, slower build).
+   - `-ef_max`: Max `ef` used during graph build.
+   - `-alpha`: Distance pruning parameter (typically 1.0 - 1.3).
+
+2. **Query Index**:
+   ```bash
+   ./build/apps/query_static_index \
+     -dataset <dataset> \
+     -N <num_points> \
+     -dataset_path <path> \
+     -query_path <path> \
+     -index_path <path> \
+     -groundtruth_root <gt_dir> \
+     -query_num <num> \
+     -query_k <k>
+   ```
+
+3. **Generate Groundtruth**:
+   ```bash
+   ./build/apps/generate_groundtruth_static \
+     -dataset <dataset> \
+     -N <num_points> \
+     -dataset_path <path> \
+     -query_path <path> \
+     -groundtruth_root <gt_dir>
+   ```
+
+#### Using Scripts
+For convenience, use the single-run wrappers in `scripts/static/`:
+```bash
+# 1. Build a single index
+bash scripts/static/run_build_static_index.sh
+
+# 2. Query the built index
+bash scripts/static/run_query_static_index.sh [SEARCH_EF]
+```
+These scripts are easier to use for single configurations. For exhaustive parameter tuning (grid search), you can also use `bash scripts/static/test_sensitivity_static.sh`.
 
 ### Dynamic workload (build + insert + query)
 - **CLIs**: `apps/dynamic/` (`build_dynamic_index.cc`, `insert_and_query_dynamic_index.cc`)
@@ -68,20 +122,36 @@ bash scripts/dynamic/run_insert_and_query_dynamic_index.sh [SEARCH_EF]
 | [Youtube-Video](https://research.google.com/youtube8m/download.html) | float | 1024 | Video Release Time |
 | [WIT-Image](https://www.kaggle.com/c/wikipedia-image-caption/overview) | float | 2048 | Image Size |
 
-<!-- ## Recommended Hyperparameters (N = 1,000,000)
-The following settings are the current recommended defaults for a 1M dataset build for chasing best recall/QPS trade off.
+## Recommended Hyperparameters
+The following settings are the current recommended defaults for a 1M dataset build for chasing best recall/QPS.
 
 | Dataset (flag) | N | k(M) | ef_construction | ef_max | alpha |
 | :- | -: | -: | -: | -: | -: |
-| `deep` | 1,000,000 | 24 | 130 | 400 | 1.1 |
-| `wikipedia` | 1,000,000 | 32 | 151 | 500 | 1.0 |
-| `yt8m-video` | 1,000,000 | 32 | 151 | 500 | 1.3 | -->
+| `deep` | 1,000,000 | 16 | 150 | 300 | 1.0 |
+| `wikipedia` | 1,000,000 | 32 | 160 | 600 | 1.1 |
+| `yt8m-video` | 1,000,000 | 32 | 160 | 600 | 1.3 |
+
 
 ## Notes
 - Targets C++17; uses STL and SIMD where helpful.
 - Datasets are not bundled—point the CLI to your own data files.
-- Expect rapid changes while insertion and densification land.
 
-## TradeOff between Index and Query
-The index time/size and query performance trade off.
-half the size and time of index can just degrade a little bit(10~20%) of query performance. How to trade off it is still a open question.
+If you are interested in seeing our qps/recall result, please check the `figs/` directory and open recall_qps_*.png figures.
+
+
+## Tradeoff Between Index Time/Size and Query Performance
+
+There is a classic tradeoff between index construction time/size and query performance. Reducing index time and memory footprint (for example, by using smaller parameters) can often yield nearly the same search quality—sometimes query recall/QPS only drops by 10–20%. Finding the best trade-off between index and query is still an open question.
+
+**Example:**  
+For the `wikipedia` dataset with 1,000,000 points and `k(M)=32`:
+
+- **Recommended settings:**  
+  - `ef_construction=160`, `alpha=1.1`  
+  - (Yields high query recall but requires more build time and memory)
+
+- **Faster/smaller index variant:**  
+  - `ef_construction=150`, `alpha=1.0`  
+  - (Indexing is ~50% faster and uses less memory, while query recall may drop only ~10–15% in the same qps)
+
+Tuning these values lets you choose the balance that fits your workload best.

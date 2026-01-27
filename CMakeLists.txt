@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 project(DynamicSegmentGraph LANGUAGES CXX)
 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(STATUS "Setting build type to 'Release' as none was specified.")
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -76,6 +82,17 @@ add_subdirectory(apps)
 
 option(BUILD_RANGE_BENCHMARKS "Build range benchmark executables under tests/" OFF)
 option(ENABLE_AVX512 "Enable AVX-512 instructions for the SIMD benchmark" OFF)
+
+add_executable(refine_dsg_index
+    tests/refine_dsg_index.cpp
+)
+target_include_directories(refine_dsg_index PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/include/utils
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(refine_dsg_index PRIVATE dsg_core UTIL OpenMP::OpenMP_CXX)
+dsg_apply_common_compile_options(refine_dsg_index)
 
 if(BUILD_RANGE_BENCHMARKS)
     add_executable(test_range_benchmark

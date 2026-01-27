@@ -9,7 +9,7 @@ by this repository's benchmarking binaries (e.g., `apps/query_index.cc`).
 Background
 ----------
 `scripts/run_query_index.sh` runs the `query_index` binary and tees its stdout to
-`logs/<dataset>/search/*.log`. For each `search_ef` setting, the binary prints
+`logs/static/<dataset>/search/*.log`. For each `search_ef` setting, the binary prints
 one summary line per range bucket (there are 7 buckets by default):
 
   [search_ef 64] [Range ratio 1.0000%] Recall=0.8123 Latency=0.4321 ms QPS=2313.1234 ...

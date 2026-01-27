@@ -66,25 +66,30 @@ BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
 BUILD_BIN="${BUILD_DIR}/apps/build_static_index"
 QUERY_BIN="${BUILD_DIR}/apps/query_static_index"
 
-DEFAULT_DATASET="wikipedia"
+# DEFAULT_DATASET="wikipedia"
 # DEFAULT_DATASET="deep"
+DEFAULT_DATASET="yt8m-video"
 DATASET="${DATASET:-${DEFAULT_DATASET}}"
 
 declare -A DEFAULT_DATASET_PATHS=(
   ["deep"]="${ROOT_DIR}/data/deep10M.bin"
   ["wikipedia"]="${ROOT_DIR}/data/wiki_image_embedding.bin"
+  ["yt8m-video"]="${ROOT_DIR}/data/yt8m_sorted_by_timestamp_video_embedding_1M.bin"
 )
 declare -A DEFAULT_QUERY_PATHS=(
   ["deep"]="${ROOT_DIR}/data/deep_query.bin"
   ["wikipedia"]="${ROOT_DIR}/data/wiki_image_query.bin"
+  ["yt8m-video"]="${ROOT_DIR}/data/yt8m_video_query_10k.bin"
 )
 
 DATASET_PATH="${DATASET_PATH:-${DEFAULT_DATASET_PATHS[${DATASET}]:-}}"
 QUERY_PATH="${QUERY_PATH:-${DEFAULT_QUERY_PATHS[${DATASET}]:-}}"
 GROUNDTRUTH_ROOT="${GROUNDTRUTH_ROOT:-${ROOT_DIR}/groundtruth/static}"
 
+
 DATA_SIZE="${DATA_SIZE:-100000}"
 QUERY_NUM="${QUERY_NUM:-1000}"
+
 QUERY_K="${QUERY_K:-10}"
 SEARCH_EF="${SEARCH_EF:-}"
 SEED="${SEED:-2025}"
@@ -93,17 +98,21 @@ SKIP_BUILD="${SKIP_BUILD:-0}"
 SKIP_QUERY="${SKIP_QUERY:-0}"
 FORCE="${FORCE:-0}"
 
-M_LIST="${M_LIST:-"24 32 48"}"
-EFC_LIST="${EFC_LIST:-"130 160 190"}"
-EFM_LIST="${EFM_LIST:-"300 500 600"}"
-ALPHA_LIST="${ALPHA_LIST:-"1.0 1.1 1.2"}"
+M_LIST="${M_LIST:-"28 32 36 40"}"
+EFC_LIST="${EFC_LIST:-"160"}"
+EFM_LIST="${EFM_LIST:-"400 500 600"}"
+ALPHA_LIST="${ALPHA_LIST:-"1.1 1.2 1.3"}"
 
 LOG_ROOT="${LOG_ROOT:-${ROOT_DIR}/logs/static/${DATASET}/sensitivity}"
 INDEX_DIR="${ROOT_DIR}/index/static/${DATASET}"
 
 configure_and_build() {
-  cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}"
-  cmake --build "${BUILD_DIR}" --target build_static_index query_static_index
+  local cmake_bin="cmake"
+  if [[ -x "/usr/bin/cmake" ]]; then
+    cmake_bin="/usr/bin/cmake"
+  fi
+  "${cmake_bin}" -S "${ROOT_DIR}" -B "${BUILD_DIR}"
+  "${cmake_bin}" --build "${BUILD_DIR}" --target build_static_index query_static_index
 }
 
 die() {
@@ -130,6 +139,9 @@ require_file "${QUERY_PATH}"
 require_dir "${GROUNDTRUTH_ROOT}"
 
 GT_DATASET_DIR="${GROUNDTRUTH_ROOT}/${DATASET}"
+if [[ "${DATASET}" == "yt8m-video" && ! -d "${GT_DATASET_DIR}" ]]; then
+  GT_DATASET_DIR="${GROUNDTRUTH_ROOT}/yt8m"
+fi
 require_dir "${GT_DATASET_DIR}"
 GT_SENTINEL="${GT_DATASET_DIR}/range_01pct_top${QUERY_K}_q${QUERY_NUM}_N${DATA_SIZE}_neighbors.bin"
 require_file "${GT_SENTINEL}"

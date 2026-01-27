@@ -9,9 +9,10 @@ set -euo pipefail
 ROOT_DIR="/common/users/zp128/DynamicSegmentGraph"
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
 BIN="${BUILD_DIR}/apps/build_static_index"
+FORWARD_ONLY="${FORWARD_ONLY:-0}"
 
 configure_and_build() {
-  cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}"
+  cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
   cmake --build "${BUILD_DIR}" --target build_static_index
 }
 
@@ -20,9 +21,10 @@ if [[ ! -x "${BIN}" ]]; then
   configure_and_build
 fi
 
-DATASET="deep"
+DATASET="yt8m-video"
+# DATASET="deep"
 # DATASET="wikipedia"
-DATA_SIZE="100000"
+DATA_SIZE="1000000"
 
 # Dataset-specific paths
 declare -A DEFAULT_DATASET_PATHS=(
@@ -52,15 +54,19 @@ case "${DATASET}" in
     EF_MAX="300"
     ALPHA="1"
     ;;
-  "wikipedia"|"yt8m-video")
+  "wikipedia")
     INDEX_K="32"
     EF_CONSTRUCTION="160"
     EF_MAX="600"
-    if [[ "${DATASET}" == "yt8m-video" ]]; then
-      ALPHA="1.3"
-    else
-      ALPHA="1.1"
-    fi
+    ALPHA="1.1"
+    ;;
+  "yt8m-video")
+    INDEX_K="32"
+    EF_CONSTRUCTION="150"
+    EF_MAX="300"
+    ALPHA="1.2"
+    # yt8m-video: build forward-only (skip reverse merge + support prune)
+    # FORWARD_ONLY="1"
     ;;
   *)
     echo "[DSG] Unknown dataset: ${DATASET}" >&2
@@ -78,10 +84,17 @@ mkdir -p "${LOG_DIR}"
 
 # Build log filename with parameters
 LOG_FILENAME="${DATASET}_N${DATA_SIZE}_k${INDEX_K}_efc${EF_CONSTRUCTION}_efm${EF_MAX}_alpha${ALPHA}_${TIMESTAMP}.log"
+if [[ "${FORWARD_ONLY}" == "1" ]]; then
+  LOG_FILENAME="${DATASET}_N${DATA_SIZE}_k${INDEX_K}_efc${EF_CONSTRUCTION}_efm${EF_MAX}_alpha${ALPHA}_fwdonly_${TIMESTAMP}.log"
+fi
 LOG_PATH="${LOG_DIR}/${LOG_FILENAME}"
 
 echo "[DSG] Running build_static_index..."
 echo "[DSG] Logging output to ${LOG_PATH}"
+EXTRA_ARGS=()
+if [[ "${FORWARD_ONLY}" == "1" ]]; then
+  EXTRA_ARGS+=("-forward_only")
+fi
 /usr/bin/time -v "${BIN}" \
   -dataset "${DATASET}" \
   -N "${DATA_SIZE}" \
@@ -91,5 +104,6 @@ echo "[DSG] Logging output to ${LOG_PATH}"
   -k "${INDEX_K}" \
   -ef_construction "${EF_CONSTRUCTION}" \
   -ef_max "${EF_MAX}" \
-  -alpha "${ALPHA}" | tee "${LOG_PATH}"
+  -alpha "${ALPHA}" \
+  "${EXTRA_ARGS[@]}" | tee "${LOG_PATH}"
 

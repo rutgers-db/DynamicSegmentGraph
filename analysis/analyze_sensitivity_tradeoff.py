@@ -31,7 +31,7 @@ Finally, we summarize robustness by counting:
 Inputs
 ------
 - A directory of `.log` files produced by `apps/query_index` (recommended:
-  `logs/deep/sensitivity/search/`).
+  `logs/static/deep/sensitivity/search/`).
 - Filenames are expected to include tokens like:
     deep_N100000_k16_efc151_efm300_alpha1.0[...].log
   where `k` corresponds to HNSW out-degree M.
@@ -58,11 +58,11 @@ import re
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 
-DEFAULT_DATASET: str = "deep"
+DEFAULT_DATASET: str = "yt8m-video"
 DEFAULT_DATA_SIZE: int = 100_000
 DEFAULT_TOP_K: int = 3
-DEFAULT_THRESHOLD_1PCT: float = 0.98
-DEFAULT_THRESHOLD_OTHERS: float = 0.99
+DEFAULT_THRESHOLD_1PCT: float = 0.99
+DEFAULT_THRESHOLD_OTHERS: float = 0.98
 
 
 @dataclass(frozen=True)
@@ -128,7 +128,7 @@ def _build_argparser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Directory to scan for query_index logs. "
-            "Default: <repo_root>/logs/<dataset>/sensitivity/search"
+            "Default: <repo_root>/logs/static/<dataset>/sensitivity/search"
         ),
     )
     p.add_argument(
@@ -277,7 +277,7 @@ def main() -> int:
     if args.log_root is not None:
         log_root = args.log_root
     else:
-        log_root = repo_root / "logs" / dataset / "sensitivity" / "search"
+        log_root = repo_root / "logs" / "static" / dataset / "sensitivity" / "search"
 
     out_csv: Path = (
         args.out_csv

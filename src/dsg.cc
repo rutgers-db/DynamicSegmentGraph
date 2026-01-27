@@ -1958,4 +1958,171 @@ void DynamicSegmentGraph::applyDfsCompression(
     dfs(dfs, global_left, global_right, center_label, center_label);
 }
 
+// Abandoned function
+// We test it to remove top degree nodes, but it is not used in larger ranges only useful for 1% range.
+// Dataset Youtube8M-Video is super strange, some nodes have big degree even up to 1e4 because it is many node's neighbors. (hubness?)
+// std::size_t DynamicSegmentGraph::refineTopDegreeNodes(double top_fraction,
+//     std::size_t dfs_budget) {
+// if (data_wrapper == nullptr) {
+// throw std::runtime_error("DynamicSegmentGraph::refineTopDegreeNodes missing DataWrapper.");
+// }
+// if (dist_func_ == nullptr) {
+// throw std::runtime_error("DynamicSegmentGraph::refineTopDegreeNodes missing distance function.");
+// }
+// if (top_fraction <= 0.0 || top_fraction > 1.0) {
+// throw std::invalid_argument("refineTopDegreeNodes top_fraction must be in (0, 1].");
+// }
+// if (dfs_budget == 0) {
+// throw std::invalid_argument("refineTopDegreeNodes dfs_budget must be > 0.");
+// }
+
+// const std::size_t num_rows = node_degrees_.size();
+// if (num_rows == 0) {
+// return 0;
+// }
+// if (row_to_label_.size() != num_rows || row_offset_.size() != num_rows + 1) {
+// throw std::runtime_error("refineTopDegreeNodes: CSR metadata not initialized.");
+// }
+
+// // Degree threshold for top fraction.
+// std::vector<std::uint32_t> degrees(num_rows);
+// for (std::size_t row = 0; row < num_rows; ++row) {
+// const auto &deg = node_degrees_[row];
+// degrees[row] = static_cast<std::uint32_t>(static_cast<std::uint32_t>(deg.fwd) +
+// static_cast<std::uint32_t>(deg.rev));
+// }
+// std::vector<std::uint32_t> degrees_copy = degrees;
+// const std::size_t kth =
+// static_cast<std::size_t>(std::max<double>(0.0, std::floor((1.0 - top_fraction) * num_rows)));
+// const std::size_t kth_clamped = std::min(kth, num_rows - 1);
+// std::nth_element(degrees_copy.begin(), degrees_copy.begin() + kth_clamped, degrees_copy.end());
+// const std::uint32_t threshold = degrees_copy[kth_clamped];
+
+// const unsigned original_M = M;
+// const float *const nodes_base = data_wrapper->nodes.data();
+// const std::size_t nodes_dim = data_wrapper->nodes.dim();
+
+// std::vector<std::pair<unsigned, DistType>> candidates;
+// std::vector<TempEdge> new_edges;
+
+// std::size_t refined = 0;
+// std::uint64_t total_before = 0;
+// std::uint64_t total_after = 0;
+// std::uint32_t max_before = 0;
+// std::uint32_t max_after = 0;
+
+// for (std::size_t row = 0; row < num_rows; ++row) {
+// const std::uint32_t deg_total = degrees[row];
+// if (deg_total < threshold || deg_total <= dfs_budget) {
+// continue;
+// }
+
+// const unsigned center_label = row_to_label_[row];
+// const std::size_t start = row_offset_[row];
+// const std::size_t capacity = row_offset_[row + 1] - start;
+// const auto &deg = node_degrees_[row];
+// const std::size_t total = static_cast<std::size_t>(deg.fwd) + static_cast<std::size_t>(deg.rev);
+// if (capacity == 0 || total == 0) {
+// continue;
+// }
+
+// const float *const center_vec =
+// nodes_base + static_cast<std::size_t>(center_label) * nodes_dim;
+
+// candidates.clear();
+// candidates.reserve(total);
+// for (std::size_t i = 0; i < total; ++i) {
+// const unsigned nbr = neighbors_[start + i];
+// if (nbr >= static_cast<unsigned>(data_wrapper->data_size)) {
+// continue;
+// }
+// const float *const nbr_vec =
+// nodes_base + static_cast<std::size_t>(nbr) * nodes_dim;
+// const DistType d = dist_func_(center_vec, nbr_vec, dist_func_param_);
+// candidates.emplace_back(nbr, d);
+// }
+// if (candidates.empty()) {
+// continue;
+// }
+
+// std::sort(candidates.begin(), candidates.end(),
+// [](const auto &a, const auto &b) { return a.second < b.second; });
+
+// // Run DFS with a custom neighbor budget by temporarily overriding M.
+// M = dfs_budget;
+// applyDfsCompression(center_label, candidates);
+// M = original_M;
+
+// new_edges.clear();
+// new_edges.reserve(dfs_scratch_.ordered_candidates.size());
+// for (std::size_t i = 0; i < dfs_scratch_.ordered_candidates.size(); ++i) {
+// if (!dfs_scratch_.is_neighbor[i]) {
+// continue;
+// }
+// new_edges.push_back(TempEdge{
+// dfs_scratch_.ordered_candidates[i].first,
+// dfs_scratch_.left_lower[i],
+// dfs_scratch_.left_upper[i],
+// dfs_scratch_.right_lower[i],
+// dfs_scratch_.right_upper[i],
+// });
+// }
+// if (new_edges.empty()) {
+// continue;
+// }
+// std::sort(new_edges.begin(), new_edges.end(),
+// [](const TempEdge &a, const TempEdge &b) { return a.external_id < b.external_id; });
+
+// const std::size_t new_count = std::min<std::size_t>(new_edges.size(), capacity);
+// for (std::size_t i = 0; i < new_count; ++i) {
+// const unsigned nbr = new_edges[i].external_id;
+// neighbors_[start + i] = nbr;
+
+// // Make refined edges more broadly usable across query ranges to preserve
+// // exploration ability after aggressive degree reduction.
+// //
+// // Envelope policy for refined edges:
+// // - LL = 0 (minimum possible left bound)
+// // - LU = nbr (edge can be used as long as L <= nbr)
+// // - RL = nbr (edge can be used as long as R >= nbr)
+// // - RU = UINT_MAX (no upper restriction on R)
+// //
+// // Together with the rangeSearch() scan that only considers neighbors in [L, R],
+// // this effectively makes the edge eligible for any range that contains `nbr`.
+// left_lower_[start + i] = 0u;
+// left_upper_[start + i] = nbr;
+// right_lower_[start + i] = nbr;
+// right_upper_[start + i] = std::numeric_limits<unsigned>::max();
+// }
+
+// node_degrees_[row].fwd = new_count;
+// node_degrees_[row].rev = 0;
+
+// refined += 1;
+// total_before += deg_total;
+// total_after += static_cast<std::uint32_t>(node_degrees_[row].fwd);
+// max_before = std::max(max_before, deg_total);
+// max_after = std::max<std::uint32_t>(max_after, static_cast<std::uint32_t>(node_degrees_[row].fwd));
+// }
+
+// // Best-effort restore.
+// M = original_M;
+
+// const std::size_t target = static_cast<std::size_t>(std::ceil(top_fraction * static_cast<double>(num_rows)));
+// std::cout << "[DSG] refineTopDegreeNodes: top_fraction=" << top_fraction
+// << " (target~" << target << " nodes), threshold_degree>=" << threshold
+// << ", dfs_budget=" << dfs_budget
+// << ", refined=" << refined << std::endl;
+// if (refined > 0) {
+// std::cout << "[DSG] refineTopDegreeNodes: avg_degree_before="
+// << (static_cast<double>(total_before) / static_cast<double>(refined))
+// << " avg_degree_after="
+// << (static_cast<double>(total_after) / static_cast<double>(refined))
+// << " max_before=" << max_before
+// << " max_after=" << max_after
+// << std::endl;
+// }
+// return refined;
+// }
+
 } // namespace dsg

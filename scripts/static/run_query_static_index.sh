@@ -20,7 +20,7 @@ BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
 BIN="${BUILD_DIR}/apps/query_static_index"
 
 configure_and_build() {
-  cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}"
+  cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
   cmake --build "${BUILD_DIR}" --target query_static_index
 }
 
@@ -36,9 +36,10 @@ elif [[ $# -eq 1 ]]; then
   SEARCH_EF="$1"
 fi
 
-DATASET="deep"
+DATASET="yt8m-video"
+# DATASET="deep"
 # DATASET="wikipedia"
-DATA_SIZE="100000"
+DATA_SIZE="1000000"
 
 # Dataset-specific paths
 declare -A DEFAULT_DATASET_PATHS=(
@@ -68,15 +69,20 @@ case "${DATASET}" in
     EF_MAX="300"
     ALPHA="1"
     ;;
-  "wikipedia"|"yt8m-video")
+  "wikipedia")
     INDEX_K="32"
     EF_CONSTRUCTION="160"
     EF_MAX="600"
-    if [[ "${DATASET}" == "yt8m-video" ]]; then
-      ALPHA="1.3"
-    else
-      ALPHA="1.1"
-    fi
+    ALPHA="1.1"
+    ;;
+  "yt8m-video")
+    INDEX_K="32"
+    # EF_CONSTRUCTION="150"
+    EF_MAX="300"
+    # FORWARD_ONLY="1"
+    EF_CONSTRUCTION="160"
+    EF_MAX="600"
+    ALPHA="1.3"
     ;;
   *)
     echo "[DSG] Unknown dataset: ${DATASET}" >&2

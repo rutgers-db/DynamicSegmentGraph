@@ -6,7 +6,7 @@ Plot Recall–QPS Curves (7 Range Buckets) from Benchmark Logs.
 This script scans the repository logs for `query_index` results and draws a
 single figure with 7 subplots. By default, it plots **all** log files under:
 
-  `logs/deep/search/*.log`
+  `logs/static/deep/search/*.log`
 
 filtered to the default dataset size `N=1000000` (i.e., filenames containing
 `_N1000000_`). Each subplot contains **multiple curves** (one curve per log
@@ -26,18 +26,18 @@ From the repo root:
 
   python3 analysis/plot_recall_qps.py
 
-This will plot all logs under `logs/deep/search/*.log`.
+This will plot all logs under `logs/static/deep/search/*.log`.
 
 Plot a specific log file (recommended for a single run):
 
   python3 analysis/plot_recall_qps.py \
-    --log_file logs/deep/search/deep_N1000000_k16_efc150_efm300_alpha1.0_20251228_230148.log \
+    --log_file logs/static/deep/search/deep_N1000000_k16_efc150_efm300_alpha1.0_20251228_230148.log \
     --out analysis/recall_qps.png
 
 Or plot all logs for another dataset by pointing to its search folder:
 
   python3 analysis/plot_recall_qps.py \
-    --log_root logs/wikipedia/search \
+    --log_root logs/static/wikipedia/search \
     --out /path/to/out.png
 
 To plot a different dataset size (still within the same dataset folder), pass
@@ -61,6 +61,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 RECALL_X_MIN: float = 0.95
 RECALL_X_MAX: float = 1.0
+DEFAULT_TYPE: str = "static"
 DEFAULT_DATASET: str = "deep"
 DEFAULT_TASK_SUBDIR: str = "search"
 DEFAULT_DATA_SIZE: int = 1_000_000
@@ -86,7 +87,7 @@ def _build_argparser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Directory to scan for logs when --log_file is not used "
-            "(default: <repo_root>/logs/deep/search)."
+            "(default: <repo_root>/logs/static/deep/search)."
         ),
     )
     p.add_argument(
@@ -236,7 +237,7 @@ def main() -> int:
     if args.log_root is not None:
         log_root = args.log_root
     else:
-        log_root = repo_root / "logs" / DEFAULT_DATASET / DEFAULT_TASK_SUBDIR
+        log_root = repo_root / "logs" / DEFAULT_TYPE / DEFAULT_DATASET / DEFAULT_TASK_SUBDIR
     out_path: Path = args.out if args.out is not None else (repo_root / "analysis" / "recall_qps.png")
     patterns: List[str] = args.pattern if args.pattern is not None else ["**/*.log"]
 

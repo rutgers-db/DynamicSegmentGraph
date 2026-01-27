@@ -10,9 +10,10 @@ set -euo pipefail
 ROOT_DIR="/common/users/zp128/DynamicSegmentGraph"
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build}"
 BIN="${BUILD_DIR}/apps/build_dynamic_index"
+FORWARD_ONLY="${FORWARD_ONLY:-0}"
 
 configure_and_build() {
-  cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}"
+  cmake -S "${ROOT_DIR}" -B "${BUILD_DIR}" -DCMAKE_BUILD_TYPE=Release
   cmake --build "${BUILD_DIR}" --target build_dynamic_index
 }
 
@@ -23,7 +24,7 @@ fi
 
 # DATASET="${DATASET:-deep}"
 DATASET="wikipedia"
-DATA_SIZE="${DATA_SIZE:-100000}"
+DATA_SIZE="${DATA_SIZE:-1000000}"
 BUILD_RATIO="${BUILD_RATIO:-0.5}"
 
 # Dataset-specific paths
@@ -81,10 +82,17 @@ TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_DIR="${ROOT_DIR}/logs/dynamic/${DATASET}/build"
 mkdir -p "${LOG_DIR}"
 LOG_FILENAME="${DATASET}_N${DATA_SIZE}_ratio${BUILD_RATIO}_k${INDEX_K}_efc${EF_CONSTRUCTION}_efm${EF_MAX}_alpha${ALPHA}_${TIMESTAMP}.log"
+if [[ "${FORWARD_ONLY}" == "1" ]]; then
+  LOG_FILENAME="${DATASET}_N${DATA_SIZE}_ratio${BUILD_RATIO}_k${INDEX_K}_efc${EF_CONSTRUCTION}_efm${EF_MAX}_alpha${ALPHA}_fwdonly_${TIMESTAMP}.log"
+fi
 LOG_PATH="${LOG_DIR}/${LOG_FILENAME}"
 
 echo "[DSG] Running build_dynamic_index..."
 echo "[DSG] Logging output to ${LOG_PATH}"
+EXTRA_ARGS=()
+if [[ "${FORWARD_ONLY}" == "1" ]]; then
+  EXTRA_ARGS+=("-forward_only")
+fi
 /usr/bin/time -v "${BIN}" \
   -dataset "${DATASET}" \
   -N "${DATA_SIZE}" \
@@ -96,7 +104,8 @@ echo "[DSG] Logging output to ${LOG_PATH}"
   -ef_max "${EF_MAX}" \
   -alpha "${ALPHA}" \
   -build_ratio "${BUILD_RATIO}" \
-  ${QUERY_PATH:+ -query_path "${QUERY_PATH}"} | tee "${LOG_PATH}"
+  ${QUERY_PATH:+ -query_path "${QUERY_PATH}"} \
+  "${EXTRA_ARGS[@]}" | tee "${LOG_PATH}"
 
 echo "[DSG] Index: ${INDEX_PATH}"
 echo "[DSG] Remaining labels: ${REMAINING_LABELS_PATH}"
